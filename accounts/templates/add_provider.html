@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Add Provider{% endblock %}
+
+{% block style_css %}
+<style>
+  .form-wrapper {
+    background: #fff;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .form-label {
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  .form-control {
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .btn-custom {
+    width: 180px;
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 576px) {
+    .form-heading {
+      font-size: 18px;
+    }
+
+    .btn-custom {
+      width: 100%;
+      font-size: 14px;
+    }
+
+    .form-control {
+      font-size: 14px;
+    }
+  }
+</style>
+{% endblock style_css %}
+
+{% block content %}
+<div class="container mt-4" style="min-height: 100vh;">
+  <div class="row justify-content-center">
+    <div class="col-md-10 mt-5">
+      <div class="form-wrapper">
+        <div class="form-heading">🔧 Add New Provider & Upload Table Structure</div>
+
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="row">
+
+
+
+            <div class="col-md-6 mb-3">
+  <label class="form-label">Select User</label>
+  <select name="selected_user" class="form-control" required>
+    <option value="" disabled selected>-- Select User --</option>
+    {% for user in users %}
+      <option value="{{ user.username }}">{{ user.username }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+
+
+
+
+
+           <div class="col-md-6 mb-3">
+  <label class="form-label">Provider Name</label>
+
+  <select class="form-control mb-2" id="providerDropdown">
+    <option value="">-- Select Existing Provider --</option>
+    {% for provider in providers %}
+      <option value="{{ provider.name }}">{{ provider.name|title }}</option>
+    {% endfor %}
+  </select>
+
+  <input type="text" name="provider_name" id="providerInput" class="form-control" placeholder="Or enter new provider name" required>
+  <small class="text-muted">Selecting a provider will auto-fill the input. You can also type manually.</small>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const dropdown = document.getElementById("providerDropdown");
+    const input = document.getElementById("providerInput");
+
+    dropdown.addEventListener("change", function () {
+      input.value = this.value;
+    });
+  });
+</script>
+
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Select Energy Type</label>
+              <select name="energy_type" class="form-control" required>
+                <option value="" disabled selected>-- Select --</option>
+                {% for energy in energy_types %}
+                  <option value="{{ energy.id }}">{{ energy.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Upload Table Structure (CSV or Excel)</label>
+<input type="file" name="structure_file" class="form-control" accept=".csv,.xls,.xlsx,.xlsm,.ods,.odt" required>
+              <small class="text-muted">Only header row needed. File won't be saved.</small>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button type="submit" class="btn btn-success btn-custom">➕ Create Provider</button>
+          </div>
+        </form>
+      </div>
+
+ 
+ 
+
+    </div>
+  </div>
+</div>
+
+  {% include 'fotter.html' %}
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const dropdown = document.getElementById("providerDropdown");
+    const input = document.getElementById("providerInput");
+
+    dropdown.addEventListener("change", function () {
+      input.value = this.value;
+    });
+
+    // On submit, make sure either dropdown or input is filled
+    document.querySelector("form").addEventListener("submit", function (e) {
+      if (!dropdown.value && !input.value.trim()) {
+        e.preventDefault();
+        alert("Please select or enter a provider name.");
+      }
+    });
+  });
+</script>
+
+{% endblock %}

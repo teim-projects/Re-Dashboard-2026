@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Add Energy Type{% endblock %}
+
+{% block style_css %}
+<style>
+  .form-wrapper {
+    background: #fff;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  .form-control {
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .btn-custom {
+    width: 160px;
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .list-group-item {
+    border-radius: 10px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    padding: 12px 20px;
+  }
+
+  .list-group-item form {
+    display: inline;
+  }
+
+  .modal-header.gradient-bg {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: white;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+  }
+</style>
+{% endblock style_css %}
+
+{% block content %}
+<div class="container mt-5" >
+  <div class="row justify-content-center mt-5">
+    <div class="col-md-8 mt-5">
+      <div class="form-wrapper">
+        <div class="form-heading">Add New Energy Type</div>
+
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+
+        <form method="POST" class="mb-4">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="name" class="form-label">Energy Type Name</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g., Wind, Solar" required>
+          </div>
+
+          <div class="action-buttons">
+            <button type="submit" class="btn btn-success btn-custom">➕ Add</button>
+            <button type="button" class="btn btn-primary btn-custom" data-bs-toggle="modal" data-bs-target="#energyTypeModal">
+              ⚡ Records
+            </button>
+          </div>
+        </form>
+
+<!-- Records Modal -->
+<div class="modal fade" id="energyTypeModal" tabindex="-1" aria-labelledby="energyTypeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+    
+      <div class="modal-header gradient-bg">
+        <h5 class="modal-title" id="energyTypeModalLabel">⚡ Existing Energy Types</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body">
+        {% if energy_types %}
+          <ul class="list-group">
+            {% for energy in energy_types %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ energy.name }}
+                <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
+                        data-bs-target="#confirmDeleteModal" data-energyid="{{ energy.id }}"
+                        data-energyname="{{ energy.name }}">
+                  🗑️ Delete
+                </button>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted">No energy types available.</p>
+        {% endif %}
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header gradient-bg">
+        <h5 class="modal-title" id="confirmDeleteModalLabel">Confirm Deletion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <form method="POST">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p>Are you sure you want to delete "<strong id="energyTypeName"></strong>"?</p>
+          <input type="hidden" name="delete_id" id="deleteEnergyId">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Yes, Delete</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap script to pass energy ID/name to modal -->
+<script>
+  const deleteModal = document.getElementById('confirmDeleteModal');
+  deleteModal.addEventListener('show.bs.modal', function (event) {
+    const button = event.relatedTarget;
+    const energyId = button.getAttribute('data-energyid');
+    const energyName = button.getAttribute('data-energyname');
+
+    document.getElementById('deleteEnergyId').value = energyId;
+    document.getElementById('energyTypeName').textContent = energyName;
+  });
+</script>
+<!-- Fixed Footer for Desktop & Tablet -->
+<div class="container-fluid py-3 mt-5 border-top text-center footer fixed-bottom d-none d-sm-block bg-white">
+  <div class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2 gap-md-4 flex-wrap">
+    
+    <span style="font-weight: 600; color: #000;">
+      © 2025. Powered by
+      <img src="{% static 'images/crono.png' %}" alt="Chronoanalytics Logo" style="height: 20px; vertical-align: middle;">
+      <a href="http://www.chronoanalytics.in/" target="_blank"
+         style="text-decoration: none;
+                background: linear-gradient(to right, #2575fc, #6a11cb);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-weight: 600;">
+        Chronoanalytics Solution
+      </a>
+    </span>
+
+    <span style="font-weight: 600; color: #000;">
+      | Marketed by
+      <img src="{% static 'images/TeimLogo.png' %}" alt="Teim Logo" style="height: 20px; vertical-align: middle;">
+      <a href="http://teim.in/" target="_blank"
+         style="text-decoration: none;
+                background: linear-gradient(to right, #2575fc, #6a11cb);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-weight: 600;">
+        TEIM
+      </a>
+    </span>
+
+  </div>
+</div>
+
+<!-- Scrolling Footer for Mobile -->
+<div class="container-fluid py-3 mt-5 border-top text-center footer d-block d-sm-none bg-white">
+  <div class="d-flex flex-column justify-content-center align-items-center gap-2 flex-wrap">
+    
+    <span style="font-weight: 600; color: #000;">
+      © 2025. Powered by
+      <img src="{% static 'images/crono.png' %}" alt="Chronoanalytics Logo" style="height: 18px; vertical-align: middle;">
+      <a href="http://www.chronoanalytics.in/" target="_blank"
+         style="text-decoration: none;
+                background: linear-gradient(to right, #2575fc, #6a11cb);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-weight: 600;">
+        Chronoanalytics
+      </a>
+    </span>
+
+    <span style="font-weight: 600; color: #000;">
+      Marketed by
+      <img src="{% static 'images/TeimLogo.png' %}" alt="Teim Logo" style="height: 18px; vertical-align: middle;">
+      <a href="http://teim.in/" target="_blank"
+         style="text-decoration: none;
+                background: linear-gradient(to right, #2575fc, #6a11cb);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-weight: 600;">
+        TEIM
+      </a>
+    </span>
+
+  </div>
+</div>
+
+{% endblock content %}
+

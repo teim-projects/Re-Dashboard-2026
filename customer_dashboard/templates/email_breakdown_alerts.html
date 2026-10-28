@@ -1,0 +1,19 @@
+<html>
+<body style="font-family: Arial;">
+
+<h2>Hello {{ username }},</h2>
+<p>Here are your latest breakdown alerts:</p>
+
+{% for a in alerts %}
+<div style="margin-bottom:12px; padding:10px; border-left:5px solid #4ea8de; background:#f5f7fa;">
+    <strong>WTG {{ a.machine }}</strong><br>
+    <b>Severity:</b> {{ a.severity }}<br>
+    <b>Date:</b> {{ a.date }}<br>
+    <b>Message:</b> {{ a.message }}<br>
+ </div>
+{% endfor %}
+
+<p>Sent automatically from your Dashboard.</p>
+
+</body>
+</html>

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block style_css %}
+<style>
+.dashboard-section {
+  margin-top: 80px;
+  padding: 40px 20px 120px 20px; /* bottom padding to prevent footer overlap */
+  animation: fadeInUp 1s ease-in-out;
+  min-height: 77vh !important;
+}
+
+.card-hover {
+  transition: transform 0.3s ease;
+  border-radius: 1rem;
+}
+
+.card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-icon {
+  font-size: 2.5rem;
+  color: #6a11cb;
+}
+
+.dashboard-title {
+  font-weight: 700;
+  color: #333;
+}
+
+.dashboard-footer {
+  width: 100%;
+  padding: 10px 0;
+  background-color: #f8f9fa;
+  z-index: 1000;
+}
+
+.footer span {
+  margin: 0;
+  font-weight: 600;
+  color: #000;
+  font-size: 14px;
+}
+
+.footer a {
+  background: linear-gradient(to right, #2575fc, #6a11cb);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 1rem;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.footer img {
+  height: 20px;
+  vertical-align: middle;
+  margin: 0 4px;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
+{% endblock style_css %}
+
+{% block content %}
+<div class="container dashboard-section">
+  <div class="text-center mb-5">
+    <h1 class="dashboard-title">Welcome to Admin Dashboard</h1>
+    <p class="text-muted">Manage your platform effectively with quick access to key actions.</p>
+  </div>
+
+  <div class="row g-4">
+    <!-- Add Installation Summary -->
+ <div class="col-md-4"></div>
+
+    <!-- Reports -->
+    <div class="col-md-4">
+      <div class="card text-center shadow-sm p-3 card-hover">
+        <div class="dashboard-icon mb-3"><i class="fas fa-chart-line"></i></div>
+        <h5 class="card-title">Reports & Insights</h5>
+        <p class="card-text">View analytics and summaries of uploaded data.</p>
+        <a href="#" class="btn btn-success">Coming Soon</a>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+    {% include 'fotter.html' %}
+
+{% endblock content %}

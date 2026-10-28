@@ -1,0 +1,722 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block style_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<style>
+  :root {
+    --card-radius: 16px;
+    --transition-speed: 0.25s;
+  }
+  body {
+    background-color: #f8fafc;
+  }
+  .page-header-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+    padding: 1.25rem;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .kpi-icon-bubble {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+  }
+  .visual-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    margin-bottom: 1.5rem;
+  }
+  .visual-card-header {
+    background: transparent;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 1.1rem 1.5rem;
+  }
+  .table thead th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0.75rem;
+  }
+  .badge-status {
+    padding: 0.35rem 0.65rem;
+    font-weight: 600;
+    font-size: 0.75rem;
+    border-radius: 6px;
+  }
+  .badge-optimal { background-color: #dcfce7; color: #15803d; }
+  .badge-normal { background-color: #e0f2fe; color: #0369a1; }
+  .badge-underperforming { background-color: #fee2e2; color: #b91c1c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3" style="margin-top: 85px;">
+
+  <!-- PAGE HEADER & BREADCRUMB -->
+  <div class="page-header-card">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-info-subtle text-info fw-bold px-2 py-1" style="font-size: 11px;">
+            <i class="fa-solid fa-chart-line"></i> PRIORITY VISUAL #4, #6 &amp; #7
+          </span>
+          <span class="text-muted small">Availability &amp; Efficiency Analysis</span>
+        </div>
+        <h3 class="fw-bold text-dark mt-1 mb-0">Plant Load Factor (PLF) &amp; Availability</h3>
+        <p class="text-muted small mb-0">Turbine efficiency, availability matrix heatmap, outlier scatter detection, and grid performance</p>
+      </div>
+
+      <!-- FILTER BUTTONS -->
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+          <i class="fa-regular fa-calendar-days text-primary me-1"></i> Date Range
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#providerModal">
+          <i class="fa-solid fa-industry text-info me-1"></i> OEM
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#customerModal">
+          <i class="fa-solid fa-user text-success me-1"></i> Customer
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#stateModal">
+          <i class="fa-solid fa-map-location-dot text-warning me-1"></i> State
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#siteModal">
+          <i class="fa-solid fa-map-pin text-danger me-1"></i> Site
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#wtgModal">
+          <i class="fa-solid fa-bolt text-purple me-1"></i> WTG
+        </button>
+      </div>
+    </div>
+
+    <!-- ACTIVE APPLIED FILTER CHIPS -->
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+    <div class="d-flex flex-wrap align-items-center gap-2 pt-3 mt-3 border-top">
+      <span class="small text-muted fw-bold"><i class="fa-solid fa-filter me-1"></i>Active:</span>
+      {% if date_from and date_to %}
+      <span class="badge rounded-pill bg-primary-subtle text-primary px-3 py-1">{{ date_from }} → {{ date_to }}</span>
+      {% endif %}
+      {% for p in selected_providers %}<span class="badge rounded-pill bg-info-subtle text-info px-3 py-1">{{ p }}</span>{% endfor %}
+      {% for c in selected_customers %}<span class="badge rounded-pill bg-success-subtle text-success px-3 py-1">{{ c }}</span>{% endfor %}
+      {% for s in selected_states %}<span class="badge rounded-pill bg-warning-subtle text-warning px-3 py-1">{{ s }}</span>{% endfor %}
+      {% for s in selected_sites %}<span class="badge rounded-pill bg-danger-subtle text-danger px-3 py-1">{{ s }}</span>{% endfor %}
+      {% for w in selected_wtgs %}<span class="badge rounded-pill bg-secondary-subtle text-secondary px-3 py-1">{{ w }}</span>{% endfor %}
+      <a href="?clear_filters=1" class="btn btn-sm btn-link text-danger p-0 ms-2 small text-decoration-none">Reset All</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- KPI SUMMARY DECK (6 CARDS) -->
+  <div class="row g-3 mb-4">
+    <!-- Card 1: Fleet PLF -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Fleet Avg PLF</span>
+          <div class="kpi-icon-bubble bg-info-subtle text-info"><i class="fa-solid fa-percent"></i></div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ fleet_avg_plf }}%</h3>
+        <small class="text-info fw-semibold mt-1 d-block"><i class="fa-solid fa-chart-line me-1"></i>Load Factor</small>
+      </div>
+    </div>
+
+    <!-- Card 2: Machine Availability -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Fleet Avg MA</span>
+          <div class="kpi-icon-bubble bg-success-subtle text-success"><i class="fa-solid fa-gear"></i></div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ fleet_avg_ma }}%</h3>
+        <small class="text-success fw-semibold mt-1 d-block"><i class="fa-solid fa-shield-halved me-1"></i>Machine Avail.</small>
+      </div>
+    </div>
+
+    <!-- Card 3: Internal Grid Availability -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Int Grid Avail.</span>
+          <div class="kpi-icon-bubble bg-primary-subtle text-primary"><i class="fa-solid fa-tower-observation"></i></div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ avg_iga }}%</h3>
+        <small class="text-primary fw-semibold mt-1 d-block"><i class="fa-solid fa-check me-1"></i>Feeder/Substation</small>
+      </div>
+    </div>
+
+    <!-- Card 4: External Grid Availability -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Ext Grid Avail.</span>
+          <div class="kpi-icon-bubble bg-warning-subtle text-warning"><i class="fa-solid fa-tower-broadcast"></i></div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ avg_ega }}%</h3>
+        <small class="text-warning fw-semibold mt-1 d-block"><i class="fa-solid fa-bolt me-1"></i>EB Utility Grid</small>
+      </div>
+    </div>
+
+    <!-- Card 5: Top PLF Turbine -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Highest PLF</span>
+          <div class="kpi-icon-bubble bg-success-subtle text-success"><i class="fa-solid fa-trophy"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 text-truncate">{{ top_plf_wtg.wtg|default:"--" }}</h4>
+        <small class="text-muted font-monospace mt-1 d-block">{{ top_plf_wtg.y }}% PLF</small>
+      </div>
+    </div>
+
+    <!-- Card 6: Lowest PLF Turbine -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Lowest PLF</span>
+          <div class="kpi-icon-bubble bg-danger-subtle text-danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 text-truncate">{{ bottom_plf_wtg.wtg|default:"--" }}</h4>
+        <small class="text-muted font-monospace mt-1 d-block">{{ bottom_plf_wtg.y }}% PLF</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #6: SCATTER PLOT & VISUAL #7: INTERNAL VS EXTERNAL GRID AVAILABILITY -->
+  <div class="row g-4 mb-4">
+    <!-- VISUAL #6: MACHINE AVAILABILITY VS PLF SCATTER PLOT -->
+    <div class="col-xl-7 col-lg-12">
+      <div class="visual-card h-100 d-flex flex-column">
+        <div class="visual-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-braille text-primary"></i>
+              <h5 class="fw-bold text-dark mb-0">Machine Availability vs PLF Scatter Plot</h5>
+            </div>
+            <small class="text-muted">Visual #6: Identify performance outliers and underperforming turbines</small>
+          </div>
+          <span class="badge bg-primary-subtle text-primary px-3 py-1 fw-bold">Outlier Detection</span>
+        </div>
+        <div class="card-body p-3 flex-grow-1">
+          <div id="plfScatterChart" style="min-height: 420px; width: 100%;"></div>
+          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top text-muted small">
+            <span><i class="fa-regular fa-hand-pointer text-primary me-1"></i> Hover points to see WTG name, MA %, and PLF %</span>
+            <span class="badge bg-light text-muted border">X = Availability %, Y = PLF %</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISUAL #7: INTERNAL VS EXTERNAL GRID AVAILABILITY -->
+    <div class="col-xl-5 col-lg-12">
+      <div class="visual-card h-100 d-flex flex-column">
+        <div class="visual-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-chart-column text-info"></i>
+              <h5 class="fw-bold text-dark mb-0">Internal vs External Grid Availability</h5>
+            </div>
+            <small class="text-muted">Visual #7: Substation &amp; feeder losses vs state EB grid stability</small>
+          </div>
+          <span class="badge bg-info-subtle text-info px-3 py-1 fw-bold">Grid Benchmark</span>
+        </div>
+        <div class="card-body p-3 flex-grow-1">
+          <div id="gridComparisonChart" style="min-height: 420px; width: 100%;"></div>
+          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top text-muted small">
+            <span><i class="fa-solid fa-plug text-info me-1"></i> Benchmark target: &gt;= 99.0%</span>
+            <span class="badge bg-light text-muted border">Dual Bar</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #4: TURBINE AVAILABILITY HEATMAP -->
+  <div class="visual-card mb-4">
+    <div class="visual-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-border-all text-success"></i>
+          <h5 class="fw-bold text-dark mb-0">Turbine Availability Heatmap</h5>
+        </div>
+        <small class="text-muted">Visual #4: Compare multi-turbine availability across months (Deep Green: &gt;=96%, Yellow: 90-95%, Red: &lt;90%)</small>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-1">
+          <span class="small text-muted fw-bold">Page Size:</span>
+          <select id="heatmapPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
+            <option value="10" selected>10 WTGs</option>
+            <option value="15">15 WTGs</option>
+            <option value="25">25 WTGs</option>
+            <option value="all">All WTGs</option>
+          </select>
+        </div>
+        <span class="badge rounded-pill bg-success px-2 py-1" style="font-size: 11px;">&gt;=96% Optimal</span>
+        <span class="badge rounded-pill bg-warning text-dark px-2 py-1" style="font-size: 11px;">90-95% Normal</span>
+        <span class="badge rounded-pill bg-danger px-2 py-1" style="font-size: 11px;">&lt;90% Low</span>
+      </div>
+    </div>
+    <div class="card-body p-3">
+      <div id="plfHeatmapChart" style="min-height: 440px; width: 100%;"></div>
+      <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
+        <span id="heatmapPaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
+        <nav aria-label="Heatmap Pagination">
+          <ul class="pagination pagination-sm mb-0" id="heatmapPaginationNav"></ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL PERFORMANCE DATA TABLE -->
+  <div class="visual-card">
+    <div class="visual-card-header d-flex justify-content-between align-items-center">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-table text-purple"></i>
+          <h5 class="fw-bold text-dark mb-0">Turbine PLF &amp; Availability Matrix</h5>
+        </div>
+        <small class="text-muted">Detailed performance metrics across all reporting turbines</small>
+      </div>
+      <span class="badge bg-light text-dark border px-3 py-2 fw-semibold">
+        Total: {{ wtg_count }} Turbines
+      </span>
+    </div>
+    <div class="card-body p-3">
+      <div class="table-responsive">
+        <table id="plfTable" class="table table-hover table-striped w-100 align-middle">
+          <thead>
+            <tr>
+              <th style="width: 70px;" class="text-center">Rank</th>
+              <th>Turbine ID</th>
+              <th>OEM Brand</th>
+              <th class="text-end">PLF (%)</th>
+              <th class="text-end">Machine Avail (%)</th>
+              <th class="text-end">Int Grid (%)</th>
+              <th class="text-end">Ext Grid (%)</th>
+              <th class="text-end">Generation (kWh)</th>
+              <th class="text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in table_data %}
+            <tr>
+              <td class="text-center fw-bold">#{{ r.rank }}</td>
+              <td><strong>{{ r.wtg_no }}</strong></td>
+              <td><span class="badge bg-light text-dark border">{{ r.oem }}</span></td>
+              <td class="text-end font-monospace fw-bold text-primary">{{ r.plf }}%</td>
+              <td class="text-end font-monospace fw-bold text-dark">{{ r.ma }}%</td>
+              <td class="text-end font-monospace text-muted">{{ r.iga }}%</td>
+              <td class="text-end font-monospace text-muted">{{ r.ega }}%</td>
+              <td class="text-end font-monospace text-muted">{{ r.generation|intcomma }}</td>
+              <td class="text-center">
+                {% if r.status == "High Yield" %}
+                  <span class="badge-status badge-optimal">High Yield</span>
+                {% elif r.status == "Low PLF" %}
+                  <span class="badge-status badge-underperforming">Low PLF</span>
+                {% else %}
+                  <span class="badge-status badge-normal">Normal</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Filter Modals -->
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label small fw-bold">From</label><input type="date" name="date_from" value="{{ date_from }}" class="form-control"></div>
+          <div class="col-6"><label class="form-label small fw-bold">To</label><input type="date" name="date_to" value="{{ date_to }}" class="form-control"></div>
+        </div>
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}{% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}{% endif %}
+      {% endfor %}
+      <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary btn-sm px-4">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- OEM Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light"><h5 class="modal-title fw-bold">Select OEM Provider</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+        {% for p in providers %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}" {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+            <label class="form-check-label fw-semibold">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No OEM providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}{% if key != "provider" %}{% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
+      <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary btn-sm px-4">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light"><h5 class="modal-title fw-bold">Select Customer</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body p-4">
+        {% for c in customers %}
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="customer" value="{{ c }}" {% if not selected_customers or c in selected_customers %}checked{% endif %}><label class="form-check-label">{{ c }}</label></div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}{% if key != "customer" %}{% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
+      <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary btn-sm px-4">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light"><h5 class="modal-title fw-bold">Select State</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body p-4">
+        {% for s in states %}
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="state" value="{{ s }}" {% if not selected_states or s in selected_states %}checked{% endif %}><label class="form-check-label">{{ s }}</label></div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}{% if key != "state" %}{% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
+      <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary btn-sm px-4">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light"><h5 class="modal-title fw-bold">Select Site</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body p-4">
+        {% for s in sites %}
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="site" value="{{ s }}" {% if not selected_sites or s in selected_sites %}checked{% endif %}><label class="form-check-label">{{ s }}</label></div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}{% if key != "site" %}{% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
+      <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary btn-sm px-4">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light"><h5 class="modal-title fw-bold">Select WTG</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+        <div class="row">
+          {% for w in wtgs %}
+          <div class="col-md-4 col-sm-6 mb-2">
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}" {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}><label class="form-check-label font-monospace">{{ w }}</label></div>
+          </div>
+          {% empty %}<p class="text-muted">No WTGs found.</p>{% endfor %}
+        </div>
+      </div>
+      {% for key,vals in request.GET.lists %}{% if key != "wtg" %}{% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}{% endif %}{% endfor %}
+      <div class="modal-footer bg-light"><button type="submit" class="btn btn-primary btn-sm px-4">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  let scatterData = [];
+  let heatmapSeries = [];
+  let gridComparison = { labels: [], values: [] };
+
+  try { scatterData = JSON.parse(`{{ scatter_data_json|escapejs }}`) || []; } catch(e){}
+  try { heatmapSeries = JSON.parse(`{{ heatmap_series_json|escapejs }}`) || []; } catch(e){}
+  try { gridComparison = JSON.parse(`{{ grid_comparison_json|escapejs }}`) || { labels: [], values: [] }; } catch(e){}
+
+  const fleetAvgPlf = {{ fleet_avg_plf|default:0 }};
+  const fleetAvgMa = {{ fleet_avg_ma|default:0 }};
+
+  // 1. Initialize DataTable
+  $('#plfTable').DataTable({
+    paging: true,
+    pageLength: 10,
+    lengthMenu: [5, 10, 25, 50, 100],
+    ordering: true,
+    order: [[3, 'desc']], // Order by PLF desc
+    responsive: true
+  });
+
+  // 2. VISUAL #6: Scatter Plot (Machine Availability vs PLF)
+  if (scatterData.length > 0) {
+    const scatterSeries = [{
+      name: 'Turbines',
+      data: scatterData.map(d => ({
+        x: d.x,
+        y: d.y,
+        wtg: d.wtg,
+        oem: d.oem
+      }))
+    }];
+
+    const scatterOpts = {
+      series: scatterSeries,
+      chart: {
+        type: 'scatter',
+        height: 420,
+        toolbar: { show: true },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      colors: ['#4f46e5'],
+      xaxis: {
+        title: { text: 'Machine Availability (%)', style: { fontWeight: 600, color: '#64748b' } },
+        labels: { formatter: function(val) { return val.toFixed(1) + '%'; } }
+      },
+      yaxis: {
+        title: { text: 'Plant Load Factor - PLF (%)', style: { fontWeight: 600, color: '#64748b' } },
+        labels: { formatter: function(val) { return val.toFixed(1) + '%'; } }
+      },
+      markers: {
+        size: 8,
+        strokeWidth: 2,
+        strokeColors: '#ffffff',
+        hover: { size: 11 }
+      },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      annotations: {
+        xaxis: [{
+          x: fleetAvgMa,
+          borderColor: '#10b981',
+          strokeDashArray: 4,
+          label: {
+            text: `Fleet Avg MA: ${fleetAvgMa}%`,
+            style: { color: '#fff', background: '#10b981', fontSize: '10px' }
+          }
+        }],
+        yaxis: [{
+          y: fleetAvgPlf,
+          borderColor: '#06b6d4',
+          strokeDashArray: 4,
+          label: {
+            text: `Fleet Avg PLF: ${fleetAvgPlf}%`,
+            style: { color: '#fff', background: '#06b6d4', fontSize: '10px' }
+          }
+        }]
+      },
+      tooltip: {
+        theme: 'light',
+        custom: function({ series, seriesIndex, dataPointIndex, w }) {
+          const point = w.config.series[seriesIndex].data[dataPointIndex];
+          return `
+            <div class="p-2 shadow-sm rounded" style="font-size: 12px; background: #ffffff;">
+              <strong class="d-block text-dark">${point.wtg} (${point.oem})</strong>
+              <div class="text-muted mt-1">Machine Availability: <strong>${point.x}%</strong></div>
+              <div class="text-primary">Load Factor (PLF): <strong>${point.y}%</strong></div>
+            </div>`;
+        }
+      }
+    };
+    const scatterChart = new ApexCharts(document.querySelector("#plfScatterChart"), scatterOpts);
+    scatterChart.render();
+  }
+
+  // 3. VISUAL #7: Internal vs External Grid Availability Clustered Bar
+  if (gridComparison.labels && gridComparison.labels.length > 0) {
+    const gridOpts = {
+      series: [{ name: 'Availability (%)', data: gridComparison.values }],
+      chart: { type: 'bar', height: 420, toolbar: { show: false } },
+      plotOptions: {
+        bar: { borderRadius: 8, columnWidth: '40%', distributed: true }
+      },
+      colors: ['#0ea5e9', '#f59e0b'],
+      dataLabels: {
+        enabled: true,
+        formatter: function(val) { return val.toFixed(2) + '%'; },
+        style: { fontSize: '13px', fontWeight: 700 }
+      },
+      xaxis: {
+        categories: gridComparison.labels,
+        labels: { style: { fontSize: '12px', fontWeight: 600 } }
+      },
+      yaxis: {
+        max: 100,
+        min: 80,
+        labels: { formatter: function(val) { return val + '%'; } }
+      },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      legend: { show: false },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val + '%'; } }
+      }
+    };
+    const gridChart = new ApexCharts(document.querySelector("#gridComparisonChart"), gridOpts);
+    gridChart.render();
+  }
+
+  // 4. VISUAL #4: Turbine Availability Heatmap with Pagination
+  let heatmapInstance = null;
+  let hmPageSize = 10;
+  let hmCurrentPage = 1;
+
+  function getHmTotalPages() {
+    if (hmPageSize === "all") return 1;
+    return Math.max(1, Math.ceil(heatmapSeries.length / hmPageSize));
+  }
+
+  function updateHmPaginationNav() {
+    const nav = document.getElementById("heatmapPaginationNav");
+    const info = document.getElementById("heatmapPaginationInfo");
+    if (!nav) return;
+    const totalPages = getHmTotalPages();
+
+    if (hmPageSize === "all" || totalPages <= 1) {
+      nav.innerHTML = "";
+      if (info) info.textContent = `Showing All ${heatmapSeries.length} Turbines`;
+      return;
+    }
+
+    const startIdx = (hmCurrentPage - 1) * hmPageSize + 1;
+    const endIdx = Math.min(hmCurrentPage * hmPageSize, heatmapSeries.length);
+    if (info) info.textContent = `Showing WTGs ${startIdx}-${endIdx} of ${heatmapSeries.length} (Page ${hmCurrentPage}/${totalPages})`;
+
+    let html = `<li class="page-item ${hmCurrentPage === 1 ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToHmPage(${hmCurrentPage - 1})">&laquo; Prev</button>
+    </li>`;
+
+    for (let p = 1; p <= totalPages; p++) {
+      if (totalPages > 6 && Math.abs(p - hmCurrentPage) > 2 && p !== 1 && p !== totalPages) {
+        if (p === 2 || p === totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        continue;
+      }
+      html += `<li class="page-item ${p === hmCurrentPage ? 'active' : ''}">
+        <button type="button" class="page-link" onclick="goToHmPage(${p})">${p}</button>
+      </li>`;
+    }
+
+    html += `<li class="page-item ${hmCurrentPage === totalPages ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToHmPage(${hmCurrentPage + 1})">Next &raquo;</button>
+    </li>`;
+    nav.innerHTML = html;
+  }
+
+  function renderPaginatedHeatmap() {
+    if (!heatmapSeries || heatmapSeries.length === 0) {
+      document.querySelector("#plfHeatmapChart").innerHTML = '<div class="alert alert-info text-center m-4">No monthly heatmap data available.</div>';
+      return;
+    }
+
+    let subset;
+    if (hmPageSize === "all") {
+      subset = [...heatmapSeries];
+    } else {
+      const start = (hmCurrentPage - 1) * hmPageSize;
+      subset = heatmapSeries.slice(start, start + hmPageSize);
+    }
+
+    const heatmapOpts = {
+      series: subset,
+      chart: { type: 'heatmap', height: Math.max(380, subset.length * 34), toolbar: { show: true } },
+      plotOptions: {
+        heatmap: {
+          shadeIntensity: 0.5,
+          radius: 4,
+          useWarmShades: false,
+          colorScale: {
+            ranges: [
+              { from: 0, to: 89.9, name: '<90% Low', color: '#fee2e2' },
+              { from: 90, to: 95.9, name: '90-95% Normal', color: '#fef08a' },
+              { from: 96, to: 100, name: '>=96% Optimal', color: '#bbf7d0' }
+            ]
+          }
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        style: { colors: ['#1e293b'], fontSize: '11px', fontWeight: 600 },
+        formatter: function(val) { return val ? (val + '%') : ''; }
+      },
+      xaxis: { labels: { style: { fontSize: '11px', colors: '#64748b' } } },
+      yaxis: { labels: { style: { fontSize: '11px', fontWeight: 600, colors: '#1e293b' } } },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val + '% Machine Availability'; } }
+      }
+    };
+
+    if (heatmapInstance) {
+      heatmapInstance.destroy();
+    }
+    heatmapInstance = new ApexCharts(document.querySelector("#plfHeatmapChart"), heatmapOpts);
+    heatmapInstance.render();
+    updateHmPaginationNav();
+  }
+
+  window.goToHmPage = function(p) {
+    const total = getHmTotalPages();
+    if (p < 1 || p > total) return;
+    hmCurrentPage = p;
+    renderPaginatedHeatmap();
+  };
+
+  const hmPageSizeSelect = document.getElementById("heatmapPageSize");
+  if (hmPageSizeSelect) {
+    hmPageSizeSelect.addEventListener("change", function () {
+      hmPageSize = this.value === "all" ? "all" : parseInt(this.value);
+      hmCurrentPage = 1;
+      renderPaginatedHeatmap();
+    });
+  }
+
+  renderPaginatedHeatmap();
+});
+</script>
+{% endblock %}

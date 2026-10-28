@@ -1,0 +1,1455 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RE·OS — Renewable Energy Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ==========================================================================
+   RE·OS Landing Page — single file, no framework, no build step
+   ========================================================================== */
+:root {
+  --bg: #f4f7f5;
+  --card: #ffffff;
+  --ink: #0a1f16;
+  --muted: rgba(0,0,0,.55);
+  --line: rgba(0,0,0,.06);
+  --emerald: #059669;
+  --teal: #0d9488;
+  --sky: #0284c7;
+  --amber: #d97706;
+  --lime: #65a30d;
+  --shadow-sm: 0 1px 3px rgba(10,31,22,.04), 0 8px 24px -12px rgba(10,31,22,.10);
+  --shadow-lg: 0 24px 80px -24px rgba(10,31,22,.18);
+  --side-pad: clamp(24px, 4vw, 64px);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--ink);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(52,211,153,.12), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 10%, rgba(45,212,191,.10), transparent),
+    linear-gradient(rgba(5,150,105,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(5,150,105,.05) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+  overflow-x: hidden;
+  width: 100%;
+}
+h1, h2, h3, .display { font-family: 'Space Grotesk', sans-serif; letter-spacing: -.02em; }
+a { text-decoration: none; color: inherit; }
+button { font-family: inherit; cursor: pointer; }
+
+.gradient-text {
+  background: linear-gradient(120deg, #059669, #0d9488, #65a30d);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; padding: 5px 14px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .18em;
+  color: var(--emerald); background: #ecfdf5; border: 1px solid rgba(5,150,105,.2);
+}
+.eyebrow .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--emerald); position: relative; }
+.eyebrow .pulse::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; background: #10b981;
+  animation: ping 1.6s ease-out infinite;
+}
+@keyframes ping { 0% { transform: scale(1); opacity: .6 } 100% { transform: scale(2.4); opacity: 0 } }
+
+/* ---------------- nav ---------------- */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  transition: all .4s;
+  width: 100%;
+  background: rgba(255,255,255,.94);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 16px rgba(10,31,22,.04);
+}
+.nav.scrolled {
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 4px 24px rgba(10,31,22,.08);
+}
+.nav-inner {
+  width: 100%;
+  max-width: 100%;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--side-pad);
+  gap: 16px;
+}
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-logo {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  transition: transform .2s ease;
+}
+.logo:hover .brand-logo {
+  transform: scale(1.03);
+}
+.logo-sep {
+  width: 1px;
+  height: 32px;
+  background: rgba(0,0,0,.12);
+  margin: 0 2px;
+}
+.logo-text b {
+  font-size: 16px;
+  display: block;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.logo-text span {
+  font-size: 9px;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  color: var(--emerald);
+  font-weight: 700;
+}
+.nav-links {
+  display: flex;
+  gap: 32px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0,0,0,.65);
+}
+.nav-links a {
+  transition: color .2s;
+  position: relative;
+  padding: 4px 0;
+}
+.nav-links a:hover {
+  color: var(--emerald);
+}
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.crono-logo {
+  height: 42px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  transition: transform .2s ease;
+}
+.crono-logo:hover {
+  transform: scale(1.03);
+}
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ink);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all .25s;
+  white-space: nowrap;
+}
+.nav-cta:hover {
+  background: #047857;
+  box-shadow: 0 8px 24px rgba(5,150,105,.35);
+  transform: translateY(-1px);
+}
+.nav-cta svg {
+  width: 14px;
+  height: 14px;
+  transition: transform .2s;
+}
+.nav-cta:hover svg {
+  transform: translateX(3px);
+}
+
+/* ---------------- hero ---------------- */
+.hero {
+  position: relative;
+  padding: 128px var(--side-pad) 64px;
+  overflow: hidden;
+  width: 100%;
+}
+.hero::before {
+  content: ""; position: absolute; top: -160px; left: 50%; transform: translateX(-50%);
+  width: 1200px; height: 600px; border-radius: 50%;
+  background: rgba(16,185,129,.10); filter: blur(140px); pointer-events: none;
+}
+.hero-inner {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: clamp(32px, 4.5vw, 64px);
+  align-items: center;
+}
+.hero-title { font-size: clamp(38px, 4.5vw, 68px); line-height: 1.05; font-weight: 700; margin-top: 20px; }
+.hero-sub { margin-top: 20px; max-width: 620px; font-size: clamp(15px, 1.1vw, 17px); line-height: 1.65; color: var(--muted); }
+.hero-btns { margin-top: 32px; display: flex; gap: 16px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; border-radius: 999px;
+  padding: 14px 30px; font-size: 14px; font-weight: 600; border: 0; transition: all .25s;
+}
+.btn svg { width: 16px; height: 16px; transition: transform .2s; }
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-primary:hover { background: #047857; box-shadow: 0 12px 40px rgba(5,150,105,.4); }
+.btn-primary:hover svg { transform: translateX(4px); }
+.btn-ghost { background: #fff; color: var(--ink); border: 1px solid rgba(0,0,0,.12); }
+.btn-ghost:hover { border-color: rgba(5,150,105,.4); background: #ecfdf5; color: var(--emerald); }
+.hero-stats { margin-top: 40px; max-width: 520px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; border-top: 1px solid var(--line); padding-top: 28px; }
+.hero-stats .v { font-family: 'Space Grotesk'; font-size: clamp(24px, 2vw, 28px); font-weight: 700; }
+.hero-stats .l { margin-top: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: rgba(0,0,0,.45); font-weight: 600; }
+
+/* hero scene */
+.hero-scene {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  margin-left: auto;
+}
+.hero-scene::before {
+  content: ""; position: absolute; inset: -32px; z-index: 0;
+  border-radius: 40px; filter: blur(48px);
+  background: linear-gradient(135deg, rgba(16,185,129,.2), rgba(13,148,136,.08) 50%, transparent);
+}
+.video-wrapper {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 480px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(5,150,105,.25);
+  background: #04170f;
+  line-height: 0;
+}
+.hero-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 24px;
+  object-fit: cover;
+}
+.chip {
+  position: absolute; z-index: 2; display: flex; align-items: center; gap: 10px;
+  background: rgba(4,17,12,.82); border: 1px solid; border-radius: 16px;
+  padding: 10px 14px; backdrop-filter: blur(8px);
+  animation: floaty 5s ease-in-out infinite;
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; animation: blink 1.6s infinite; }
+.chip .l { font-size: 8px; text-transform: uppercase; letter-spacing: .18em; color: rgba(255,255,255,.6); font-weight: 600; }
+.chip .v { font-family: 'Space Grotesk'; font-size: 14px; font-weight: 700; }
+.chip.green  { border-color: rgba(52,211,153,.4); box-shadow: 0 8px 32px rgba(52,211,153,.25); } .chip.green .v  { color: #6ee7b7; } .chip.green .dot  { background: #34d399; }
+.chip.sky    { border-color: rgba(56,189,248,.4); box-shadow: 0 8px 32px rgba(56,189,248,.25); } .chip.sky .v    { color: #7dd3fc; } .chip.sky .dot    { background: #38bdf8; }
+.chip.amber  { border-color: rgba(251,191,36,.4); box-shadow: 0 8px 32px rgba(251,191,36,.25); } .chip.amber .v  { color: #fcd34d; } .chip.amber .dot  { background: #fbbf24; }
+.chip.violet { border-color: rgba(167,139,250,.4); box-shadow: 0 8px 32px rgba(167,139,250,.25); } .chip.violet .v { color: #c4b5fd; } .chip.violet .dot { background: #a78bfa; }
+.chip.c1 { left: 16px; top: 40px; }
+.chip.c2 { right: 16px; top: 64px; animation-delay: -1.2s; }
+.chip.c3 { left: 32px; bottom: 56px; animation-delay: -2.1s; }
+.chip.c4 { right: 24px; bottom: 80px; animation-delay: -0.6s; }
+
+/* ---------------- marquee ---------------- */
+.marquee {
+  overflow: hidden;
+  background: #ffffff;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  width: 100%;
+  box-shadow: 0 2px 12px rgba(10,31,22,.03);
+}
+.marquee { overflow: hidden; background: #fff; border-bottom: 1px solid var(--line); padding: 16px 0; width: 100%; }
+.marquee-track { display: flex; width: max-content; animation: scroll 32s linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@keyframes scroll { to { transform: translateX(-50%); } }
+.marquee-item { display: flex; align-items: center; gap: 40px; padding: 0 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .25em; color: rgba(0,0,0,.4); white-space: nowrap; }
+.marquee-item svg { width: 12px; height: 12px; color: rgba(5,150,105,.7); }
+
+/* ---------------- sections ---------------- */
+section {
+  width: 100%;
+  max-width: 100%;
+  padding: 88px var(--side-pad);
+}
+.sec-head { max-width: 680px; margin: 0 auto 56px; text-align: center; }
+.sec-title { font-size: clamp(28px, 3.4vw, 42px); font-weight: 700; margin-top: 16px; }
+.sec-sub { margin-top: 16px; font-size: 15px; line-height: 1.7; color: rgba(0,0,0,.55); }
+
+/* ==================== CYBER SCADA COMMAND COCKPIT ==================== */
+.window {
+  border: 1px solid rgba(16, 185, 129, 0.32);
+  background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.15) 0%, rgba(6, 15, 11, 0.98) 70%), #060f0b;
+  border-radius: 24px;
+  box-shadow: 0 32px 100px -20px rgba(0, 0, 0, 0.75), 0 0 60px -10px rgba(16, 185, 129, 0.22);
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.window:hover {
+  box-shadow: 0 40px 120px -20px rgba(0, 0, 0, 0.85), 0 0 80px -5px rgba(16, 185, 129, 0.32);
+  border-color: rgba(16, 185, 129, 0.55);
+}
+
+/* Window Bar (Header HUD) */
+.window-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: rgba(10, 24, 17, 0.92);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.window-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.window-dots {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.window-dots i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px currentColor;
+}
+.window-bar .t {
+  font-family: 'Space Grotesk', monospace, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #f1f5f9;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.window-bar .t .badge-ver {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Time Switcher Tabs */
+.window-time-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 3px;
+  border-radius: 999px;
+}
+.time-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.time-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.time-btn.active {
+  background: #10b981;
+  color: #042f1a;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.55);
+  font-weight: 800;
+}
+
+.window-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.window-bar .live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 4px 12px;
+  border-radius: 999px;
+  letter-spacing: 0.08em;
+}
+.window-bar .live i {
+  width: 6px;
+  height: 6px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10b981;
+  animation: blink 1.2s infinite;
+}
+
+/* Telemetry Ribbon (Quick KPI Strip) */
+.cockpit-ribbon {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px 24px;
+  gap: 16px;
+}
+.ribbon-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ribbon-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ribbon-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.ribbon-dot.green { background: #10b981; box-shadow: 0 0 6px #10b981; }
+.ribbon-dot.cyan { background: #06b6d4; box-shadow: 0 0 6px #06b6d4; }
+.ribbon-dot.amber { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+.ribbon-dot.purple { background: #a855f7; box-shadow: 0 0 6px #a855f7; }
+.ribbon-val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.ribbon-sub {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Grid Layout for Cockpit Cards */
+.window-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1.15fr;
+  background: transparent;
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+.window-cell {
+  background: rgba(13, 26, 20, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+}
+.window-cell:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 24px rgba(16, 185, 129, 0.15);
+}
+
+/* Cell Header */
+.cell-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+.cell-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cell-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cell-val-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 2px;
+}
+.cell-big-val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.cell-unit {
+  font-size: 13px;
+  font-weight: 600;
+  color: #34d399;
+}
+.cell-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cell-badge.green {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.cell-badge.sky {
+  background: rgba(2, 132, 199, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(2, 132, 199, 0.4);
+}
+.cell-badge.gold {
+  background: rgba(217, 119, 6, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(217, 119, 6, 0.4);
+}
+
+/* Visual Containers */
+.cell-graph-wrap {
+  width: 100%;
+  position: relative;
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Footnotes */
+.cell-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+.cell-footer-stat {
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+/* Progress List for Matrix */
+.donut-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  margin-top: 14px;
+}
+.donut-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.donut-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+.donut-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+.donut-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.donut-row-val {
+  font-weight: 700;
+  color: #ffffff;
+}
+.matrix-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.matrix-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* Turbine Spotlight Card */
+.wtg-spotlight-card {
+  margin-top: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+}
+.wtg-spotlight-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #fbbf24;
+  font-weight: 700;
+}
+.wtg-spotlight-right {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+}
+
+@media (max-width: 1100px) {
+  .cockpit-ribbon {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .window-grid {
+    grid-template-columns: 1fr;
+  }
+  .window-bar {
+    justify-content: center;
+  }
+}
+@media (max-width: 600px) {
+  .cockpit-ribbon {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* modules */
+.modules-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 2.4vw, 32px); width: 100%; }
+.module {
+  position: relative; overflow: hidden; background: #fff; border: 1px solid var(--line);
+  border-radius: 24px; padding: clamp(24px, 2.6vw, 36px); display: flex; flex-direction: column;
+  transition: transform .3s, box-shadow .3s, border-color .3s;
+}
+.module:hover { transform: translateY(-6px); border-color: rgba(0,0,0,.12); box-shadow: 0 24px 60px -24px rgba(10,31,22,.2); }
+.module .glow { position: absolute; top: -80px; right: -80px; width: 220px; height: 220px; border-radius: 50%; filter: blur(80px); opacity: 0; transition: opacity .5s; }
+.module:hover .glow { opacity: 1; }
+.module .ico { width: 50px; height: 50px; border-radius: 16px; display: grid; place-items: center; border: 1px solid; margin-bottom: 20px; }
+.module h3 { font-size: 22px; font-weight: 700; }
+.module .tag { margin-top: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .2em; color: rgba(0,0,0,.35); font-weight: 600; }
+.module p { margin-top: 16px; font-size: 14px; line-height: 1.65; color: rgba(0,0,0,.55); }
+.module ul { list-style: none; margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+.module li { font-size: 12px; color: rgba(0,0,0,.65); display: flex; align-items: center; gap: 8px; }
+.module li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.module .go { margin-top: auto; padding-top: 24px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; transition: gap .25s; }
+.module:hover .go { gap: 12px; }
+.m-wind  { color: #059669; } .m-wind  .ico { color: #059669; border-color: rgba(5,150,105,.3); background: rgba(5,150,105,.08); }  .m-wind  .glow { background: rgba(5,150,105,.15); }
+.m-solar { color: #d97706; } .m-solar .ico { color: #d97706; border-color: rgba(217,119,6,.3); background: rgba(217,119,6,.08); } .m-solar .glow { background: rgba(217,119,6,.15); }
+.m-bio   { color: #65a30d; } .m-bio   .ico { color: #65a30d; border-color: rgba(101,163,13,.3); background: rgba(101,163,13,.08); } .m-bio   .glow { background: rgba(101,163,13,.15); }
+
+/* capabilities */
+.caps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(16px, 2vw, 24px); width: 100%; }
+.cap {
+  background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: clamp(20px, 2vw, 28px);
+  transition: transform .3s, box-shadow .3s, border-color .3s;
+}
+.cap:hover { transform: translateY(-4px); border-color: rgba(5,150,105,.25); box-shadow: 0 20px 50px -20px rgba(5,150,105,.25); }
+.cap .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: #ecfdf5; color: var(--emerald); border: 1px solid rgba(5,150,105,.2); transition: transform .3s; }
+.cap:hover .ico { transform: scale(1.1); }
+.cap h3 { margin-top: 16px; font-size: 15px; font-weight: 700; }
+.cap p { margin-top: 8px; font-size: 13px; line-height: 1.65; color: rgba(0,0,0,.55); }
+
+/* workflow */
+.flow-grid { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(16px, 2vw, 28px); width: 100%; }
+.flow-line { position: absolute; top: 32px; left: 10%; right: 10%; height: 1px; background: linear-gradient(90deg, transparent, rgba(5,150,105,.3), transparent); }
+.flow-step { text-align: center; position: relative; }
+.flow-ico {
+  width: 64px; height: 64px; margin: 0 auto; border-radius: 20px; display: grid; place-items: center;
+  background: #fff; border: 1px solid rgba(5,150,105,.2); color: var(--emerald);
+  box-shadow: 0 0 30px rgba(5,150,105,.12);
+}
+.flow-step .n { margin-top: 16px; font-size: 10px; font-weight: 700; letter-spacing: .3em; color: rgba(5,150,105,.7); }
+.flow-step h3 { margin-top: 6px; font-size: 15px; font-weight: 700; }
+.flow-step p { margin: 8px auto 0; max-width: 260px; font-size: 12px; line-height: 1.6; color: rgba(0,0,0,.55); }
+
+/* cta */
+.cta {
+  position: relative; overflow: hidden; text-align: center;
+  border: 1px solid rgba(5,150,105,.2); border-radius: 32px;
+  background: linear-gradient(135deg, rgba(5,150,105,.1), rgba(13,148,136,.05) 50%, transparent);
+  padding: clamp(56px, 6vw, 88px) clamp(24px, 4vw, 56px);
+  width: 100%;
+}
+.cta::before {
+  content: ""; position: absolute; top: -128px; left: 50%; transform: translateX(-50%);
+  width: 700px; height: 280px; border-radius: 50%; background: rgba(52,211,153,.15); filter: blur(100px);
+}
+.cta > * { position: relative; }
+.cta h2 { font-size: clamp(28px, 3.8vw, 48px); font-weight: 700; max-width: 680px; margin: 0 auto; }
+.cta p { margin: 16px auto 0; max-width: 600px; font-size: 15px; line-height: 1.7; color: rgba(0,0,0,.6); }
+.cta .btns { margin-top: 32px; display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
+.cta .by { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: rgba(0,0,0,.45); }
+
+/* footer */
+footer { border-top: 1px solid var(--line); width: 100%; background: rgba(255,255,255,.5); }
+.footer-inner {
+  width: 100%;
+  max-width: 100%;
+  padding: 40px var(--side-pad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.footer-inner .mid, .footer-inner .end { font-size: 12px; color: rgba(0,0,0,.4); }
+
+/* reveal on scroll */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.show { opacity: 1; transform: none; }
+
+/* responsive */
+@media (max-width: 1080px) {
+  .hero-inner { grid-template-columns: 1fr; gap: 40px; }
+  .hero-scene { margin-left: 0; max-width: 100%; }
+  .video-wrapper { height: 380px; }
+  .nav-links { display: none; }
+  .modules-grid { grid-template-columns: 1fr; }
+  .window-grid { grid-template-columns: 1fr; }
+  .caps-grid { grid-template-columns: repeat(2, 1fr); }
+  .flow-grid { grid-template-columns: repeat(2, 1fr); }
+  .flow-line { display: none; }
+}
+@media (max-width: 640px) {
+  :root { --side-pad: 18px; }
+  .hero { padding: 100px var(--side-pad) 40px; }
+  .video-wrapper { height: 260px; }
+  .caps-grid { grid-template-columns: 1fr; }
+  .flow-grid { grid-template-columns: 1fr; }
+  .hero-stats { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .hero-stats .v { font-size: 20px; }
+  .ticker-inner { justify-content: center; text-align: center; }
+  .ticker-sep { display: none; }
+  .footer-inner { flex-direction: column; text-align: center; gap: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================ NAVBAR ============================ -->
+<header class="nav" id="nav">
+  <div class="nav-inner">
+    <div class="nav-left">
+      <a class="logo" href="#">
+        <img src="{% static 'images/TeimLogo.png' %}" alt="TEIM Logo" class="brand-logo teim-logo" />
+
+      </a>
+    </div>
+    <nav class="nav-links">
+      <a href="#modules">Modules</a>
+      <a href="#intelligence">Intelligence</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#savings">Savings</a>
+    </nav>
+    <div class="nav-right">
+      <img src="{% static 'images/crono.png' %}" alt="Chronoanalytics Logo" class="brand-logo crono-logo" />
+      <a class="nav-cta" href="/account/login/">
+        Login Portal
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- ============================ HERO ============================ -->
+<div class="hero">
+  <div class="hero-inner">
+    <div>
+      <span class="eyebrow"><span class="pulse"></span> Live telemetry · 1.2 GW fleet monitored</span>
+      <h1 class="hero-title">
+        Every watt.<br />
+        <span class="gradient-text">Every turbine.</span><br />
+        One brain.
+      </h1>
+      <p class="hero-sub">
+        RE·OS is the renewable energy command center from TEIM Energy &amp; Chronoanalytics —
+        real-time wind, solar and biogas telemetry, DSM penalty guardrails, predictive
+        maintenance and open-access savings intelligence in one dashboard.
+      </p>
+      <div class="hero-btns">
+        <a class="btn btn-primary" href="/dashboard/">
+          Enter Dashboard
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="#modules">Explore Modules</a>
+      </div>
+      <div class="hero-stats">
+        <div><div class="v">1.2 GW</div><div class="l">Assets monitored</div></div>
+        <div><div class="v">99.2%</div><div class="l">Fleet uptime</div></div>
+        <div><div class="v">15-min</div><div class="l">DSM precision</div></div>
+      </div>
+    </div>
+
+    <!-- animated scene -->
+    <div class="hero-scene">
+      <div class="video-wrapper">
+        <video class="hero-video" autoplay loop muted playsinline preload="auto">
+          <source src="{% static 'images/video1.mp4' %}" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
+
+      <!-- floating chips -->
+      <div class="chip green c1"><span class="dot"></span><div><div class="l">WTG-04 PLF</div><div class="v">38.2%</div></div></div>
+      <div class="chip sky c2"><span class="dot"></span><div><div class="l">Grid Avail</div><div class="v">99.1%</div></div></div>
+      <div class="chip amber c3"><span class="dot"></span><div><div class="l">Solar PR</div><div class="v">84.6%</div></div></div>
+      <div class="chip violet c4"><span class="dot"></span><div><div class="l">DSM Dev</div><div class="v">±2.4%</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ MARQUEE ============================ -->
+<div class="marquee">
+  <div class="marquee-track" id="marquee"></div>
+</div>
+
+<!-- ============================ COMMAND CENTER ============================ -->
+<section id="intelligence">
+  <div class="sec-head reveal">
+    <span class="eyebrow"><span class="pulse"></span> Live SCADA Cockpit</span>
+    <h2 class="sec-title">Telemetry that thinks <span class="gradient-text">before you ask</span></h2>
+    <p class="sec-sub">Live generation curves, predictive dispatch, fleet availability splits and individual turbine PLF rankings — real engineering intelligence at your fingertips.</p>
+  </div>
+  <div class="window reveal">
+    <!-- Window Title Bar -->
+    <div class="window-bar">
+      <div class="window-bar-left">
+        <div class="window-dots">
+          <i style="background:#ff5f56; color:#ff5f56;"></i>
+          <i style="background:#ffbd2e; color:#ffbd2e;"></i>
+          <i style="background:#27c93f; color:#27c93f;"></i>
+        </div>
+        <span class="t">RE·OS // SCADA CORE <span class="badge-ver">v4.8 TELEMETRY</span></span>
+      </div>
+
+      <!-- Time Filter Tabs -->
+      <div class="window-time-tabs">
+        <button class="time-btn active" onclick="switchWindowTime('24h', this)">24H LIVE</button>
+        <button class="time-btn" onclick="switchWindowTime('7d', this)">7D FLEET</button>
+        <button class="time-btn" onclick="switchWindowTime('30d', this)">30D HIST</button>
+      </div>
+
+      <div class="window-bar-right">
+        <span class="live"><i></i> SCADA FEED ACTIVE</span>
+      </div>
+    </div>
+
+    <!-- Telemetry Status Ribbon -->
+    <div class="cockpit-ribbon">
+      <div class="ribbon-item">
+        <span class="ribbon-label"><i class="ribbon-dot green"></i> FLEET STATUS</span>
+        <span class="ribbon-val" id="rbFleet">50 WTGs Online <span class="ribbon-sub">98.0% Sync</span></span>
+      </div>
+      <div class="ribbon-item">
+        <span class="ribbon-label"><i class="ribbon-dot cyan"></i> ACTIVE DISPATCH RATE</span>
+        <span class="ribbon-val" id="rbDispatch">48.8 MW <span class="ribbon-sub">@ 50.02 Hz</span></span>
+      </div>
+      <div class="ribbon-item">
+        <span class="ribbon-label"><i class="ribbon-dot amber"></i> ANEMOMETER SPEED</span>
+        <span class="ribbon-val" id="rbWind">8.9 m/s <span class="ribbon-sub">WSW · Optimal</span></span>
+      </div>
+      <div class="ribbon-item">
+        <span class="ribbon-label"><i class="ribbon-dot purple"></i> CO₂ OFFSET TODAY</span>
+        <span class="ribbon-val" id="rbCo2">342.8 MT <span class="ribbon-sub">Saved</span></span>
+      </div>
+    </div>
+
+    <!-- 3-Column Cockpit Grid -->
+    <div class="window-grid">
+      <!-- 1️⃣ Generation Curve -->
+      <div class="window-cell">
+        <div class="cell-top">
+          <div class="cell-title-wrap">
+            <span class="cell-label"><i style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;box-shadow:0 0 6px #10b981;"></i> Fleet Power Generation</span>
+            <div class="cell-val-row">
+              <span class="cell-big-val" id="cmdGenVal">428.4</span>
+              <span class="cell-unit">MWh</span>
+            </div>
+          </div>
+          <span class="cell-badge green" id="cmdGenBadge">▲ +4.2% peak</span>
+        </div>
+        <div class="cell-graph-wrap" id="previewArea"></div>
+        <div class="cell-footer">
+          <span id="cmdPeakText">Peak Output: 48.6 MW @ 13:45</span>
+          <span class="cell-footer-stat" id="cmdIntervalText">15-min Intervals</span>
+        </div>
+      </div>
+
+      <!-- 2️⃣ Availability Split -->
+      <div class="window-cell">
+        <div class="cell-top">
+          <div class="cell-title-wrap">
+            <span class="cell-label"><i style="width:6px;height:6px;border-radius:50%;background:#06b6d4;display:inline-block;box-shadow:0 0 6px #06b6d4;"></i> Fleet Availability Matrix</span>
+            <div class="cell-val-row">
+              <span class="cell-big-val" id="cmdAvailVal">97.8%</span>
+              <span class="cell-unit">Avail</span>
+            </div>
+          </div>
+          <span class="cell-badge sky">Optimal Health</span>
+        </div>
+        <div class="cell-graph-wrap" id="previewDonut"></div>
+        <div class="donut-breakdown-list" id="donutBreakdown"></div>
+      </div>
+
+      <!-- 3️⃣ Turbine PLF Ranking -->
+      <div class="window-cell">
+        <div class="cell-top">
+          <div class="cell-title-wrap">
+            <span class="cell-label"><i style="width:6px;height:6px;border-radius:50%;background:#f59e0b;display:inline-block;box-shadow:0 0 6px #f59e0b;"></i> Turbine PLF Efficiency</span>
+            <div class="cell-val-row">
+              <span class="cell-big-val" id="cmdTopVal">44.2%</span>
+              <span class="cell-unit">Peak</span>
+            </div>
+          </div>
+          <span class="cell-badge gold" id="cmdTopWtg">🏆 WTG-07</span>
+        </div>
+        <div class="cell-graph-wrap" id="previewBars"></div>
+        <div class="wtg-spotlight-card">
+          <div class="wtg-spotlight-left">
+            <span>🏆 WTG-07</span>
+            <span style="color:rgba(255,255,255,0.8); font-weight:600;">(Senvion 2.1M)</span>
+          </div>
+          <div class="wtg-spotlight-right">
+            <span>Wind: 9.2 m/s • 0 Faults</span>
+          </div>
+        </div>
+        <div class="cell-footer">
+          <span>Fleet Benchmark: 38.0%</span>
+          <span class="cell-footer-stat">8 Ranked WTGs</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ MODULES ============================ -->
+<section id="modules">
+  <div class="sec-head reveal">
+    <span class="eyebrow">Platform Modules</span>
+    <h2 class="sec-title">One OS for your <span class="gradient-text">entire renewable fleet</span></h2>
+    <p class="sec-sub">Purpose-built apps for wind, solar and hybrid assets — sharing one telemetry backbone, one alert engine, one truth.</p>
+  </div>
+  <div class="modules-grid">
+    <a class="module m-wind reveal" href="/customer/">
+      <div class="glow"></div>
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 15l3.5-3.5"/><path d="M20.3 18a10 10 0 1 0-16.6 0"/></svg></div>
+      <h3>Wind Fleet</h3>
+      <div class="tag">customer_dashboard</div>
+      <p>Per-turbine generation, PLF curves, machine vs grid availability and click-to-drill breakdown logs with automated email alerts.</p>
+      <ul><li>WTG PLF tracking</li><li>MA vs GA split</li><li>Breakdown drill-down</li><li>Email trip alerts</li></ul>
+      <div class="go">Open module <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+    </a>
+    <a class="module m-solar reveal" href="/solar/" style="transition-delay:.12s">
+      <div class="glow"></div>
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg></div>
+      <h3>Solar PV</h3>
+      <div class="tag">solardashboard</div>
+      <p>Performance ratio against pyranometer irradiance, inverter operating hours, soiling loss and weather-correlated generation analytics.</p>
+      <ul><li>PR tracking</li><li>Irradiance overlay</li><li>Soiling loss audit</li><li>Inverter hours</li></ul>
+      <div class="go">Open module <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+    </a>
+    <a class="module m-bio reveal" href="/open_access/" style="transition-delay:.24s">
+      <div class="glow"></div>
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg></div>
+      <h3>Biogas / Hybrid</h3>
+      <div class="tag">open_access</div>
+      <p>Hybrid plant monitoring with green power tariff modelling and MSEDCL open-access savings calculator for industrial consumers.</p>
+      <ul><li>Hybrid dispatch</li><li>Green tariff</li><li>MSEDCL comparison</li><li>Savings reports</li></ul>
+      <div class="go">Open module <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+    </a>
+  </div>
+</section>
+
+<!-- ============================ CAPABILITIES ============================ -->
+<section>
+  <div class="sec-head reveal">
+    <span class="eyebrow">Intelligence Layer</span>
+    <h2 class="sec-title">Built for the <span class="gradient-text">operations room</span></h2>
+  </div>
+  <div class="caps-grid">
+    <div class="cap reveal">
+      <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+      <h3>DSM Engine</h3>
+      <p>96-block daily schedule vs actual generation with MAE / RMSE / R² forecast quality and penalty-risk scoring.</p>
+    </div>
+    <div class="cap reveal" style="transition-delay:.06s">
+      <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="m22 6-10 7L2 6"/></svg></div>
+      <h3>Breakdown Alerts</h3>
+      <p>Turbine trips trigger instant email alerts to maintenance engineers — with fault type, severity and drill-down.</p>
+    </div>
+    <div class="cap reveal" style="transition-delay:.12s">
+      <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div>
+      <h3>PR Tracking</h3>
+      <p>Solar performance ratio computed against pyranometer irradiance, with soiling-loss and weather correlation.</p>
+    </div>
+    <div class="cap reveal" style="transition-delay:.18s">
+      <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+      <h3>Preventive Maintenance</h3>
+      <p>Scheduled inspections, checklists and technician assignment for turbines and inverters.</p>
+    </div>
+    <div class="cap reveal" style="transition-delay:.24s">
+      <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
+      <h3>Excel Ingestion</h3>
+      <p>Drop SCADA Excel exports — pandas-style cleaning maps columns straight into PostgreSQL telemetry tables.</p>
+    </div>
+    <div class="cap reveal" style="transition-delay:.3s">
+      <div class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></div>
+      <h3>Savings Calculator</h3>
+      <p>MSEDCL vs green open-access tariff comparison with TOD slabs, wheeling, duty and SLDC charges.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ WORKFLOW ============================ -->
+<section id="workflow">
+  <div class="sec-head reveal">
+    <span class="eyebrow">Data Flow</span>
+    <h2 class="sec-title">From SCADA signal to <span class="gradient-text">boardroom decision</span></h2>
+  </div>
+  <div class="flow-grid reveal">
+    <div class="flow-line"></div>
+    <div class="flow-step">
+      <div class="flow-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></div>
+      <div class="n">01</div>
+      <h3>SCADA Telemetry</h3>
+      <p>Plant meters &amp; SCADA push raw Excel / CSV exports daily.</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
+      <div class="n">02</div>
+      <h3>Ingest &amp; Clean</h3>
+      <p>Pandas-style engine validates, maps and loads into PostgreSQL.</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div class="n">03</div>
+      <h3>Analytics Engine</h3>
+      <p>PLF, PR, availability splits and DSM deviation metrics computed.</p>
+    </div>
+    <div class="flow-step">
+      <div class="flow-ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></div>
+      <div class="n">04</div>
+      <h3>Act &amp; Save</h3>
+      <p>Alerts fire, maintenance schedules, savings reports export.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ CTA ============================ -->
+<section id="savings">
+  <div class="cta reveal">
+    <h2>Ready to orchestrate your renewable fleet?</h2>
+    <p>Log in to explore live wind &amp; solar dashboards, run the DSM engine, and calculate your open-access savings against MSEDCL tariffs.</p>
+    <div class="btns">
+      <a class="btn btn-primary" href="/dashboard/">
+        Open Dashboard
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <span class="by">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        TEIM Energy · Chronoanalytics
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FOOTER ============================ -->
+<footer>
+  <div class="footer-inner">
+    <div style="display:flex;align-items:center;gap:14px">
+      <img src="{% static 'images/TeimLogo.png' %}" alt="TEIM Logo" style="height:30px;object-fit:contain" />
+      <div style="width:1px;height:24px;background:rgba(0,0,0,.12)"></div>
+      <img src="{% static 'images/crono.png' %}" alt="Chronoanalytics Logo" style="height:28px;object-fit:contain" />
+
+    </div>
+    <div class="mid">Renewable Energy Intelligence · Wind · Solar · Biogas · DSM · Open Access</div>
+    <div class="end">© 2026 TEIM Energy &amp; Chronoanalytics</div>
+  </div>
+</footer>
+
+<script>
+/* ==========================================================================
+   RE·OS Landing — interactions (vanilla JS, no dependencies)
+   ========================================================================== */
+
+/* ---------- navbar scroll ---------- */
+const nav = document.getElementById("nav");
+window.addEventListener("scroll", () => {
+  nav.classList.toggle("scrolled", window.scrollY > 24);
+}, { passive: true });
+
+/* ---------- reveal on scroll ---------- */
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach((e) => {
+    if (e.isIntersecting) { e.target.classList.add("show"); obs.unobserve(e.target); }
+  });
+}, { threshold: 0.12 });
+document.querySelectorAll(".reveal").forEach((el) => obs.observe(el));
+
+/* ---------- marquee ---------- */
+const items = [
+  "Wind Fleet Intelligence", "Solar PR Tracking", "DSM Penalty Guard",
+  "Predictive Maintenance", "Breakdown Alerts", "Open Access Savings",
+  "Excel Telemetry Ingest", "Grid Code Compliance",
+];
+const leaf = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>';
+document.getElementById("marquee").innerHTML =
+  [...items, ...items].map((t) => `<div class="marquee-item">${t} ${leaf}</div>`).join("");
+
+/* ---------- high-tech command center interactive preview charts ---------- */
+// ==================== CYBER COCKPIT DATA & RENDERING ====================
+const windowDatasets = {
+  "24h": {
+    ribbon: { fleet: "50 WTGs Online", fleetSub: "98.0% Sync", dispatch: "48.8 MW", dispatchSub: "@ 50.02 Hz", wind: "8.9 m/s", windSub: "WSW · Optimal", co2: "342.8 MT", co2Sub: "Saved Today" },
+    genVal: "428.4",
+    genBadge: "▲ +4.2% peak",
+    peakText: "Peak Output: 48.6 MW @ 13:45",
+    intervalText: "15-min Intervals",
+    availVal: "97.8%",
+    donutCenter: "97.8%",
+    donutSegs: [
+      { label: "Machine Availability (MA)", value: 96.4, color: "#10b981", gradient: "linear-gradient(90deg, #059669, #10b981)" },
+      { label: "Grid Availability (GA)", value: 98.8, color: "#06b6d4", gradient: "linear-gradient(90deg, #0284c7, #06b6d4)" },
+      { label: "External / Trips", value: 1.4, color: "#f59e0b", gradient: "linear-gradient(90deg, #d97706, #f59e0b)" },
+      { label: "Scheduled Maint", value: 0.8, color: "#f43f5e", gradient: "linear-gradient(90deg, #e11d48, #f43f5e)" }
+    ],
+    topVal: "44.2%",
+    topWtg: "🏆 WTG-07",
+    barData: [
+      { l: "WTG-07", v: 44.2 }, { l: "WTG-04", v: 41.5 }, { l: "WTG-12", v: 39.8 },
+      { l: "WTG-01", v: 38.6 }, { l: "WTG-09", v: 36.2 }, { l: "WTG-15", v: 34.0 },
+      { l: "WTG-03", v: 31.8 }, { l: "WTG-18", v: 28.4 }
+    ],
+    actualCurve: [18, 22, 28, 35, 42, 48, 52, 46, 38, 29, 24, 21, 19, 23, 31, 39, 44, 48.6, 45, 38, 32, 26, 22, 19],
+    forecastCurve: [17, 21, 26, 33, 40, 45, 49, 44, 37, 28, 23, 20, 18, 22, 29, 37, 42, 46, 43, 36, 30, 25, 21, 18]
+  },
+  "7d": {
+    ribbon: { fleet: "49 WTGs Online", fleetSub: "96.4% Sync", dispatch: "46.2 MW", dispatchSub: "@ 50.00 Hz", wind: "9.4 m/s", windSub: "SW · Strong", co2: "2,280 MT", co2Sub: "Saved This Week" },
+    genVal: "2,842",
+    genBadge: "▲ +6.1% weekly",
+    peakText: "Peak Day: Thu (49.8 MW)",
+    intervalText: "Daily Average",
+    availVal: "98.2%",
+    donutCenter: "98.2%",
+    donutSegs: [
+      { label: "Machine Availability (MA)", value: 97.2, color: "#10b981", gradient: "linear-gradient(90deg, #059669, #10b981)" },
+      { label: "Grid Availability (GA)", value: 99.1, color: "#06b6d4", gradient: "linear-gradient(90deg, #0284c7, #06b6d4)" },
+      { label: "External / Trips", value: 1.1, color: "#f59e0b", gradient: "linear-gradient(90deg, #d97706, #f59e0b)" },
+      { label: "Scheduled Maint", value: 0.6, color: "#f43f5e", gradient: "linear-gradient(90deg, #e11d48, #f43f5e)" }
+    ],
+    topVal: "45.1%",
+    topWtg: "🏆 WTG-04",
+    barData: [
+      { l: "WTG-04", v: 45.1 }, { l: "WTG-07", v: 43.8 }, { l: "WTG-12", v: 41.2 },
+      { l: "WTG-01", v: 39.4 }, { l: "WTG-09", v: 37.5 }, { l: "WTG-15", v: 35.8 },
+      { l: "WTG-03", v: 33.2 }, { l: "WTG-18", v: 30.1 }
+    ],
+    actualCurve: [26, 31, 39, 44, 48, 49.8, 46, 41, 35, 30, 27, 32, 38, 45, 47, 43, 38, 33, 29, 34, 40, 46, 42, 36],
+    forecastCurve: [25, 29, 36, 42, 46, 48, 44, 39, 33, 29, 26, 30, 36, 43, 45, 41, 36, 32, 28, 32, 38, 44, 40, 35]
+  },
+  "30d": {
+    ribbon: { fleet: "50 WTGs Online", fleetSub: "98.8% Sync", dispatch: "47.5 MW", dispatchSub: "@ 49.98 Hz", wind: "8.7 m/s", windSub: "SSW · Steady", co2: "9,940 MT", co2Sub: "Saved This Month" },
+    genVal: "12,450",
+    genBadge: "▲ +8.4% monthly",
+    peakText: "Monthly High: 51.2 MW",
+    intervalText: "Weekly Aggregated",
+    availVal: "98.5%",
+    donutCenter: "98.5%",
+    donutSegs: [
+      { label: "Machine Availability (MA)", value: 97.6, color: "#10b981", gradient: "linear-gradient(90deg, #059669, #10b981)" },
+      { label: "Grid Availability (GA)", value: 99.4, color: "#06b6d4", gradient: "linear-gradient(90deg, #0284c7, #06b6d4)" },
+      { label: "External / Trips", value: 0.9, color: "#f59e0b", gradient: "linear-gradient(90deg, #d97706, #f59e0b)" },
+      { label: "Scheduled Maint", value: 0.5, color: "#f43f5e", gradient: "linear-gradient(90deg, #e11d48, #f43f5e)" }
+    ],
+    topVal: "46.4%",
+    topWtg: "🏆 WTG-12",
+    barData: [
+      { l: "WTG-12", v: 46.4 }, { l: "WTG-07", v: 44.9 }, { l: "WTG-04", v: 43.2 },
+      { l: "WTG-01", v: 40.8 }, { l: "WTG-09", v: 38.7 }, { l: "WTG-15", v: 36.5 },
+      { l: "WTG-03", v: 34.8 }, { l: "WTG-18", v: 31.5 }
+    ],
+    actualCurve: [30, 35, 41, 47, 51.2, 48, 43, 37, 32, 36, 42, 48, 46, 40, 35, 39, 45, 49, 47, 42, 37, 41, 46, 40],
+    forecastCurve: [28, 33, 39, 45, 49, 46, 41, 35, 31, 34, 40, 46, 44, 38, 33, 37, 43, 47, 45, 40, 35, 39, 44, 38]
+  }
+};
+
+let currentPeriod = "24h";
+
+function smoothPath(pts) {
+  if (pts.length < 2) return pts.length ? `M ${pts[0].x} ${pts[0].y}` : "";
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    d += ` C ${p1.x + (p2.x - p0.x) / 6} ${p1.y + (p2.y - p0.y) / 6}, ${p2.x - (p3.x - p1.x) / 6} ${p2.y - (p3.y - p1.y) / 6}, ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
+function toPts(data, w, h, padX = 10, padY = 20) {
+  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
+  return data.map((y, i) => ({
+    x: padX + (i / Math.max(1, data.length - 1)) * (w - padX * 2),
+    y: h - padY - ((y - min) / range) * (h - padY * 2),
+    val: y
+  }));
+}
+
+function renderArea(data) {
+  const el = document.getElementById("previewArea");
+  if (!el) return;
+  const W = 420, H = 165;
+  const actualPts = toPts(data.actualCurve, W, H);
+  const forecastPts = toPts(data.forecastCurve, W, H);
+  const actualPath = smoothPath(actualPts);
+  const forecastPath = smoothPath(forecastPts);
+
+  const maxPt = actualPts.reduce((prev, curr) => (curr.val > prev.val ? curr : prev), actualPts[0]);
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:165px; overflow:visible;">
+      <defs>
+        <linearGradient id="cyberAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#10b981" stop-opacity="0.45"/>
+          <stop offset="50%" stop-color="#059669" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#059669" stop-opacity="0.0"/>
+        </linearGradient>
+        <filter id="cyberGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+      </defs>
+
+      <!-- Background Cyber Gridlines -->
+      <line x1="10" y1="35" x2="${W - 10}" y2="35" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3 3"/>
+      <text x="${W - 12}" y="32" fill="rgba(255,255,255,0.25)" font-size="8.5" text-anchor="end">50 MW</text>
+
+      <line x1="10" y1="85" x2="${W - 10}" y2="85" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3 3"/>
+      <text x="${W - 12}" y="82" fill="rgba(255,255,255,0.25)" font-size="8.5" text-anchor="end">25 MW</text>
+
+      <line x1="10" y1="135" x2="${W - 10}" y2="135" stroke="rgba(255,255,255,0.06)"/>
+      <text x="${W - 12}" y="132" fill="rgba(255,255,255,0.25)" font-size="8.5" text-anchor="end">0 MW</text>
+
+      <!-- Forecast Curve (AI Baseline) -->
+      <path d="${forecastPath}" fill="none" stroke="#06b6d4" stroke-width="1.8" stroke-dasharray="4 4" opacity="0.6"/>
+
+      <!-- Fill Area for Actual Curve -->
+      <path d="${actualPath} L ${actualPts[actualPts.length - 1].x} ${H - 12} L ${actualPts[0].x} ${H - 12} Z" fill="url(#cyberAreaGrad)"/>
+
+      <!-- Glowing Neon Actual Curve -->
+      <path d="${actualPath}" fill="none" stroke="#10b981" stroke-width="2.8" stroke-linecap="round" filter="url(#cyberGlow)"/>
+
+      <!-- Peak Point Marker -->
+      <circle cx="${maxPt.x}" cy="${maxPt.y}" r="8" fill="#10b981" opacity="0.4">
+        <animate attributeName="r" values="6;14;6" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.5;0.05;0.5" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${maxPt.x}" cy="${maxPt.y}" r="4" fill="#34d399" stroke="#ffffff" stroke-width="2"/>
+
+      <!-- Peak Badge -->
+      <g transform="translate(${Math.min(W - 80, Math.max(30, maxPt.x - 35))}, ${Math.max(8, maxPt.y - 20)})">
+        <rect width="70" height="18" rx="5" fill="#042f1a" stroke="#10b981" stroke-width="1"/>
+        <text x="35" y="12.5" text-anchor="middle" fill="#34d399" font-size="9.5" font-weight="bold">${maxPt.val} MW</text>
+      </g>
+
+      <!-- Legend -->
+      <g transform="translate(15, 15)">
+        <line x1="0" y1="0" x2="14" y2="0" stroke="#10b981" stroke-width="2.5"/>
+        <text x="18" y="3" fill="rgba(255,255,255,0.6)" font-size="8.5" font-weight="600">Actual SCADA</text>
+        <line x1="90" y1="0" x2="104" y2="0" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <text x="108" y="3" fill="rgba(255,255,255,0.4)" font-size="8.5">AI P50 Forecast</text>
+      </g>
+    </svg>
+  `;
+}
+
+function renderDonut(data) {
+  const el = document.getElementById("previewDonut");
+  const legendEl = document.getElementById("donutBreakdown");
+  if (!el || !legendEl) return;
+
+  const size = 155, th = 16, r = (size - th) / 2, c = 2 * Math.PI * r;
+  const segs = data.donutSegs;
+  const total = segs.reduce((a, s) => a + s.value, 0);
+
+  let off = 0;
+  el.innerHTML = `
+    <div style="position:relative; width:${size}px; height:${size}px; display:flex; align-items:center; justify-content:center;">
+      <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="transform:rotate(-90deg)">
+        <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="${th}"/>
+        ${segs.map(s => {
+          const dash = (s.value / total) * c;
+          const out = `<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${th}" stroke-dasharray="${dash} ${c - dash}" stroke-dashoffset="${-off}" stroke-linecap="round"/>`;
+          off += dash;
+          return out;
+        }).join("")}
+      </svg>
+      <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+        <span style="font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:#ffffff; line-height:1; text-shadow:0 0 16px rgba(16,185,129,0.5);">${data.donutCenter}</span>
+        <span style="font-size:9px; text-transform:uppercase; letter-spacing:0.14em; color:#34d399; font-weight:700; margin-top:3px;">FLEET AVAIL</span>
+      </div>
+    </div>
+  `;
+
+  legendEl.innerHTML = segs.map(s => `
+    <div class="donut-row">
+      <div class="donut-row-header">
+        <div class="donut-row-left">
+          <span class="donut-dot" style="background:${s.color}; box-shadow:0 0 6px ${s.color};"></span>
+          <span>${s.label}</span>
+        </div>
+        <span class="donut-row-val">${s.value.toFixed(1)}%</span>
+      </div>
+      <div class="matrix-track">
+        <div class="matrix-fill" style="width:${Math.min(100, s.value)}%; background:${s.gradient};"></div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderBars(data) {
+  const el = document.getElementById("previewBars");
+  if (!el) return;
+
+  const bars = data.barData;
+  const max = Math.max(...bars.map(d => d.v));
+
+  el.innerHTML = `
+    <div style="display:flex; align-items:flex-end; gap:8px; height:155px; width:100%; position:relative; padding-top:20px;">
+      <!-- Benchmark Line -->
+      <div style="position:absolute; top:40%; left:0; right:0; border-top:1.5px dashed rgba(245,158,11,0.5); z-index:1;" title="Target: 38%"></div>
+
+      ${bars.map((d, i) => {
+        const heightPct = (d.v / max) * 100;
+        const isTop = i === 0;
+        return `
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; z-index:2;" title="${d.l}: ${d.v}% PLF">
+            <span style="font-size:9.5px; font-weight:700; color:${isTop ? '#fbbf24' : 'rgba(255,255,255,0.6)'}; margin-bottom:4px;">${d.v.toFixed(0)}%</span>
+            <div style="width:100%; height:${heightPct}%; border-radius:5px 5px 0 0; background:${isTop ? 'linear-gradient(180deg, #f59e0b, rgba(245,158,11,0.25))' : 'linear-gradient(180deg, #10b981, rgba(16,185,129,0.2))'}; transition:all 0.3s ease; box-shadow:${isTop ? '0 0 12px rgba(245,158,11,0.6)' : '0 0 6px rgba(16,185,129,0.3)'};"></div>
+            <span style="font-size:9px; font-weight:600; color:rgba(255,255,255,0.45); margin-top:6px; white-space:nowrap; font-family:monospace;">${d.l.replace('WTG-','W')}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function updateCockpit(period) {
+  const data = windowDatasets[period];
+  if (!data) return;
+
+  const rbFleet = document.getElementById("rbFleet");
+  const rbDispatch = document.getElementById("rbDispatch");
+  const rbWind = document.getElementById("rbWind");
+  const rbCo2 = document.getElementById("rbCo2");
+
+  if (rbFleet && data.ribbon) rbFleet.innerHTML = `${data.ribbon.fleet} <span class="ribbon-sub">${data.ribbon.fleetSub}</span>`;
+  if (rbDispatch && data.ribbon) rbDispatch.innerHTML = `${data.ribbon.dispatch} <span class="ribbon-sub">${data.ribbon.dispatchSub}</span>`;
+  if (rbWind && data.ribbon) rbWind.innerHTML = `${data.ribbon.wind} <span class="ribbon-sub">${data.ribbon.windSub}</span>`;
+  if (rbCo2 && data.ribbon) rbCo2.innerHTML = `${data.ribbon.co2} <span class="ribbon-sub">${data.ribbon.co2Sub}</span>`;
+
+  const genVal = document.getElementById("cmdGenVal");
+  const genBadge = document.getElementById("cmdGenBadge");
+  const peakText = document.getElementById("cmdPeakText");
+  const intervalText = document.getElementById("cmdIntervalText");
+  const availVal = document.getElementById("cmdAvailVal");
+  const topVal = document.getElementById("cmdTopVal");
+  const topWtg = document.getElementById("cmdTopWtg");
+
+  if (genVal) genVal.textContent = data.genVal;
+  if (genBadge) genBadge.textContent = data.genBadge;
+  if (peakText) peakText.textContent = data.peakText;
+  if (intervalText) intervalText.textContent = data.intervalText;
+  if (availVal) availVal.textContent = data.availVal;
+  if (topVal) topVal.textContent = data.topVal;
+  if (topWtg) topWtg.textContent = data.topWtg;
+
+  renderArea(data);
+  renderDonut(data);
+  renderBars(data);
+}
+
+window.switchWindowTime = function(period, btn) {
+  document.querySelectorAll(".time-btn").forEach(b => b.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  currentPeriod = period;
+  updateCockpit(period);
+};
+
+// Initial Render
+updateCockpit("24h");
+
+</script>
+</body>
+</html>

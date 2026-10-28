@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<!--
+  Professional Enterprise Dashboard — Option A
+  - 4 KPI cards with icons
+  - 4 charts (Donut, Bar, Line, Pie)
+  - No scrolling on desktop (responsive fallback)
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg-1: #f6f8fb;
+    --card-bg: #ffffff;
+    --muted: #6c757d;
+    --primary: #2f5bea;
+    --accent: #1cc88a;
+    --glass: rgba(255,255,255,0.75);
+    --shadow: 0 8px 30px rgba(18, 38, 63, 0.06);
+  }
+
+  html,body {   margin:0; font-family: "Inter", sans-serif; background: linear-gradient(180deg,var(--bg-1),#eef2f7); -webkit-font-smoothing:antialiased; }
+
+  /* container */
+  .dashboard {
+    min-height: 100vh;              /* keeps same as your original */
+    margin: 24px 28px;
+    display: grid;
+    gap: 20px;
+    grid-template-rows: auto 1fr;
+   }
+
+  /* TOP row = KPIs */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    align-items: stretch;
+  }
+
+  .kpi {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(46,60,80,0.04);
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    transition: transform .28s cubic-bezier(.2,.9,.2,1), box-shadow .28s;
+  }
+  .kpi:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(18,38,63,0.08); }
+
+  /* circular icon badge */
+  .kpi-badge {
+    min-width:56px; min-height:56px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg,var(--primary), #6f8bff);
+    color:#fff; font-size:20px; flex-shrink:0;
+    box-shadow: 0 6px 18px rgba(47,91,234,0.18);
+  }
+  .kpi-content { flex:1; display:flex; flex-direction:column; gap:2px; }
+  .kpi-title { font-size:13px; color:var(--muted); font-weight:600; }
+  .kpi-value { font-size:28px; font-weight:800; color:#1f2a44; letter-spacing:-0.5px; }
+
+  .kpi-sub { font-size:12px; color:#8390a6; margin-top:6px; }
+
+  /* charts area */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    height: 100%;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(46,60,80,0.03);
+    display:flex; flex-direction:column;
+    overflow: hidden;
+  }
+
+  .card-head {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;
+  }
+  .card-title { font-weight:700; color:#1f2a44; font-size:15px; }
+  .card-sub { font-size:12px; color:#6b7a90; }
+
+  .chart-wrap { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+
+  /* sparkline small area for label */
+  .kpi-small { font-size:11px; color:#8a98ad; }
+
+  /* responsive */
+  @media (max-width:1200px){
+    .dashboard { margin: 16px; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .charts-grid { grid-template-columns: 1fr; grid-auto-rows: 1fr; }
+    /* allow vertical scroll on small screens */
+    .dashboard { height: auto; overflow-y: auto; padding-bottom:12px; }
+  }
+
+  /* subtle entrance */
+  .fade-in {
+    animation: fadeUp .6s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(8px) scale(.998); }
+    to { opacity:1; transform: translateY(0) scale(1); }
+  }
+
+  /* small utility */
+  .muted { color:var(--muted); font-size:13px; }
+
+</style>
+
+<div class="dashboard ">
+
+  <!-- KPI ROW -->
+  <div class="kpi-row mt-5">
+    <div class="kpi fade-in" style="animation-delay:0s">
+      <div class="kpi-badge"><i class="fas fa-users"></i></div>
+      <div class="kpi-content">
+        <div class="kpi-title">Total Customers</div>
+        <div class="kpi-value counter" data-target="{{ total_customers|default:0 }}">0</div>
+        <div class="kpi-sub">All registered customers</div>
+      </div>
+    </div>
+
+    <div class="kpi fade-in" style="animation-delay:0.08s">
+      <div class="kpi-badge" style="background: linear-gradient(135deg,#1cc88a,#28d98a)"><i class="fas fa-user-check"></i></div>
+      <div class="kpi-content">
+        <div class="kpi-title">Active Customers</div>
+        <div class="kpi-value counter" data-target="{{ active_customers|default:0 }}">0</div>
+        <div class="kpi-sub">Currently active</div>
+      </div>
+    </div>
+
+    <div class="kpi fade-in" style="animation-delay:0.16s">
+      <div class="kpi-badge" style="background: linear-gradient(135deg,#36b9cc,#1fb7d1)"><i class="fas fa-industry"></i></div>
+      <div class="kpi-content">
+        <div class="kpi-title">Total Providers</div>
+        <div class="kpi-value counter" data-target="{{ total_providers|default:0 }}">0</div>
+        <div class="kpi-sub">Connected providers</div>
+      </div>
+    </div>
+
+    <div class="kpi fade-in" style="animation-delay:0.24s">
+      <div class="kpi-badge" style="background: linear-gradient(135deg,#f6c23e,#f59f3d)"><i class="fas fa-bolt"></i></div>
+      <div class="kpi-content">
+        <div class="kpi-title">Energy Types</div>
+        <div class="kpi-value counter" data-target="{{ total_energy|default:0 }}">0</div>
+        <div class="kpi-sub">Registered energy categories</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS GRID (2x2) -->
+  <div class="charts-grid">
+    <!-- Card 1: Energy Distribution (Donut) -->
+    <div class="card fade-in" style="animation-delay:0.04s">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Energy Distribution</div>
+          <div class="card-sub">Share by energy type</div>
+        </div>
+        <div class="muted">Donut • Current</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="energyDonut" style="max-height:260px; width:100%;"></canvas>
+      </div>
+    </div>
+
+    <!-- Card 2: Active vs Inactive (Bar) -->
+    <div class="card fade-in" style="animation-delay:0.08s">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Customers — Active vs Inactive</div>
+          <div class="card-sub">Quick status overview</div>
+        </div>
+        <div class="muted">Bar • Live</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="custBar" style="max-height:260px; width:100%;"></canvas>
+      </div>
+    </div>
+
+    <!-- Card 3: Customer Growth (Line) -->
+    
+
+    
+
+  </div>
+
+</div>
+
+
+<!-- SCRIPTS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
+<script>
+/* ===== Helpful: safely parse Django arrays (if passed as JSON from view) =====
+   For missing variables we provide sensible defaults so template doesn't break.
+*/
+function safeParse(obj){
+  try {
+    if (Array.isArray(obj)) return obj;
+    if (!obj) return [];
+    return JSON.parse(obj);
+  } catch(e){
+    return [];
+  }
+}
+
+/* ===== Counters ===== */
+document.querySelectorAll('.counter').forEach(el=>{
+  const target = parseInt(el.getAttribute('data-target')) || 0;
+  let current = 0;
+  const duration = 900; // ms
+  const steps = Math.min(60, Math.max(10, Math.floor(duration/16)));
+  const increment = Math.ceil(target / steps) || 1;
+  const tick = () => {
+    current += increment;
+    if (current >= target){
+      el.innerText = target;
+    } else {
+      el.innerText = current;
+      requestAnimationFrame(tick);
+    }
+  };
+  tick();
+});
+
+/* ===== Data placeholders (replace by passing from view) =====
+   You should pass these from your Django view as JSON safe lists:
+   - energy_labels, energy_values
+   - active_customers, inactive_customers (ints)
+   - customer_growth_labels, customer_growth_values
+   - provider_labels, provider_values
+*/
+const ENERGY_LABELS = safeParse({{ energy_labels|safe|default:"[]" }});
+const ENERGY_VALUES = safeParse({{ energy_values|safe|default:"[]" }});
+const ACTIVE_COUNT = parseInt({{ active_customers|default:0 }});
+const INACTIVE_COUNT = parseInt({{ inactive_customers|default:0 }});
+
+const GROWTH_LABELS = safeParse({{ customer_growth_labels|safe|default:"[]" }});
+const GROWTH_VALUES = safeParse({{ customer_growth_values|safe|default:"[]" }});
+
+const PROVIDER_LABELS = safeParse({{ provider_labels|safe|default:"[]" }});
+const PROVIDER_VALUES = safeParse({{ provider_values|safe|default:"[]" }});
+
+/* ===== Color palettes - professional and accessible ===== */
+const COLORS = [
+  '#2f5bea','#1cc88a','#36b9cc','#f6c23e','#e74a3b','#858796','#6f8bff','#3b7bd3'
+];
+
+function pickColors(n){
+  const palette = [];
+  for (let i=0;i<n;i++) palette.push(COLORS[i % COLORS.length]);
+  return palette;
+}
+
+/* ===== Chart defaults ===== */
+Chart.defaults.font.family = "Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue'";
+Chart.defaults.color = '#4b5563';
+
+/* ===== ENERGY DONUT ===== */
+const donutCtx = document.getElementById('energyDonut').getContext('2d');
+const donut = new Chart(donutCtx, {
+  type: 'doughnut',
+  data: {
+    labels: ENERGY_LABELS,
+    datasets: [{
+      data: ENERGY_VALUES,
+      backgroundColor: pickColors(Math.max(ENERGY_VALUES.length, ENERGY_LABELS.length, 6)),
+      hoverOffset:14,
+      borderWidth:0
+    }]
+  },
+  options: {
+    cutout: '68%',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth:10, padding:12 } },
+      tooltip: { padding:10, titleFont: { weight:700 } }
+    },
+    animation: { duration: 900, easing:'easeOutCubic' }
+  }
+});
+
+/* ===== Active vs Inactive BAR ===== */
+const barCtx = document.getElementById('custBar').getContext('2d');
+const bar = new Chart(barCtx, {
+  type: 'bar',
+  data: {
+    labels: ['Active','Inactive'],
+    datasets: [{
+      label: 'Customers',
+      data: [ACTIVE_COUNT || 0, INACTIVE_COUNT || 0],
+      backgroundColor: ['#1cc88a','#e74a3b'],
+      borderRadius: 8,
+      barPercentage: 0.5
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display:false } },
+    scales: {
+      x: { grid: { display:false }, ticks: { color:'#475569', font: { size:12, weight:700 } } },
+      y: { beginAtZero:true, ticks: { color:'#475569' }, grid: { color:'rgba(15,23,42,0.06)' } }
+    },
+    animation: { duration: 900, easing:'easeOutQuart' }
+  }
+});
+ 
+
+/* ===== Optional: expose update functions to refresh charts dynamically ===== */
+window.__dashboard_update = {
+  updateEnergy: (labels, values) => { donut.data.labels = labels; donut.data.datasets[0].data = values; donut.update(); },
+  updateCounts: (active, inactive) => { bar.data.datasets[0].data = [active, inactive]; bar.update(); },
+  updateGrowth: (labels, values) => { growth.data.labels = labels; growth.data.datasets[0].data = values; growth.update(); },
+  updateProviders: (labels, values) => { provider.data.labels = labels; provider.data.datasets[0].data = values; provider.update(); }
+};
+
+</script>
+<!-- Footer -->
+<div class="    text-center   "   >
+  <div  >
+    
+    <span style="font-weight: 600; color: #000;">
+      © 2025. Powered by
+      <img src="{% static 'images/crono.png' %}" alt="Chronoanalytics Logo" style="height: 20px; vertical-align: middle;">
+      <a href="http://www.chronoanalytics.in/" target="_blank"
+         style="text-decoration: none;
+                background: linear-gradient(to right, #2575fc, #6a11cb);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-weight: 600;">
+        Chronoanalytics Solution</a>
+ 
+    | Marketed by
+      <img src="{% static 'images/TeimLogo.png' %}" alt="Teim Logo" style="height: 20px; vertical-align: middle;">
+      <a href="http://teim.in/" target="_blank"
+         style="text-decoration: none;
+                background: linear-gradient(to right, #2575fc, #6a11cb);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                font-weight: 600;">
+        TEIM
+      </a>
+    </span>
+
+  </div>
+</div>
+{% endblock %}

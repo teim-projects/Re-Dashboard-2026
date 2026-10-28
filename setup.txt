@@ -1,0 +1,20 @@
+## env setup
+env\scripts\activate
+
+## project setup
+# check env is activate "(env)" in terminal
+
+# create database 
+---> "re_dashboard"
+
+# run 
+pip install -r requirements.txt
+
+
+# update requrements.txt
+pip freeze > requirements.txt
+
+
+
+#Restart Nginx Server
+sudo systemctl restart re_dashboard.service

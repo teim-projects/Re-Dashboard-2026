@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Upload Files{% endblock %}
+
+{% block style_css %}
+<style>
+  .form-wrapper {
+    background: #fff;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+ .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .form-label {
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  .form-control {
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .btn-custom {
+    width: 160px;
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 576px) {
+    .form-heading {
+      font-size: 18px;
+    }
+
+    .btn-custom {
+      width: 100%;
+      font-size: 14px;
+    }
+
+    .form-control {
+      font-size: 14px;
+    }
+  }
+</style>
+{% endblock style_css %}
+
+{% load static %}
+{% block content %}
+<div class="main" style="min-height: 100vh;">
+  <div class="container">
+    <div class="row justify-content-center mt-5">
+      <div class="col-md-8 mt-5">
+        <div class="form-wrapper">
+          <div class="form-heading">📁 Upload Customer Energy Data</div>
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+
+          <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row">
+
+              <!-- ✅ Select User -->
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Select User</label>
+                <select class="form-control" id="userSelect">
+                  <option value="">-- Select --</option>
+                  {% for user in staff_users %}
+                    <option value="{{ user.username }}">{{ user.username }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+<!-- ✅ Select Provider -->
+<div class="col-md-4 mb-3">
+  <label class="form-label">Select Provider</label>
+  <select class="form-control" id="providerSelect" name="provider_name" required>
+    <option value="">-- Select --</option>
+    {% for provider in providers %}
+      <option value="{{ provider.name }}">{{ provider.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+
+              <!-- ✅ Select Energy Type -->
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Select Energy Type</label>
+                <select class="form-control" id="energySelect">
+                  <option value="">-- Select --</option>
+                  {% for energy in energy_types %}
+                    <option value="{{ energy.name }}">{{ energy.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- ✅ Auto-Matched Table -->
+              <div class="col-md-12 mb-3">
+                <label class="form-label">Auto-Matched Provider Table</label>
+                <select class="form-control" name="provider" id="tableSelect" required>
+                  <option value="">-- Auto-Select Table --</option>
+                  {% for table in expected_tables %}
+                    <option value="{{ table.name|lower }}">{{ table.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              
+              <div class="col-md-12 mb-3">
+                <label class="form-label">Choose Excel or CSV File <span class="text-danger">*</span></label>
+                <input type="file" class="form-control" name="data_file" required>
+              </div>
+            </div>
+
+            <div class="action-buttons mt-4">
+              <button type="submit" class="btn btn-success btn-custom">📤 Upload File</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ JavaScript for auto-matching -->
+<script>
+  function normalize(text) {
+    return text.trim().toLowerCase();
+  }
+
+  function autoSelectTable() {
+    const user = normalize(document.getElementById("userSelect").value);
+    const provider = normalize(document.getElementById("providerSelect").value);
+    const energy = normalize(document.getElementById("energySelect").value);
+
+    const targetTable = `${user}_${provider}_${energy}`;
+    const tableDropdown = document.getElementById("tableSelect");
+
+    for (let i = 0; i < tableDropdown.options.length; i++) {
+      const option = tableDropdown.options[i];
+      if (option.value.toLowerCase() === targetTable) {
+        tableDropdown.selectedIndex = i;
+        return;
+      }
+    }
+
+    // Reset if not matched
+    tableDropdown.selectedIndex = 0;
+  }
+
+  document.getElementById("userSelect").addEventListener("change", autoSelectTable);
+  document.getElementById("providerSelect").addEventListener("change", autoSelectTable);
+  document.getElementById("energySelect").addEventListener("change", autoSelectTable);
+</script>
+
+
+
+{% endblock content %}

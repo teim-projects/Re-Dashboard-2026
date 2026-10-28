@@ -1,0 +1,378 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Turbine Drill-Down Analysis{% endblock %}
+
+{% block style_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<style>
+  :root {
+    --card-radius: 16px;
+    --transition-speed: 0.25s;
+  }
+  body {
+    background-color: #f8fafc;
+  }
+  .page-header-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+    padding: 1.25rem;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .kpi-icon-bubble {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+  }
+  .visual-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    margin-bottom: 1.5rem;
+  }
+  .visual-card-header {
+    background: transparent;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 1.1rem 1.5rem;
+  }
+  .table thead th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0.75rem;
+  }
+  .turbine-picker-select {
+    font-size: 1.05rem;
+    font-weight: 700;
+    border-radius: 10px;
+    border: 2px solid #0284c7;
+    padding: 0.45rem 1rem;
+    color: #0f172a;
+    background-color: #f0f9ff;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3" style="margin-top: 85px;">
+
+  <!-- PAGE HEADER & TURBINE SELECTOR -->
+  <div class="page-header-card">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-purple-subtle text-purple fw-bold px-2 py-1" style="font-size: 11px;">
+            <i class="fa-solid fa-magnifying-glass-chart"></i> PRIORITY VISUAL #12
+          </span>
+          <span class="text-muted small">Turbine-Level Detail View</span>
+        </div>
+        <h3 class="fw-bold text-dark mt-1 mb-0">
+          Turbine Drill-Down: <span class="text-primary">{{ selected_wtg }}</span>
+          <span class="badge bg-light text-dark border ms-2 fw-normal fs-6">{{ selected_oem }}</span>
+        </h3>
+        <p class="text-muted small mb-0">Deep dive into individual turbine performance trajectory, operational loss breakdown, and breakdown logs</p>
+      </div>
+
+      <!-- TURBINE SELECTOR DROPDOWN -->
+      <form method="get" class="d-flex align-items-center gap-2">
+        <label class="fw-bold small text-muted text-nowrap"><i class="fa-solid fa-fan text-primary me-1"></i>Select WTG:</label>
+        <select name="selected_wtg" class="form-select turbine-picker-select" onchange="this.form.submit()">
+          {% for w in wtg_list %}
+          <option value="{{ w }}" {% if w == selected_wtg %}selected{% endif %}>{{ w }}</option>
+          {% endfor %}
+        </select>
+        <noscript><button type="submit" class="btn btn-primary btn-sm">Load</button></noscript>
+      </form>
+    </div>
+  </div>
+
+  <!-- INDIVIDUAL TURBINE KPI DECK (6 METRICS) -->
+  <div class="row g-3 mb-4">
+    <!-- Metric 1: Total Generation -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Total Yield</span>
+          <div class="kpi-icon-bubble bg-success-subtle text-success"><i class="fa-solid fa-bolt-lightning"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ total_gen|floatformat:0|intcomma }}</h4>
+        <small class="text-success fw-semibold mt-1 d-block"><i class="fa-solid fa-check me-1"></i>kWh Generated</small>
+      </div>
+    </div>
+
+    <!-- Metric 2: Machine Availability -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Machine Avail.</span>
+          <div class="kpi-icon-bubble bg-primary-subtle text-primary"><i class="fa-solid fa-gear"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ avg_ma }}%</h4>
+        <small class="text-primary fw-semibold mt-1 d-block"><i class="fa-solid fa-shield-halved me-1"></i>Unit Availability</small>
+      </div>
+    </div>
+
+    <!-- Metric 3: PLF -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Capacity Factor</span>
+          <div class="kpi-icon-bubble bg-info-subtle text-info"><i class="fa-solid fa-percent"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ avg_plf }}%</h4>
+        <small class="text-info fw-semibold mt-1 d-block"><i class="fa-solid fa-chart-line me-1"></i>PLF Efficiency</small>
+      </div>
+    </div>
+
+    <!-- Metric 4: Operating Hours -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Operating Hours</span>
+          <div class="kpi-icon-bubble bg-dark-subtle text-dark"><i class="fa-solid fa-clock"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ operating_hours|floatformat:1|intcomma }}</h4>
+        <small class="text-muted fw-semibold mt-1 d-block"><i class="fa-solid fa-play me-1"></i>Hours Running</small>
+      </div>
+    </div>
+
+    <!-- Metric 5: Grid Availability -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Grid Avail.</span>
+          <div class="kpi-icon-bubble bg-warning-subtle text-warning"><i class="fa-solid fa-tower-broadcast"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ avg_iga }}%</h4>
+        <small class="text-warning fw-semibold mt-1 d-block"><i class="fa-solid fa-network-wired me-1"></i>Internal Grid</small>
+      </div>
+    </div>
+
+    <!-- Metric 6: Downtime -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Total Downtime</span>
+          <div class="kpi-icon-bubble bg-danger-subtle text-danger"><i class="fa-solid fa-hourglass-end"></i></div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ total_downtime|floatformat:1|intcomma }}</h4>
+        <small class="text-danger fw-semibold mt-1 d-block"><i class="fa-solid fa-triangle-exclamation me-1"></i>Hours Lost</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: CHARTS ROW -->
+  <div class="row g-4 mb-4">
+    <!-- Time Series Generation Trajectory -->
+    <div class="col-lg-8">
+      <div class="visual-card h-100">
+        <div class="visual-card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="fw-bold text-dark mb-0">
+              <i class="fa-solid fa-chart-area text-primary me-2"></i>Generation Trajectory (kWh)
+            </h5>
+            <small class="text-muted">Monthly energy production for Turbine {{ selected_wtg }}</small>
+          </div>
+          <span class="badge bg-light text-muted border">Time Series</span>
+        </div>
+        <div class="card-body p-3">
+          <div id="wtgTrajectoryChart" style="min-height: 380px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operational Loss Allocation Donut -->
+    <div class="col-lg-4">
+      <div class="visual-card h-100">
+        <div class="visual-card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="fw-bold text-dark mb-0">
+              <i class="fa-solid fa-chart-pie text-danger me-2"></i>Operational Loss Breakdown
+            </h5>
+            <small class="text-muted">Downtime allocation by cause category (Hours)</small>
+          </div>
+          <span class="badge bg-light text-muted border">Loss Donut</span>
+        </div>
+        <div class="card-body p-3">
+          <div id="lossDonutChart" style="min-height: 380px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: TURBINE SPECIFIC BREAKDOWN INCIDENT LOG TABLE -->
+  <div class="visual-card">
+    <div class="visual-card-header d-flex justify-content-between align-items-center">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-list-check text-primary"></i>
+          <h5 class="fw-bold text-dark mb-0">Breakdown Log for {{ selected_wtg }}</h5>
+        </div>
+        <small class="text-muted">Historical technical incidents and restoration log</small>
+      </div>
+      <span class="badge bg-light text-dark border px-3 py-2 fw-semibold">
+        Incidents Logged: {{ breakdown_events|length }}
+      </span>
+    </div>
+    <div class="card-body p-3">
+      <div class="table-responsive">
+        <table id="drilldownTable" class="table table-hover table-striped w-100 align-middle">
+          <thead>
+            <tr>
+              <th style="width: 120px;">Date</th>
+              <th>Root Cause / Error Description</th>
+              <th class="text-end" style="width: 140px;">Duration (Hours)</th>
+              <th>Action Taken / Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ev in breakdown_events %}
+            <tr>
+              <td class="text-muted font-monospace small">{{ ev.date }}</td>
+              <td><strong class="text-danger">{{ ev.cause }}</strong></td>
+              <td class="text-end font-monospace fw-bold text-dark">{{ ev.duration }} hrs</td>
+              <td class="small text-muted">{{ ev.action|default:"Restored to normal operation." }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td class="text-muted text-center">-</td>
+              <td class="text-muted text-center">No breakdown records recorded for Turbine {{ selected_wtg }}.</td>
+              <td class="text-muted text-end">0.0 hrs</td>
+              <td class="text-muted text-center">-</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  let genSeries = [];
+  let lossCategories = [];
+  let lossValues = [];
+
+  try { genSeries = JSON.parse(`{{ generation_series_json|escapejs }}`) || []; } catch(e){}
+  try { lossCategories = JSON.parse(`{{ loss_categories_json|escapejs }}`) || []; } catch(e){}
+  try { lossValues = JSON.parse(`{{ loss_values_json|escapejs }}`) || []; } catch(e){}
+
+  // 1. Trajectory Chart FIRST
+  if (genSeries.length > 0) {
+    const trajOpts = {
+      series: [{
+        name: 'Generation (kWh)',
+        data: genSeries.map(d => d.y)
+      }],
+      chart: {
+        type: 'area',
+        height: 380,
+        toolbar: { show: true },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      stroke: { curve: 'smooth', width: 3 },
+      colors: ['#0ea5e9'],
+      fill: {
+        type: 'gradient',
+        gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 95, 100] }
+      },
+      xaxis: {
+        categories: genSeries.map(d => d.x),
+        labels: { rotate: -45, style: { fontSize: '11px', colors: '#64748b' } }
+      },
+      yaxis: {
+        title: { text: 'Generation (kWh)', style: { fontWeight: 600, color: '#64748b' } },
+        labels: {
+          formatter: function(val) {
+            if (val >= 1e6) return (val/1e6).toFixed(1) + 'M';
+            if (val >= 1e3) return (val/1e3).toFixed(0) + 'k';
+            return val;
+          }
+        }
+      },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val.toLocaleString() + ' kWh'; } }
+      }
+    };
+    new ApexCharts(document.querySelector("#wtgTrajectoryChart"), trajOpts).render();
+  } else {
+    document.querySelector("#wtgTrajectoryChart").innerHTML = '<div class="alert alert-light text-center m-4 text-muted">No monthly generation data found for this turbine.</div>';
+  }
+
+  // 2. Loss Donut Chart
+  if (lossCategories.length > 0 && lossValues.some(v => v > 0)) {
+    const donutOpts = {
+      series: lossValues,
+      labels: lossCategories,
+      chart: { type: 'donut', height: 380, fontFamily: 'Inter, system-ui, sans-serif' },
+      colors: ['#ef4444', '#06b6d4', '#f59e0b', '#8b5cf6', '#10b981'],
+      legend: { position: 'bottom' },
+      dataLabels: {
+        enabled: true,
+        formatter: function(val) { return val.toFixed(1) + '%'; }
+      },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val + ' Hours'; } }
+      }
+    };
+    new ApexCharts(document.querySelector("#lossDonutChart"), donutOpts).render();
+  } else {
+    document.querySelector("#lossDonutChart").innerHTML = '<div class="alert alert-light text-center m-4 text-muted">No operational loss data recorded for this turbine.</div>';
+  }
+
+  // 3. DataTables in try-catch so it never breaks charts
+  try {
+    $('#drilldownTable').DataTable({
+      paging: true,
+      pageLength: 10,
+      lengthMenu: [5, 10, 25, 50],
+      ordering: true,
+      order: [[0, 'desc']],
+      responsive: true,
+      language: { search: "_INPUT_", searchPlaceholder: "Search breakdown records..." }
+    });
+  } catch(e) {
+    console.error("DataTables error:", e);
+  }
+});
+</script>
+{% endblock %}

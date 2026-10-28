@@ -1,0 +1,509 @@
+{% extends "basesolar.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --g1: #6EE7B7;
+  --g2: #3B82F6;
+  --g3: #A78BFA;
+  --kpi-bg: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  --card: #ffffff;
+  --muted: #64748b;
+  --shadow: 0 10px 30px rgba(16,24,40,0.06);
+}
+
+/* Page container */
+.container {
+  margin-top: 60px;
+  margin-bottom: 40px;
+  max-width: 1200px;
+  padding: 18px;
+}
+
+/* FILTER ROW */
+.filter-row {
+  display:flex;
+  gap:12px;
+  align-items:flex-end;
+  background: var(--card);
+  padding:14px;
+  border-radius:12px;
+  box-shadow:var(--shadow);
+  flex-wrap:wrap;
+}
+.filter-col { display:flex; flex-direction:column; min-width:150px; }
+.filter-col label { font-size:13px; color:var(--muted); margin-bottom:6px; font-weight:600; }
+.filter-col select { padding:8px 10px; border-radius:8px; border:1px solid #e6eefc; background:#fff; }
+
+/* KPI ROW (animated gradient cards) */
+.kpi-row {
+  display:grid;
+  grid-template-columns: repeat(3,1fr);
+  gap:14px;
+  margin-top:16px;
+}
+.kpi-card {
+  position:relative;
+  overflow:hidden;
+  padding:20px 18px;
+  border-radius:10px;
+  color:#fff;
+  box-shadow:var(--shadow);
+  min-height:92px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  transition:transform .25s ease;
+}
+.kpi-card:hover{ transform: translateY(-6px) }
+
+.kpi-gradient-1{ background:linear-gradient(135deg,#4ADE80,#06B6D4); }
+.kpi-gradient-2{ background:linear-gradient(135deg,#60A5FA,#7C3AED); }
+.kpi-gradient-3{ background:linear-gradient(135deg,#FDBA74,#FB7185); }
+
+/* animated accent */
+.kpi-card::after{
+  content:"";
+  position:absolute;
+  right:-40%;
+  top:-50%;
+  width:180%;
+  height:180%;
+  opacity:0.08;
+  transform:rotate(25deg);
+}
+
+/* values */
+.kpi-title { font-size:14px; opacity:0.92; margin-bottom:6px; font-weight:700; letter-spacing:0.2px; }
+.kpi-value {
+  font-size:40px;
+  font-weight:900;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* mini-donut row (small gauges) */
+.gauge-row {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:flex-start;
+  margin-top:12px;
+}
+.gauge-box { width:70px; height:86px; text-align:center; background:var(--card); border-radius:8px; padding:6px; box-shadow:0 6px 18px rgba(2,6,23,0.04); }
+.gauge-box canvas{ width:70px !important; height:70px !important; display:block; margin:0 auto; }
+.gauge-label{ font-size:12px; margin-top:4px; color:#334155; font-weight:700; }
+
+/* charts area */
+.charts {
+  display:grid;
+  grid-template-columns: 1fr 340px;
+  gap:16px;
+  margin-top:18px;
+}
+.chart-card {
+  background:var(--card);
+  padding:16px;
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  min-height:320px;
+  display:flex;
+  flex-direction:column;
+}
+.chart-title { font-weight:700; margin-bottom:8px; color:#0f172a; }
+
+/* smaller pie container */
+.pie-small { height:100%; display:flex; align-items:center; justify-content:center; }
+
+/* legend */
+.legend-list { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.legend-item { display:flex; gap:8px; align-items:center; font-weight:700; color:#475569; }
+.legend-swatch { width:14px; height:14px; border-radius:4px; }
+
+/* responsive */
+@media (max-width: 1100px){
+  .charts{ grid-template-columns: 1fr; }
+  .kpi-row{ grid-template-columns: 1fr; }
+}
+
+  
+</style>
+
+<div class="container">
+
+  <!-- FILTERS -->
+  <div class="filter-row">
+    <div class="filter-col">
+      <label>Site</label>
+      <select id="filter-site"><option value="">All Sites</option></select>
+    </div>
+
+    <div class="filter-col">
+      <label>Year</label>
+      <select id="filter-year"><option value="">All Years</option></select>
+    </div>
+
+    <div class="filter-col">
+      <label>Quarter</label>
+      <select id="filter-quarter">
+        <option value="">All</option>
+        <option value="Q1">Q1 (Jan–Mar)</option>
+        <option value="Q2">Q2 (Apr–Jun)</option>
+        <option value="Q3">Q3 (Jul–Sep)</option>
+        <option value="Q4">Q4 (Oct–Dec)</option>
+      </select>
+    </div>
+
+    <div class="filter-col">
+      <label>Month</label>
+      <select id="filter-month">
+        <option value="">All</option>
+        <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+        <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+        <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+        <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+    </div>
+
+    <div style="margin-left:auto; display:flex; gap:10px;">
+      <button id="btn-apply" class="btn btn-primary">Apply</button>
+      <button id="btn-reset" class="btn btn-secondary">Reset</button>
+    </div>
+  </div>
+
+  <!-- KPIs (animated gradients) -->
+  <div class="kpi-row" style="margin-top:16px;">
+    <div class="kpi-card kpi-gradient-1">
+      <div class="kpi-title">PLF_Daily</div>
+      <div class="kpi-value" id="kpi-plf">0.00</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;color:rgba(255,255,255,0.9);font-weight:600;font-size:13px;">
+        <div><i class="fas fa-chart-line"></i> Avg</div>
+        <div id="kpi-plf-sub" style="opacity:0.9">—</div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-gradient-2">
+      <div class="kpi-title">Grid_OK_Percentage</div>
+      <div class="kpi-value" id="kpi-grid">0.00</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;color:rgba(255,255,255,0.9);font-weight:600;font-size:13px;">
+        <div><i class="fas fa-plug"></i> Avg</div>
+        <div id="kpi-grid-sub" style="opacity:0.9">—</div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-gradient-3">
+      <div class="kpi-title">Plant_Availability</div>
+      <div class="kpi-value" id="kpi-avail">0.00</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;color:rgba(255,255,255,0.9);font-weight:600;font-size:13px;">
+        <div><i class="fas fa-check-circle"></i> Avg</div>
+        <div id="kpi-avail-sub" style="opacity:0.9">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- small gauges + charts -->
+  <div class="charts">
+    <!-- bar chart -->
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-chart-bar"></i> Monthly Generation vs Operating Hours</div>
+      <div style="flex:1; min-height:260px;">
+        <canvas id="barChart"></canvas>
+      </div>
+      <div style="margin-top:12px;" id="bar-legend"></div>
+    </div>
+
+    <!-- small donut / gauges -->
+    <div class="chart-card">
+      <div class="chart-title"><i class="fas fa-gauge-high"></i> Downtime Distribution</div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;flex:1;">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="legend-item"><div class="legend-swatch" style="background:#1E90FF"></div>GF</div>
+            <div class="legend-item"><div class="legend-swatch" style="background:#EF4444"></div>FM</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="legend-item"><div class="legend-swatch" style="background:#F59E0B"></div>S</div>
+            <div class="legend-item"><div class="legend-swatch" style="background:#10B981"></div>U</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:center;justify-content:center">
+          <div class="gauge-box"><canvas id="gauge_GF"></canvas><div class="gauge-label">GF</div></div>
+          <div class="gauge-box"><canvas id="gauge_FM"></canvas><div class="gauge-label">FM</div></div>
+          <div class="gauge-box"><canvas id="gauge_S"></canvas><div class="gauge-label">S</div></div>
+          <div class="gauge-box"><canvas id="gauge_U"></canvas><div class="gauge-label">U</div></div>
+        </div>
+
+        <div style="flex:1;display:flex;align-items:center;justify-content:center">
+          <div style="width:220px; height:120px;">
+            <canvas id="pieChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================
+   CONFIG
+========================= */
+const API = "{% url 'api_solar_summary_dashboard' %}";
+const MONTHS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+];
+
+/* =========================
+   GLOBAL STATE
+========================= */
+let state = {
+  years: [],                 // filtered years (for charts)
+  sites: [],
+  monthly_by_year: {},
+  pie: [],
+  kpis: {}
+};
+
+/* 🔥 MASTER DATA (FIX) */
+let masterYears = null;
+let masterSites = null;
+
+let barChart = null;
+let pieChart = null;
+let gaugeCharts = {};
+
+/* =========================
+   HELPERS
+========================= */
+const num = v => (v == null || isNaN(v)) ? 0 : Number(v);
+const fmt = (n, d = 2) => num(n).toFixed(d);
+
+/* =========================
+   FETCH DATA
+========================= */
+async function fetchData(){
+  const site    = document.getElementById("filter-site").value;
+  const year    = document.getElementById("filter-year").value;
+  const quarter = document.getElementById("filter-quarter").value;
+  const month   = document.getElementById("filter-month").value;
+
+  const params = new URLSearchParams();
+  if(site)    params.append("site", site);
+  if(year)    params.append("year", year);
+  if(quarter) params.append("quarter", quarter);
+  if(month)   params.append("month", month);
+
+  const res  = await fetch(API + "?" + params.toString());
+  const json = await res.json();
+
+  if(!json || json.status !== "ok"){
+    console.error("API Error", json);
+    return;
+  }
+
+  /* ---------- STORE MASTER DATA ONCE ---------- */
+  if (!masterYears && json.years) {
+    masterYears = json.years.map(y => String(y));
+  }
+  if (!masterSites && json.sites) {
+    masterSites = [...json.sites];
+  }
+
+  /* ---------- FILTERED DATA ---------- */
+  state = {
+    years: (json.years || []).map(y => String(y)),  // 🔑 FORCE STRING
+    sites: json.sites || [],
+    monthly_by_year: json.monthly_by_year || {},
+    pie: json.pie || [],
+    kpis: json.kpis || {}
+  };
+
+  populateFilters();
+  updateUI();
+}
+
+/* =========================
+   POPULATE FILTERS (MASTER-BASED)
+========================= */
+function populateFilters(){
+  const siteSel = document.getElementById("filter-site");
+  const yearSel = document.getElementById("filter-year");
+
+  const curSite = siteSel.value;
+  const curYear = yearSel.value;
+
+  /* ---- SITES ---- */
+  siteSel.innerHTML = "<option value=''>All Sites</option>";
+  (masterSites || []).forEach(s => {
+    const o = document.createElement("option");
+    o.value = s;
+    o.textContent = s;
+    siteSel.appendChild(o);
+  });
+  siteSel.value = curSite;
+
+  /* ---- YEARS (🔥 FIX) ---- */
+  yearSel.innerHTML = "<option value=''>All Years</option>";
+  (masterYears || []).forEach(y => {
+    const o = document.createElement("option");
+    o.value = y;
+    o.textContent = y;
+    yearSel.appendChild(o);
+  });
+  yearSel.value = curYear;
+}
+
+/* =========================
+   UPDATE UI
+========================= */
+function updateUI(){
+  document.getElementById("kpi-plf").textContent   = fmt(state.kpis.plf_daily);
+  document.getElementById("kpi-grid").textContent = fmt(state.kpis.grid_ok);
+  document.getElementById("kpi-avail").textContent= fmt(state.kpis.plant_availability);
+
+  drawBarChart();
+  drawMiniGauges();
+  drawPieChart();
+}
+
+/* =========================
+   BAR CHART (FIXED)
+========================= */
+function drawBarChart(){
+  const selectedYear = document.getElementById("filter-year").value;
+
+  let gen = new Array(12).fill(0);
+  let op  = new Array(12).fill(0);
+
+  if (selectedYear && state.monthly_by_year[selectedYear]) {
+    // ✅ SINGLE YEAR
+    const arr = state.monthly_by_year[selectedYear];
+    arr.forEach((r, i) => {
+      gen[i] = num(r.gen);
+      op[i]  = num(r.op);
+    });
+  } else {
+    // ✅ ALL YEARS
+    Object.keys(state.monthly_by_year).forEach(y => {
+      const arr = state.monthly_by_year[y];
+      arr.forEach((r, i) => {
+        gen[i] += num(r.gen);
+        op[i]  += num(r.op);
+      });
+    });
+  }
+
+  if (barChart) barChart.destroy();
+
+  barChart = new Chart(document.getElementById("barChart"), {
+    type: "bar",
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label: "Generation Hours", data: gen, backgroundColor: "#2563eb", borderRadius: 6 },
+        { label: "Operating Hours",  data: op,  backgroundColor: "#38bdf8", borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { position: "top" } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+/* =========================
+   MINI GAUGES
+========================= */
+function drawMiniGauges(){
+  Object.values(gaugeCharts).forEach(c => c.destroy());
+  gaugeCharts = {};
+
+  const colors = { GF:"#1E90FF", FM:"#EF4444", S:"#F59E0B", U:"#10B981" };
+  const values = {};
+  state.pie.forEach(p => values[p.label] = num(p.value));
+
+  ["GF","FM","S","U"].forEach(label => {
+    gaugeCharts[label] = new Chart(document.getElementById("gauge_" + label), {
+      type: "doughnut",
+      data: {
+        datasets: [{
+          data: [values[label] || 0, 100 - (values[label] || 0)],
+          backgroundColor: [colors[label], "#e5e7eb"],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        rotation: -135 * Math.PI / 180,
+        circumference: 270 * Math.PI / 180,
+        cutout: "75%",
+        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+      }
+    });
+  });
+}
+
+/* =========================
+   PIE CHART
+========================= */
+function drawPieChart(){
+  if(pieChart) pieChart.destroy();
+
+  pieChart = new Chart(document.getElementById("pieChart"), {
+    type: "doughnut",
+    data: {
+      labels: state.pie.map(d => `${d.label} ${d.value}%`),
+      datasets: [{
+        data: state.pie.map(d => d.value),
+        backgroundColor: state.pie.map(d =>
+          d.label==="GF"?"#1E90FF":
+          d.label==="FM"?"#EF4444":
+          d.label==="S" ?"#F59E0B":"#10B981"
+        )
+      }]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      cutout:"60%",
+      plugins:{ legend:{ display:false } }
+    }
+  });
+}
+
+/* =========================
+   EVENTS
+========================= */
+["filter-site","filter-year","filter-quarter","filter-month"]
+  .forEach(id => document.getElementById(id).addEventListener("change", fetchData));
+
+document.getElementById("btn-apply").addEventListener("click", fetchData);
+
+document.getElementById("btn-reset").addEventListener("click", ()=>{
+  ["filter-site","filter-year","filter-quarter","filter-month"]
+    .forEach(id => document.getElementById(id).value = "");
+  fetchData();
+});
+
+/* =========================
+   INIT
+========================= */
+fetchData();
+</script>
+
+
+{% endblock %}

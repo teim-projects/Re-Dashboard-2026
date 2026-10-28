@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Login - TEIM{% endblock %}
+
+{% block style_css %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #ffffff, #f6f9ff, #f8fffb);
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+  /* Header Section */
+  .header {
+    background: #fff;
+    border-bottom: 1px solid #e5e9f0;
+    padding: 10px 25px;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Center Wrapper */
+  .login-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 100px 20px 60px;
+    background: url("{% static 'images/bg_pattern.png' %}") center/contain no-repeat;
+    min-height: 100vh;
+  }
+
+  /* Login Card */
+  .login-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 18px;
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 420px;
+    padding: 45px 35px;
+    animation: floatIn 0.8s ease-out;
+    border: 1px solid #eaeaea;
+    transition: all 0.3s ease;
+  }
+
+  .login-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+  }
+
+  @keyframes floatIn {
+    0% {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Heading */
+  .login-header {
+    text-align: center;
+    margin-bottom: 35px;
+  }
+
+  .login-header h2 {
+    font-size: 26px;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 6px;
+  }
+
+  .login-header p {
+    color: #555;
+    font-size: 15px;
+  }
+
+  /* Input fields */
+  .form-group {
+    position: relative;
+    margin-bottom: 25px;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid #dfe6ee;
+    border-radius: 10px;
+    background: #fff;
+    color: #222;
+    font-size: 15px;
+    transition: all 0.3s ease;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: #1ab69d;
+    box-shadow: 0 0 0 3px rgba(26, 182, 157, 0.2);
+  }
+
+  .form-label {
+    position: absolute;
+    left: 16px;
+    top: 14px;
+    color: #777;
+    font-size: 15px;
+    pointer-events: none;
+    transition: all 0.3s ease;
+     padding: 0 4px;
+  }
+
+  .form-control:focus ~ .form-label,
+  .form-control:not(:placeholder-shown) ~ .form-label {
+    top: -9px;
+    font-size: 12px;
+    color: #1ab69d;
+    font-weight: 600;
+  }
+
+  /* Password toggle */
+  .password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  .password-toggle:hover {
+    color: #1ab69d;
+  }
+
+  /* Buttons */
+  .btn-custom {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary-custom {
+    background: linear-gradient(135deg, #1ab69d, #23d5ab);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(26, 182, 157, 0.3);
+  }
+
+  .btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(26, 182, 157, 0.4);
+  }
+
+  /* Back Button */
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    background: #f3f4f6;
+    border: 1px solid #e0e0e0;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    color: #333;
+    position: absolute;
+    top: 18px;
+    right: 18px;
+  }
+
+  .btn-icon:hover {
+    background: #e9f8f6;
+    border-color: #1ab69d;
+    transform: scale(1.1);
+  }
+
+  /* Alerts */
+  .alert {
+    border-radius: 10px;
+    padding: 10px;
+    margin-top: 10px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .footer {
+    text-align: center;
+     font-size: 14px;
+    color: #444;
+  }
+
+  .footer a {
+    color: #1ab69d;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  @media (max-width: 480px) {
+    .login-card {
+      padding: 35px 25px;
+      margin: 0 15px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="header">
+  <div class="container-fluid py-1">
+    <div class="row align-items-center justify-content-between">
+      <div class="col-auto">
+        <img src="{% static 'images/TeimLogo.png' %}" alt="TEIM Logo" height="48">
+      </div>
+      <div class="col-auto">
+        <img src="{% static 'images/crono.png' %}" alt="Chronoanalytics Logo" height="48">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="login-wrapper">
+  <div class="login-card" data-aos="fade-up">
+    <a href="{% url 'index' %}" class="btn-icon" title="Go Back">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="22" height="22">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+    </a>
+
+    <div class="login-header">
+      <h2>Welcome </h2>
+      <p>Please sign in to continue</p>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+
+      {% if error %}
+        <div class="alert alert-danger"><strong>Oops!</strong> {{ error }}</div>
+      {% endif %}
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <div class="form-group">
+        <input type="text" class="form-control" name="username" id="username" placeholder=" " required>
+        <label class="form-label" for="username">Username</label>
+      </div>
+
+      <div class="form-group">
+        <input type="password" class="form-control" name="password" id="password" placeholder=" " required>
+        <label class="form-label" for="password">Password</label>
+        <span class="password-toggle" onclick="togglePassword()">
+          <i class="fas fa-eye" id="toggleIcon"></i>
+        </span>
+      </div>
+
+      <button type="submit" class="btn-custom btn-primary-custom mb-2">SIGN IN</button>
+    </form>
+  </div>
+</div>
+
+<div class="footer">
+  {% include 'fotter.html' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+<script>
+  AOS.init({ once: true });
+
+  function togglePassword() {
+    const field = document.getElementById('password');
+    const icon = document.getElementById('toggleIcon');
+    if (field.type === 'password') {
+      field.type = 'text';
+      icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+      field.type = 'password';
+      icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+  }
+</script>
+{% endblock %}
+  

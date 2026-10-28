@@ -1,0 +1,424 @@
+{% extends "basewind.html" %}
+{% load static %}
+
+{% block title %}DSM Analytics Dashboard{% endblock %}
+
+{% block content %}
+
+<style>
+:root {
+    --glass-bg: rgba(255,255,255,0.78);
+    --glass-border: rgba(255,255,255,0.35);
+    --shadow-soft: 0 18px 45px rgba(0,0,0,.08);
+}
+
+/* PAGE */
+.dashboard-wrapper {
+    padding: 30px 34px;
+    background: linear-gradient(180deg,#f8fafc,#eef2f7);
+    min-height: 100vh;
+}
+
+/* HEADER */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+}
+
+.dashboard-title h2 {
+    font-weight: 800;
+}
+
+.dashboard-title p {
+    margin: 0;
+    color: #64748b;
+}
+
+/* BUTTONS */
+.btn {
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+/* GLASS CARD */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: var(--shadow-soft);
+}
+
+/* KPI */
+.kpi {
+    padding: 10px;
+    text-align: center;
+    color: #fff;
+    border-radius: 10px;
+    transition: all .25s ease;
+}
+
+.kpi:hover {
+    transform: translateY(-6px) scale(1.01);
+}
+
+.kpi-icon {
+    font-size: 2.6rem;
+    margin-bottom: 10px;
+}
+
+.kpi-value {
+    font-size: 2.3rem;
+    font-weight: 800;
+}
+
+.gradient-orange {background: linear-gradient(135deg,#fb923c,#f97316);}
+.gradient-green  {background: linear-gradient(135deg,#22c55e,#16a34a);}
+.gradient-blue   {background: linear-gradient(135deg,#6366f1,#4f46e5);}
+.gradient-dark   {background: linear-gradient(135deg,#334155,#020617);}
+
+/* SECTION */
+.section {
+    margin-bottom: 38px;
+}
+
+.section-title {
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* CHART IMAGE */
+.chart-img {
+    width: 100%;
+    max-height: 420px;
+    object-fit: contain;
+}
+
+/* MODAL */
+.modal-content {
+    border-radius: 22px;
+}
+
+.modal-header {
+    position: sticky;
+    top: 0;
+    background: var(--glass-bg);
+    z-index: 10;
+    border-bottom: 1px solid var(--glass-border);
+}
+</style>
+
+
+<div class="dashboard-wrapper mt-5">
+
+
+    <!-- ============== HEADER ============== -->
+    <div class="dashboard-header mt-3">
+        <div class="dashboard-title">
+            {% if last_loaded %}
+<div class="  text-center fw-semibold  text-info" 
+     style="border-radius: 14px;">
+    📌 Showing last saved DSM calculation 
+    <strong>{{ last_date|date:"d M Y, h:i A" }}</strong>
+</div>
+{% endif %}
+            <!-- <h2><i class="fas fa-balance-scale text-primary"></i> DSM Analytics</h2> -->
+            <!-- <p>Deviation analysis, ML prediction & future DSM forecast</p> -->
+        </div>
+
+<div class="header-actions d-flex align-items-center gap-2">
+
+    <button class="btn btn-outline-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#historyModal">
+        <i class="fas fa-history"></i> History
+    </button>
+
+    {% if forecast or model_metrics %}
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save">
+
+        <input type="hidden" name="total_dsm" value="{{ total_dsm }}">
+        <input type="hidden" name="next_month_dsm" value="{{ next_month_dsm }}">
+        <input type="hidden" name="mae" value="{{ model_metrics.mae }}">
+        <input type="hidden" name="rmse" value="{{ model_metrics.rmse }}">
+        <input type="hidden" name="r2" value="{{ model_metrics.r2 }}">
+        <input type="hidden" name="forecast_total" value="{{ forecast.total_forecast }}">
+        <input type="hidden" name="forecast_avg" value="{{ forecast.avg_forecast }}">
+        <input type="hidden" name="forecast_max" value="{{ forecast.max_forecast }}">
+
+        <button class="btn btn-success">
+            <i class="fas fa-save"></i> Save Result
+        </button>
+    </form>
+    {% endif %}
+
+</div>
+
+    </div>
+
+
+    <!-- ============== KPI ROW ============== -->
+    <div class="row g-4 section">
+
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi gradient-orange">
+                <div class="kpi-icon"><i class="fas fa-rupee-sign"></i></div>
+                <div>Total DSM</div>
+                <div class="kpi-value">₹ {{ total_dsm|default:"0.00" }}</div>
+            </div>
+        </div>
+
+        {% if next_month_dsm %}
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi gradient-green">
+                <div class="kpi-icon"><i class="fas fa-chart-line"></i></div>
+                <div>Next Month DSM</div>
+                <div class="kpi-value">₹ {{ next_month_dsm }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if model_metrics %}
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi gradient-blue">
+                <div class="kpi-icon"><i class="fas fa-robot"></i></div>
+                <div>Model R²</div>
+                <div class="kpi-value">{{ model_metrics.r2 }}</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if forecast %}
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi gradient-dark">
+                <div class="kpi-icon"><i class="fas fa-bolt"></i></div>
+                <div>Avg Forecast</div>
+                <div class="kpi-value">{{ forecast.avg_forecast }} kW</div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+
+    <!-- ============== UPLOAD + FORECAST ============== -->
+    <div class="row g-4 section">
+
+        <!-- Upload DSM File -->
+        <div class="col-lg-4">
+            <div class="glass-card p-4">
+                <div class="section-title">
+                    <i class="fas fa-file-excel text-success"></i> Upload DSM Excel
+                </div>
+
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="file" name="dsm_file" class="form-control mb-3" required>
+
+                    <button class="btn btn-primary w-100">
+                        <i class="fas fa-calculator"></i> Calculate DSM
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Forecast Summary -->
+        {% if forecast %}
+        <div class="col-lg-8">
+            <div class="glass-card p-4">
+                <div class="section-title">
+                    <i class="fas fa-calendar-alt"></i> Forecast Summary
+                </div>
+
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h6>Total</h6>
+                        <h4 class="text-primary">{{ forecast.total_forecast }} kW</h4>
+                    </div>
+
+                    <div class="col-md-4">
+                        <h6>Average</h6>
+                        <h4 class="text-success">{{ forecast.avg_forecast }} kW</h4>
+                    </div>
+
+                    <div class="col-md-4">
+                        <h6>Maximum</h6>
+                        <h4 class="text-danger">{{ forecast.max_forecast }} kW</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+
+    <!-- ============== ML METRICS ============== -->
+    {% if model_metrics %}
+    <div class="section">
+        <div class="glass-card p-4">
+
+            <div class="section-title">
+                <i class="fas fa-brain"></i> ML Model Accuracy
+            </div>
+
+            <div class="row text-center">
+
+                <div class="col-md-4">
+                    <h6>MAE</h6>
+                    <h4>{{ model_metrics.mae }}</h4>
+                </div>
+
+                <div class="col-md-4">
+                    <h6>RMSE</h6>
+                    <h4>{{ model_metrics.rmse }}</h4>
+                </div>
+
+                <div class="col-md-4">
+                    <h6>R² Score</h6>
+                    <h4 class="text-success">{{ model_metrics.r2 }}</h4>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+  <!-- SAVE SUCCESS TOAST -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999">
+    <div id="saveToast" class="toast align-items-center text-bg-success border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body">
+                DSM Result Saved Successfully! ✅
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                    data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        {% if messages %}
+            {% for m in messages %}
+                {% if m.tags == "success" %}
+                    var toastEl = document.getElementById("saveToast");
+                    var toast = new bootstrap.Toast(toastEl);
+                    toast.show();
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    });
+</script>
+
+
+    <!-- ============== CHARTS ============== -->
+    <div class="row g-4 section">
+
+        {% if img_url %}
+        <div class="col-lg-6">
+            <div class="glass-card p-4">
+                <div class="section-title">
+                    <i class="fas fa-chart-area"></i> Current Month Deviation
+                </div>
+                <img src="{{ img_url }}" class="chart-img">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if next_img_url %}
+        <div class="col-lg-6">
+            <div class="glass-card p-4">
+                <div class="section-title">
+                    <i class="fas fa-chart-line"></i> Next Month Deviation Forecast
+                </div>
+                <img src="{{ next_img_url }}" class="chart-img">
+            </div>
+        </div>
+        {% endif %}
+
+        {% if weekly_img_url %}
+        <div class="col-lg-12">
+            <div class="glass-card p-4">
+                <div class="section-title">
+                    <i class="fas fa-calendar-week"></i> Weekly DSM Charges
+                </div>
+                <img src="{{ weekly_img_url }}" class="chart-img">
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+
+</div>
+
+
+<!-- ============== HISTORY MODAL ============== -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content glass-card">
+
+            <div class="modal-header">
+                <h4 class="modal-title"><i class="fas fa-history text-primary"></i> DSM Calculation History</h4>
+                <!-- <button type="button" class="btn-close mr-2 mt-1 text-danger" data-bs-dismiss="modal"></button> -->
+<a href="{% url 'export_dsm_history' %}" class="btn btn-success btn-sm">
+    <i class="fa-solid fa-file-excel"></i> Export
+</a>
+
+            </div>
+
+            <div class="modal-body">
+
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Total DSM</th>
+                            <th>Next Month</th>
+                            <th>R²</th>
+                            <th>Avg Forecast</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for r in history %}
+                        <tr>
+                            <td>{{ r.created_at|date:"d M Y H:i" }}</td>
+                            <td>₹ {{ r.total_dsm }}</td>
+                            <td>{{ r.next_month_dsm }}</td>
+                            <td>{{ r.r2 }}</td>
+                            <td>{{ r.forecast_avg }} kW</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                No DSM history available
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+            </div>
+
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+
+
+

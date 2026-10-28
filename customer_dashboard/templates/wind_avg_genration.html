@@ -1,0 +1,691 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<style>
+  :root {
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+    --card-radius: 14px;
+  }
+  body {
+    background-color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .dash-container {
+    padding: 24px 32px 60px 32px;
+    margin-top: 65px;
+  }
+  .kpi-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid #e2e8f0;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  }
+  .kpi-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+  }
+  .kpi-card.daily-gen::before { background: #3b82f6; }
+  .kpi-card.peak-gen::before { background: #10b981; }
+  .kpi-card.tot-mwh::before { background: #8b5cf6; }
+  .kpi-card.plf::before { background: #f59e0b; }
+
+  .kpi-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+  }
+  .kpi-subtext {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+  .chart-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid #e2e8f0;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .chart-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+  }
+  .chart-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+  .chart-subtitle {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 2px;
+  }
+  .btn-filter-toggle {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-filter-toggle.active {
+    background: #1e293b;
+    color: #ffffff;
+    border-color: #1e293b;
+  }
+  .table-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+  }
+  .badge-optimal { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-weight: 600; }
+  .badge-moderate { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 600; }
+  .badge-low { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-weight: 600; }
+  .filter-chip {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #f1f5f9;
+    color: #334155;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #e2e8f0;
+  }
+</style>
+
+<div class="dash-container">
+
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+      <div class="d-flex align-items-center gap-2">
+        <h3 class="fw-bold text-dark m-0">Daily Average Generation</h3>
+        <span class="badge bg-primary-subtle text-primary fw-semibold px-2 py-1 rounded-pill" style="font-size: 0.75rem;">
+          Production Yield Analytics
+        </span>
+      </div>
+      <p class="text-muted small m-0 mt-1">WTG daily generation intensity (kWh/day), energy productivity ranking &amp; seasonal trajectories</p>
+    </div>
+
+    <!-- Filter Buttons -->
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <button type="button" class="btn btn-sm btn-white border shadow-sm px-3 py-1 rounded-pill" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+        <i class="fas fa-calendar-alt text-primary me-1"></i> Date Range
+      </button>
+      <button type="button" class="btn btn-sm btn-white border shadow-sm px-3 py-1 rounded-pill" data-bs-toggle="modal" data-bs-target="#providerModal">
+        <i class="fas fa-industry text-info me-1"></i> OEM Provider
+      </button>
+      <button type="button" class="btn btn-sm btn-white border shadow-sm px-3 py-1 rounded-pill" data-bs-toggle="modal" data-bs-target="#siteModal">
+        <i class="fas fa-map-marker-alt text-danger me-1"></i> Site
+      </button>
+      <button type="button" class="btn btn-sm btn-white border shadow-sm px-3 py-1 rounded-pill" data-bs-toggle="modal" data-bs-target="#wtgModal">
+        <i class="fas fa-fan text-success me-1"></i> WTG Select
+      </button>
+      <a href="?clear_filters=1" class="btn btn-sm btn-outline-danger px-3 py-1 rounded-pill">
+        <i class="fas fa-sync-alt me-1"></i> Reset
+      </a>
+    </div>
+  </div>
+
+  <!-- ACTIVE FILTERS BAR -->
+  {% if date_from or date_to or selected_providers or selected_sites or selected_wtgs %}
+  <div class="d-flex flex-wrap gap-2 mb-4 align-items-center bg-white p-2 px-3 rounded-3 border">
+    <span class="text-muted small fw-semibold"><i class="fas fa-filter text-primary me-1"></i> Active Filters:</span>
+    {% if date_from and date_to %}
+      <span class="filter-chip"><i class="far fa-calendar"></i> {{ date_from }} to {{ date_to }}</span>
+    {% endif %}
+    {% for p in selected_providers %}
+      <span class="filter-chip"><i class="fas fa-industry"></i> OEM: {{ p }}</span>
+    {% endfor %}
+    {% for s in selected_sites %}
+      <span class="filter-chip"><i class="fas fa-map-pin"></i> Site: {{ s }}</span>
+    {% endfor %}
+    {% for w in selected_wtgs %}
+      <span class="filter-chip"><i class="fas fa-fan"></i> WTG: {{ w }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- KPI SUMMARY CARDS -->
+  <div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card daily-gen">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-title">Fleet Daily Mean</div>
+            <div class="kpi-value text-primary">{{ kpi_daily_avg|floatformat:0|intcomma }} <span style="font-size: 1rem; font-weight: 500;">kWh/day</span></div>
+            <div class="kpi-subtext"><i class="fas fa-bolt text-primary me-1"></i> Average output per turbine per day</div>
+          </div>
+          <div class="p-2 bg-blue-50 text-primary rounded-3">
+            <i class="fas fa-bolt fa-lg"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card peak-gen">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-title">Peak Daily Yield Turbine</div>
+            <div class="kpi-value text-success">{{ kpi_peak_val|floatformat:0|intcomma }} <span style="font-size: 1rem; font-weight: 500;">kWh/d</span></div>
+            <div class="kpi-subtext"><i class="fas fa-trophy text-success me-1"></i> Turbine: <strong>{{ kpi_peak_wtg }}</strong></div>
+          </div>
+          <div class="p-2 bg-emerald-50 text-success rounded-3">
+            <i class="fas fa-award fa-lg"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card tot-mwh">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-title">Total Energy Generated</div>
+            <div class="kpi-value text-purple">{{ kpi_total_mwh|floatformat:1|intcomma }} <span style="font-size: 1rem; font-weight: 500;">MWh</span></div>
+            <div class="kpi-subtext"><i class="fas fa-solar-panel text-purple me-1"></i> Across {{ kpi_total_wtgs }} turbines</div>
+          </div>
+          <div class="p-2 bg-purple-50 text-purple rounded-3">
+            <i class="fas fa-chart-line fa-lg"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card plf">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="kpi-title">Fleet Capacity Factor</div>
+            <div class="kpi-value text-warning">{{ kpi_fleet_plf|floatformat:1 }}%</div>
+            <div class="kpi-subtext"><i class="fas fa-percent text-warning me-1"></i> Fleet normalized PLF</div>
+          </div>
+          <div class="p-2 bg-amber-50 text-warning rounded-3">
+            <i class="fas fa-gauge-simple-high fa-lg"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HORIZONTAL DAILY AVERAGE GENERATION RANKING -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <div>
+        <h5 class="chart-title">
+          <i class="fas fa-chart-bar text-primary"></i>
+          Turbine Daily Average Generation (kWh/day)
+        </h5>
+        <div class="chart-subtitle">Clean horizontal ranking isolating high-yielding turbines vs underproducing units</div>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex gap-1" id="rankingSwitcher">
+          <button type="button" class="btn-filter-toggle active" data-view="top10">Top 10</button>
+          <button type="button" class="btn-filter-toggle" data-view="bottom10">Bottom 10</button>
+          <button type="button" class="btn-filter-toggle" data-view="top25">Top 25</button>
+          <button type="button" class="btn-filter-toggle" data-view="all">All WTGs</button>
+        </div>
+        <div class="d-flex align-items-center gap-1 ms-2">
+          <span class="small text-muted fw-bold">Page Size:</span>
+          <select id="chartPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
+            <option value="10" selected>10 WTGs</option>
+            <option value="15">15 WTGs</option>
+            <option value="25">25 WTGs</option>
+            <option value="all">All WTGs</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="p-3">
+      <div id="avgGenRankingChart" style="min-height: 420px;"></div>
+      <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
+        <span id="chartPaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
+        <nav aria-label="Chart Pagination">
+          <ul class="pagination pagination-sm mb-0" id="chartPaginationNav"></ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+  <!-- MONTHLY TREND & YIELD DONUT -->
+  <div class="row g-4 mb-4">
+    <div class="col-lg-8">
+      <div class="chart-card h-100 mb-0">
+        <div class="chart-header">
+          <div>
+            <h5 class="chart-title"><i class="fas fa-chart-line text-info"></i> Monthly Daily Mean Trajectory</h5>
+            <div class="chart-subtitle">12-Month daily average generation trajectory (kWh/day)</div>
+          </div>
+          <div class="badge bg-light text-muted border">Daily Average</div>
+        </div>
+        <div class="p-3">
+          <div id="monthlyAvgGenTrendChart" style="min-height: 320px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="chart-card h-100 mb-0">
+        <div class="chart-header">
+          <div>
+            <h5 class="chart-title"><i class="fas fa-pie-chart text-success"></i> Yield Performance Tiers</h5>
+            <div class="chart-subtitle">Turbines grouped by daily production band</div>
+          </div>
+        </div>
+        <div class="p-3">
+          <div id="yieldHealthDonutChart" style="min-height: 320px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TURBINE GENERATION TABLE -->
+  <div class="table-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold text-dark m-0"><i class="fas fa-table me-2 text-primary"></i>Turbine Daily Generation Yield Ledger</h5>
+      <span class="badge bg-light text-muted border px-3 py-2">Total Turbines: {{ table_data|length }}</span>
+    </div>
+    <div class="table-responsive">
+      <table id="avgGenTable" class="table table-hover align-middle w-100">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 60px;">Rank</th>
+            <th>Turbine ID</th>
+            <th>OEM Provider</th>
+            <th>Site / Location</th>
+            <th>Daily Mean Output</th>
+            <th>Total Energy (MWh)</th>
+            <th>Capacity Factor</th>
+            <th>Yield Tier</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in table_data %}
+          <tr>
+            <td class="fw-bold text-center">{{ row.rank }}</td>
+            <td class="fw-bold text-primary">
+              <a href="{% url 'wind_drill_down' %}?wtg={{ row.wtg }}" class="text-decoration-none">
+                <i class="fas fa-fan me-1 text-muted"></i>{{ row.wtg }}
+              </a>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ row.oem }}</span></td>
+            <td>{{ row.site }}</td>
+            <td class="fw-bold text-primary">{{ row.daily_avg|floatformat:0|intcomma }} kWh/day</td>
+            <td class="fw-semibold text-dark">{{ row.total_mwh|floatformat:1|intcomma }} MWh</td>
+            <td class="fw-semibold text-success">{{ row.plf|floatformat:1 }}%</td>
+            <td>
+              {% if row.daily_avg >= 10000 %}
+                <span class="badge badge-optimal px-2 py-1"><i class="fas fa-circle-check me-1"></i>High Yield</span>
+              {% elif row.daily_avg >= 6000 %}
+                <span class="badge badge-moderate px-2 py-1"><i class="fas fa-circle-info me-1"></i>Medium Yield</span>
+              {% else %}
+                <span class="badge badge-low px-2 py-1"><i class="fas fa-triangle-exclamation me-1"></i>Low Yield</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODALS -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="get">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Select Date Range</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">From Date</label>
+            <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">To Date</label>
+            <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary px-4">Apply Date Filter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="get">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Filter by OEM Provider</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% for p in providers %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}" id="prov_{{ forloop.counter }}"
+              {% if p in selected_providers %}checked{% endif %}>
+            <label class="form-check-label" for="prov_{{ forloop.counter }}">{{ p }}</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary px-4">Apply OEM Filter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="get">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Filter by Site</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% for s in sites %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}" id="site_{{ forloop.counter }}"
+              {% if s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label" for="site_{{ forloop.counter }}">{{ s }}</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary px-4">Apply Site Filter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="get">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold">Select Specific Turbines</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+          {% for w in wtgs %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}" id="wtg_{{ forloop.counter }}"
+              {% if w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label" for="wtg_{{ forloop.counter }}">{{ w }}</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary px-4">Apply WTG Filter</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+  const fullWtgData = {{ all_wtgs_json|safe|default:"[]" }};
+  const monthlyCats = {{ monthly_cats_json|safe|default:"[]" }};
+  const monthlyAvg = {{ monthly_avg_json|safe|default:"[]" }};
+
+  let rankingChartInstance = null;
+  let chartSourceData = [...fullWtgData];
+  let chartPageSize = 10;
+  let chartCurrentPage = 1;
+
+  function getChartTotalPages() {
+    if (chartPageSize === "all") return 1;
+    return Math.max(1, Math.ceil(chartSourceData.length / chartPageSize));
+  }
+
+  function updateChartPaginationNav() {
+    const nav = document.getElementById("chartPaginationNav");
+    const info = document.getElementById("chartPaginationInfo");
+    if (!nav) return;
+    const totalPages = getChartTotalPages();
+
+    if (chartPageSize === "all" || totalPages <= 1) {
+      nav.innerHTML = "";
+      if (info) info.textContent = `Showing All ${chartSourceData.length} Turbines`;
+      return;
+    }
+
+    const startIdx = (chartCurrentPage - 1) * chartPageSize + 1;
+    const endIdx = Math.min(chartCurrentPage * chartPageSize, chartSourceData.length);
+    if (info) info.textContent = `Showing WTGs ${startIdx}-${endIdx} of ${chartSourceData.length} (Page ${chartCurrentPage}/${totalPages})`;
+
+    let html = `<li class="page-item ${chartCurrentPage === 1 ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToChartPage(${chartCurrentPage - 1})">&laquo; Prev</button>
+    </li>`;
+
+    for (let p = 1; p <= totalPages; p++) {
+      if (totalPages > 6 && Math.abs(p - chartCurrentPage) > 2 && p !== 1 && p !== totalPages) {
+        if (p === 2 || p === totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        continue;
+      }
+      html += `<li class="page-item ${p === chartCurrentPage ? 'active' : ''}">
+        <button type="button" class="page-link" onclick="goToChartPage(${p})">${p}</button>
+      </li>`;
+    }
+
+    html += `<li class="page-item ${chartCurrentPage === totalPages ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToChartPage(${chartCurrentPage + 1})">Next &raquo;</button>
+    </li>`;
+    nav.innerHTML = html;
+  }
+
+  function renderPaginatedChart() {
+    let subset;
+    if (chartPageSize === "all") {
+      subset = [...chartSourceData];
+    } else {
+      const start = (chartCurrentPage - 1) * chartPageSize;
+      subset = chartSourceData.slice(start, start + chartPageSize);
+    }
+
+    const categories = subset.map(d => d.wtg);
+    const seriesData = subset.map(d => d.daily_avg);
+
+    const options = {
+      series: [{ name: "Daily Mean Generation (kWh/day)", data: seriesData }],
+      chart: {
+        type: "bar",
+        height: Math.max(380, subset.length * 30),
+        toolbar: { show: true, tools: { download: true } }
+      },
+      plotOptions: {
+        bar: {
+          horizontal: true,
+          barHeight: "68%",
+          borderRadius: 4,
+          distributed: true,
+          dataLabels: { position: "top" }
+        }
+      },
+      colors: subset.map(d => d.daily_avg >= 10000 ? "#10b981" : (d.daily_avg >= 6000 ? "#3b82f6" : "#f59e0b")),
+      dataLabels: {
+        enabled: true,
+        formatter: (val) => val > 0 ? Math.round(val).toLocaleString() + " kWh" : "",
+        offsetX: 24,
+        style: { fontSize: "11px", colors: ["#334155"], fontWeight: 700 }
+      },
+      xaxis: {
+        categories: categories,
+        title: { text: "Daily Generation (kWh/day)" },
+        labels: { formatter: (v) => Math.round(v).toLocaleString() }
+      },
+      yaxis: {
+        labels: { style: { fontWeight: 600, fontSize: "11px" } }
+      },
+      legend: { show: false },
+      tooltip: {
+        y: { formatter: (v) => Math.round(v).toLocaleString() + " kWh/day" }
+      },
+      grid: { borderColor: "#f1f5f9" }
+    };
+
+    if (rankingChartInstance) {
+      rankingChartInstance.destroy();
+    }
+    rankingChartInstance = new ApexCharts(document.querySelector("#avgGenRankingChart"), options);
+    rankingChartInstance.render();
+    updateChartPaginationNav();
+  }
+
+  window.goToChartPage = function(p) {
+    const total = getChartTotalPages();
+    if (p < 1 || p > total) return;
+    chartCurrentPage = p;
+    renderPaginatedChart();
+  };
+
+  // Monthly Spline Chart
+  function renderMonthlyTrend() {
+    const options = {
+      series: [{ name: "Fleet Daily Mean (kWh/day)", data: monthlyAvg }],
+      chart: {
+        type: "area",
+        height: 320,
+        toolbar: { show: false }
+      },
+      colors: ["#3b82f6"],
+      fill: {
+        type: "gradient",
+        gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] }
+      },
+      dataLabels: { enabled: false },
+      stroke: { curve: "smooth", width: 2.5 },
+      xaxis: { categories: monthlyCats },
+      yaxis: { labels: { formatter: v => Math.round(v).toLocaleString() } },
+      tooltip: { y: { formatter: v => Math.round(v).toLocaleString() + " kWh/day" } },
+      grid: { borderColor: "#f1f5f9" }
+    };
+    new ApexCharts(document.querySelector("#monthlyAvgGenTrendChart"), options).render();
+  }
+
+  // Yield Donut Chart
+  function renderHealthDonut() {
+    let high = fullWtgData.filter(d => d.daily_avg >= 10000).length;
+    let mid = fullWtgData.filter(d => d.daily_avg >= 6000 && d.daily_avg < 10000).length;
+    let low = fullWtgData.filter(d => d.daily_avg < 6000).length;
+
+    const options = {
+      series: [high, mid, low],
+      labels: ["High Yield (>=10k kWh/d)", "Medium Yield (6k-10k kWh/d)", "Low Yield (<6k kWh/d)"],
+      chart: { type: "donut", height: 320 },
+      colors: ["#10b981", "#3b82f6", "#f59e0b"],
+      legend: { position: "bottom", fontSize: "11px" },
+      dataLabels: { enabled: true }
+    };
+    new ApexCharts(document.querySelector("#yieldHealthDonutChart"), options).render();
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    renderPaginatedChart();
+    renderMonthlyTrend();
+    renderHealthDonut();
+
+    const pageSizeSelect = document.getElementById("chartPageSize");
+    if (pageSizeSelect) {
+      pageSizeSelect.addEventListener("change", function () {
+        chartPageSize = this.value === "all" ? "all" : parseInt(this.value);
+        chartCurrentPage = 1;
+        renderPaginatedChart();
+      });
+    }
+
+    $("#rankingSwitcher button").on("click", function() {
+      $("#rankingSwitcher button").removeClass("active");
+      $(this).addClass("active");
+      const view = $(this).data("view");
+      if (view === "top10") {
+        chartSourceData = [...fullWtgData];
+        chartPageSize = 10;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "10";
+      } else if (view === "bottom10") {
+        chartSourceData = [...fullWtgData].reverse();
+        chartPageSize = 10;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "10";
+      } else if (view === "top25") {
+        chartSourceData = [...fullWtgData];
+        chartPageSize = 25;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "25";
+      } else if (view === "all") {
+        chartSourceData = [...fullWtgData];
+        chartPageSize = "all";
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "all";
+      }
+      renderPaginatedChart();
+    });
+
+    try {
+      $("#avgGenTable").DataTable({
+        pageLength: 15,
+        order: [[0, "asc"]],
+        language: { search: "_INPUT_", searchPlaceholder: "Search turbines..." }
+      });
+    } catch(e) {
+      console.error("DataTable init error:", e);
+    }
+  });
+</script>
+{% endblock %}

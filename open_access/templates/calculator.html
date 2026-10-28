@@ -1,0 +1,520 @@
+{% extends 'basewind.html' %}
+{% load static %}
+
+{% block content %}
+
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #2af598 0%, #009efd 100%);
+        --card-bg: #ffffff;
+        --input-bg: #f8f9fa;
+        --text-main: #2d3748;
+        --shadow-soft: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    body {
+        font-family: 'Poppins', sans-serif;
+        background-color: #f0f2f5; /* Softer background */
+        color: var(--text-main);
+    }
+
+    /* --- Container & Card Styling --- */
+    .main-card {
+        background: var(--card-bg);
+        border-radius: 20px;
+        box-shadow: var(--shadow-soft);
+        padding: 40px;
+        margin-top: 10px;
+        margin-bottom: 50px;
+        animation: fadeInDown 0.8s ease-out;
+        border: none;
+    }
+
+    h3 {
+        font-weight: 700;
+        color: #4a5568;
+        letter-spacing: -0.5px;
+    }
+
+    h5 {
+        font-weight: 600;
+        color: #718096;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+        border-left: 4px solid #764ba2;
+        padding-left: 10px;
+    }
+
+    /* --- Custom Tabs --- */
+    .nav-tabs {
+        border-bottom: 10px !important;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+    .nav-tabs .nav-link {
+        border: none;
+        border-radius: 0px 50px 5px 50px;
+        padding: 10px 30px;
+        font-weight: 600;
+        color: #000000;
+        transition: all 0.3s ease;
+        background: transparent;
+        margin: 0 5px;
+    }
+    .nav-tabs .nav-link:hover {
+        background: #e2e8f0;
+        transform: translateY(-2px);
+    }
+    .nav-tabs .nav-link.active {
+        background: var(--primary-gradient);
+        color: rgb(255, 255, 255) !important;
+        box-shadow: 0 4px 15px rgba(118, 75, 162, 0.4);
+        transform: translateY(-2px);
+    }
+
+    /* --- Inputs --- */
+    label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 5px;
+    }
+
+    .form-control {
+        background-color: var(--input-bg);
+        border: 2px solid transparent;
+        border-radius: 12px;
+        height: 50px;
+        font-weight: 500;
+        color: #2d3748;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+    }
+
+    .form-control:hover {
+        background-color: #fff;
+        border-color: #e2e8f0;
+        transform: translateY(-2px);
+    }
+
+    .form-control:focus {
+        background-color: #fff;
+        border-color: #764ba2;
+        box-shadow: 0 0 0 4px rgba(118, 75, 162, 0.1);
+        transform: translateY(-2px);
+    }
+
+    /* --- Buttons --- */
+    .btn-next {
+        background: var(--primary-gradient);
+        border: none;
+        border-radius: 12px;
+        padding: 12px 40px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+        transition: all 0.3s ease;
+    }
+    .btn-next:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 25px rgba(118, 75, 162, 0.4);
+    }
+
+    .btn-calc {
+        background: var(--success-gradient);
+        border: none;
+        border-radius: 50px;
+        padding: 12px 50px;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: white;
+        box-shadow: 0 4px 15px rgba(0, 158, 253, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+    .btn-calc:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px rgba(0, 158, 253, 0.4);
+        color: white;
+    }
+    .btn-calc:active {
+        transform: scale(0.95);
+    }
+
+    /* --- Results Section --- */
+    .result-card {
+        background: #f8fbff;
+        border-radius: 15px;
+        padding: 20px;
+        border-left: 6px solid #4facfe;
+        transition: all 0.4s ease;
+        position: relative;
+        overflow: hidden;
+        height: 100%;
+        cursor: default;
+    }
+    .result-card:hover {
+        background: #ffffff;
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-hover);
+        border-left-width: 10px;
+    }
+    .result-title {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #718096;
+        margin-bottom: 5px;
+    }
+    .result-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        background: -webkit-linear-gradient(#2d3748, #4a5568);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    /* --- Savings Box (The Hero) --- */
+    .saving-box {
+        background: var(--success-gradient);
+        border-radius: 20px;
+        padding: 30px;
+        color: white;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(42, 245, 152, 0.4);
+        animation: pulse-green 3s infinite;
+    }
+    .saving-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .saving-sub {
+        font-size: 1rem;
+        background: rgba(255,255,255,0.2);
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 20px;
+        margin-top: 10px;
+        backdrop-filter: blur(5px);
+    }
+.save-btn {
+    font-size: 1.05rem;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    border: none;
+    color: white;
+    box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3);
+    transition: 0.25s ease-in-out;
+}
+
+.save-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(39, 174, 96, 0.4);
+}
+
+    /* --- Animations --- */
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(42, 245, 152, 0.7); }
+        70% { box-shadow: 0 0 0 15px rgba(42, 245, 152, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(42, 245, 152, 0); }
+    }
+
+    .animate-entry {
+        animation: fadeInUp 0.6s ease-out forwards;
+        opacity: 0; /* Start hidden */
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+
+    /* Custom Input Wrapper for Icons */
+    .input-wrapper {
+        position: relative;
+    }
+    .input-icon {
+        position: absolute;
+        right: 15px;
+        top: 40px; /* Adjust based on label height */
+        color: #a0aec0;
+        pointer-events: none;
+    }
+</style>
+
+<div class="container">
+    <div class="main-card">
+        
+        <!-- <div class="text-center mb-5">
+            <h3><i class="fas fa-bolt text-warning mr-2"></i> MSEDCL vs OA Calculator</h3>
+            <p class="text-muted">Compare costs and visualize your savings instantly.</p>
+        </div> -->
+
+        <form method="post"  class="mt-3">
+            {% csrf_token %}
+
+            <ul class="nav nav-tabs " id="calcTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="tab1-btn" data-toggle="tab" href="#tab1">
+                        <i class="fas fa-file-invoice mr-2"></i> Current Inputs
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="tab2-btn" data-toggle="tab" href="#tab2">
+                        <i class="fas fa-chart-line mr-2"></i> OA & Results
+                    </a>
+                </li>
+            </ul>
+
+            <hr>
+            <div class="tab-content">
+
+                <div class="tab-pane fade show active" id="tab1">
+                    
+                    <div class="animate-entry delay-1">
+                        <h5 class="mt-3">Basic Parameters</h5>
+                        <div class="form-row">
+                            <div class="col-md-3 mb-3">
+                                <label>Total Units (kWh)</label>
+                                <input class="form-control" type="number" name="total_units" value="{{ input.total_units }}" placeholder="e.g. 10000">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label>Contract Demand (kVA)</label>
+                                <input class="form-control" type="number" name="contract_demand" value="{{ input.contract_demand }}">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label>Billed Demand (kVA)</label>
+                                <input class="form-control" type="number" name="billed_demand" value="{{ input.billed_demand }}">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label>Demand Rate (₹)</label>
+                                <input class="form-control" type="number" name="demand_rate" value="{{ input.demand_rate }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="animate-entry delay-2">
+                        <h5 class="mt-4">MSEDCL Rates</h5>
+                        <div class="form-row">
+                            <div class="col-md-3 mb-3">
+                                <label>Wheeling Rate</label>
+                                <input class="form-control" type="number" step="0.01" name="wheeling_rate" value="{{ input.wheeling_rate }}">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label>Energy Rate</label>
+                                <input class="form-control" type="number" step="0.01" name="energy_rate" value="{{ input.energy_rate }}">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label>FAC Rate</label>
+                                <input class="form-control" type="number" step="0.01" name="fac_rate" value="{{ input.fac_rate }}">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label>Electricity Duty (%)</label>
+                                <input class="form-control" type="number" step="0.01" name="duty_percent" value="{{ input.duty_percent }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="animate-entry delay-3">
+                        <h5 class="mt-4">TOD (Time of Day) Zones</h5>
+                        <div class="form-row mb-2">
+                            <div class="col-md-3 mb-3"><label>Zone A Units</label><input class="form-control" type="number" name="tod_a_units" value="{{ input.tod_a_units }}"></div>
+                            <div class="col-md-3 mb-3"><label>Zone A Rate</label><input class="form-control" type="number" step="0.01" name="tod_a_rate" value="{{ input.tod_a_rate }}"></div>
+                            <div class="col-md-3 mb-3"><label>Zone B Units</label><input class="form-control" type="number" name="tod_b_units" value="{{ input.tod_b_units }}"></div>
+                            <div class="col-md-3 mb-3"><label>Zone B Rate</label><input class="form-control" type="number" step="0.01" name="tod_b_rate" value="{{ input.tod_b_rate }}"></div>
+                        </div>
+                        <div class="form-row mb-3">
+                            <div class="col-md-3 mb-3"><label>Zone C Units</label><input class="form-control" type="number" name="tod_c_units" value="{{ input.tod_c_units }}"></div>
+                            <div class="col-md-3 mb-3"><label>Zone C Rate</label><input class="form-control" type="number" step="0.01" name="tod_c_rate" value="{{ input.tod_c_rate }}"></div>
+                            <div class="col-md-3 mb-3"><label>Zone D Units</label><input class="form-control" type="number" name="tod_d_units" value="{{ input.tod_d_units }}"></div>
+                            <div class="col-md-3 mb-3"><label>Zone D Rate</label><input class="form-control" type="number" step="0.01" name="tod_d_rate" value="{{ input.tod_d_rate }}"></div>
+                        </div>
+                    </div>
+
+                    <div class="animate-entry delay-3">
+                         <h5 class="mt-4">Rebates</h5>
+                         <div class="form-row">
+                             <div class="col-md-3 mb-3"><label>Incremental Rebate</label><input class="form-control" type="number" name="incremental_rebate" value="{{ input.incremental_rebate }}"></div>
+                             <div class="col-md-3 mb-3"><label>Prompt Discount</label><input class="form-control" type="number" name="prompt_discount" value="{{ input.prompt_discount }}"></div>
+                         </div>
+                    </div>
+
+                    <div class="mt-5 text-right">
+                        <button type="button" id="nextBtn" class="btn btn-primary btn-next text-white">
+                            Next Step <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+
+                </div>
+
+                <div class="tab-pane fade" id="tab2">
+
+                    <h5 class="mt-3">Open Access Configuration</h5>
+
+                    <div class="form-row">
+                        <div class="col-md-4 mb-4">
+                            <label>OA Share %</label>
+                            <input type="number" class="form-control" name="oa_percent" value="{{ input.oa_percent }}">
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <label>OA Energy Rate (₹/kWh)</label>
+                            <input type="number" step="0.01" class="form-control" name="oa_energy_rate" value="{{ input.oa_energy_rate }}">
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <label>Transmission Rate</label>
+                            <input type="number" step="0.01" class="form-control" name="oa_transmission_rate" value="{{ input.oa_transmission_rate }}">
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <label>Wheeling Rate</label>
+                            <input type="number" step="0.01" class="form-control" name="oa_wheeling_rate" value="{{ input.oa_wheeling_rate }}">
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <label>Loss Rate (%)</label>
+                            <input type="number" step="0.01" class="form-control" name="oa_loss_rate" value="{{ input.oa_loss_rate }}">
+                        </div>
+                        <div class="col-md-4 mb-4">
+                            <label>SLDC Fixed Charges</label>
+                            <input type="number" class="form-control" name="oa_sldc_fixed" value="{{ input.oa_sldc_fixed }}">
+                        </div>
+                    </div>
+
+                    <div class="mt-4 mb-5 text-center">
+                        <button type="submit" class="btn btn-calc">
+                            <i class="fas fa-calculator mr-2"></i> Calculate Savings
+                        </button>
+                    </div>
+
+                    {% if result %}
+                    <hr class="my-5" style="border-top: 2px dashed #e2e8f0;">
+
+                    <h5 class="text-center mb-4">Calculation Results</h5>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-4 animate-entry delay-1">
+                            <div class="result-card">
+                                <div class="result-title"><i class="fas fa-building mr-1"></i> Current MSEDCL Bill</div>
+                                <div class="result-value">₹ {{ result.total_only_msedcl }}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-4 animate-entry delay-1">
+                            <div class="result-card" style="border-left-color: #2ecc71;">
+                                <div class="result-title"><i class="fas fa-check-circle mr-1"></i> Bill After OA</div>
+                                <div class="result-value">₹ {{ result.total_after_oa }}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-4 animate-entry delay-2">
+                            <div class="result-card" style="border-left-color: #9b59b6;">
+                                <div class="result-title"><i class="fas fa-bolt mr-1"></i> OA Charges</div>
+                                <div class="result-value">₹ {{ result.total_oa_charges }}</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-4 animate-entry delay-2">
+                            <div class="result-card" style="border-left-color: #f1c40f;">
+                                <div class="result-title"><i class="fas fa-file-contract mr-1"></i> MSEDCL Balance</div>
+                                <div class="result-value">₹ {{ result.total_msedcl_after }}</div>
+                            </div>
+                        </div>
+<div class="col-md-3"></div>
+                        <div class="col-6 mt-2 animate-entry delay-3">
+                            <div class="saving-box">
+                                <div style="font-size: 1.1rem; opacity: 0.9;">TOTAL SAVINGS</div>
+                                <div class="saving-value">₹ {{ result.savings }}</div>
+                                <div class="saving-sub">
+                                    <i class="fas fa-calendar-alt mr-1"></i> Monthly: ₹ {{ result.monthly_saving }} 
+                                    <span class="mx-2">|</span> 
+                                    <i class="fas fa-calendar-check mr-1"></i> Yearly: ₹ {{ result.yearly_saving }}
+                                </div>
+                            </div>
+                        </div>
+
+<div class="col-md-3"></div>
+
+<div class="col-12 text-center mt-4 animate-entry delay-4">
+<button type="button" onclick="confirmSave()" class="btn btn-success px-4 py-2 save-btn">
+    <i class="fas fa-save mr-2"></i> Save Result
+</button>
+<input type="hidden" id="save_result_flag" name="save_result" value="">
+
+
+
+</div>
+
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+function confirmSave() {
+    Swal.fire({
+        title: "Save Calculation?",
+        text: "Do you want to save this calculation and view history?",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#28a745",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "Yes, Save",
+        cancelButtonText: "Cancel"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Set flag so Django knows user clicked save
+            document.getElementById("save_result_flag").value = "1";
+
+            // Submit the form
+            document.querySelector("form").submit();
+        }
+    });
+}
+</script>
+
+<script>
+    // Switch to next tab on click
+    $("#nextBtn").click(function () {
+        $('#tab2-btn').tab('show');
+    });
+
+    // If result exists, auto-switch to tab2
+    {% if result %}
+    document.addEventListener("DOMContentLoaded", function () {
+        $('#tab2-btn').tab('show');
+        $('html, body').animate({
+            scrollTop: $(".main-card").offset().top
+        }, 300);
+    });
+    {% endif %}
+</script>
+
+{% endblock %}

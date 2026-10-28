@@ -1,0 +1,485 @@
+{% extends "basesolar.html" %}
+{% load static %}
+
+{% block content %}
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+:root{
+  --g-blue: #1a73e8;
+  --g-red:  #ea4335;
+  --g-yellow: #fbbc05;
+  --g-green: #34a853;
+  --muted: #6b7280;
+  --card-bg: #ffffff;
+  --shadow: 0 6px 18px rgba(10,25,47,0.08);
+}
+
+body { font-family: "Poppins", sans-serif; }
+
+.dashboard-container { padding: 28px; }
+
+/* FILTER CARDS */
+.filter-card {
+    background: var(--card-bg);
+    padding: 14px;
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    min-width: 240px;
+}
+.filter-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    background: #e8f0fe;
+    color: var(--g-blue);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+}
+.filter-inner { display: flex; flex-direction: column; width: 100%; }
+.filter-inner label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.filter-inner select, .filter-inner input {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #dce3ee;
+    width: 100%;
+}
+
+/* KPI CARDS */
+.kpi-row { display:flex; gap:16px; flex-wrap:wrap; }
+.kpi-card {
+  background:var(--card-bg);
+  padding:14px;
+  border-radius:10px;
+  min-width:220px;
+  box-shadow:var(--shadow);
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
+.kpi-icon { width:56px; height:56px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; }
+.kpi-blue { background: linear-gradient(135deg, #e8f0fe, var(--g-blue)); color:var(--g-blue); }
+.kpi-red  { background: linear-gradient(135deg,#ffece9, var(--g-red)); color:var(--g-red); }
+.kpi-green{ background: linear-gradient(135deg,#eaf6ee, var(--g-green)); color:var(--g-green); }
+.kpi-label { font-weight:600; color:var(--muted); font-size:13px; }
+.kpi-value { font-size:26px; font-weight:800; }
+
+/* chart panels */
+.charts-row-2 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:20px; }
+.chart-panel { background:white; padding:12px; border-radius:10px; box-shadow:var(--shadow); }
+.chart-area { width:100%; height:360px; }
+
+.monthly-panel { margin-top:14px; background:white; padding:12px; border-radius:10px; box-shadow:var(--shadow); }
+
+#tooltip {
+  position:absolute; opacity:0; pointer-events:none;
+  padding:8px 10px; background:white; border-radius:8px;
+  box-shadow:0 6px 20px rgba(0,0,0,0.15);
+}
+
+/* quarter pill + reset */ .controls-row { display:flex; gap:10px; align-items:center; margin-left:auto; } .pill { background:#f1f5f9; color:#0b2540; padding:6px 10px; border-radius:999px; font-weight:600; font-size:13px; display:inline-flex; gap:8px; align-items:center; } .reset-btn { background:transparent; border:1px solid #dbe7ff; padding:6px 10px; border-radius:8px; cursor:pointer; } /* responsive */ @media (max-width:980px){ .charts-row-2 { grid-template-columns: 1fr; } .chart-area { height:300px; } }
+.kpi-magenta {
+    background: linear-gradient(135deg, #007e26, rgb(0, 184, 83));
+    color: rgb(0, 0, 0);   /* icon color */
+}
+#tooltip {
+  position: fixed;           /* 🔥 KEY FIX */
+  opacity: 0;
+  pointer-events: none;
+  padding: 8px 10px;
+  background: #ffffff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0b2540;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  z-index: 9999;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.bar-active { stroke:#000; stroke-width:2px; }
+</style>
+
+<div class="dashboard-container container-fluid" style="margin-top: 45px;">
+
+
+<div class="d-flex" style="align-items:center; gap:12px; margin-bottom:8px;"> 
+    <div id="activeControls" class="controls-row" style="display:none;"> 
+        <div class="pill" id="activePill"><span id="activePillText"></span></div> 
+        <button class="reset-btn" id="resetFilters">Reset</button> 
+    </div>
+ </div>
+<!-- FILTER + KPI SIDE-BY-SIDE -->
+<div style="
+    display:grid;
+    grid-template-columns: 55% 45%;
+    gap:20px;
+    margin-bottom:25px;
+">
+
+    <!-- LEFT FILTERS -->
+    <div class="filters-left" style="
+        display:grid;
+        grid-template-columns: 1fr 1fr;
+        gap:18px;
+    ">
+
+        <div class="filter-card">
+            <div class="filter-icon"><i class="fas fa-map-marker-alt"></i></div>
+            <div class="filter-inner">
+                <label>Site</label>
+                <select id="siteSelect"><option value="">All Sites</option></select>
+            </div>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-icon"><i class="fas fa-calendar"></i></div>
+            <div class="filter-inner">
+                <label>Year</label>
+                <select id="yearSelect"><option value="">All Years</option></select>
+            </div>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-icon"><i class="fas fa-calendar-alt"></i></div>
+            <div class="filter-inner">
+                <label>Month</label>
+                <select id="monthSelect">
+                    <option value="">All</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-icon"><i class="fas fa-clock"></i></div>
+            <div class="filter-inner">
+                <label>Day</label>
+                <input id="dayInput" type="number" min="1" max="31" placeholder="All">
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RIGHT KPI CARDS -->
+    <div class="kpi-right">
+
+        <div class="kpi-row">
+
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-blue " style="color: rgb(255, 206, 114);" ><i class="fas fa-bolt"></i></div>
+              <div>
+                <div class="kpi-label">PLF Daily</div>
+                <div class="kpi-value" id="kpiDaily">0.00</div>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-red" style="color: rgb(255, 255, 255);"><i class="fas fa-calendar"></i></div>
+              <div>
+                <div class="kpi-label">PLF Monthly</div>
+                <div class="kpi-value" id="kpiMonthly">0.00</div>
+              </div>
+            </div>
+
+            <div class="kpi-card">
+<div class="kpi-icon kpi-magenta">
+    <i class="fas fa-chart-line"></i>
+</div>
+              <div>
+                <div class="kpi-label">PLF Yearly</div>
+                <div class="kpi-value" id="kpiYearly">0.00</div>
+              </div>
+            </div>
+
+
+
+
+            <div class="kpi-card">
+<div class="kpi-icon " style=" 
+    background: linear-gradient(135deg, #f2e9ff, #8e44ad);
+    color: #ffffff;
+ 
+">
+    <i class="fas fa-sliders-h"></i>
+</div>
+
+
+              
+                <div class="kpi-label">  
+                    <p>Filter-driven <strong>PLF</strong><br> Smart Dashboard</p>
+                </div>
+              
+
+
+
+
+
+
+        </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- CHARTS -->
+<div class="charts-row-2">
+    <div class="chart-panel">
+        <div class="panel-title">PLF Quarterly</div>
+        <div id="plfQuarterly" class="chart-area"></div>
+    </div>
+
+    <div class="chart-panel">
+        <div class="panel-title">PLF Yearly</div>
+        <div id="plfYearly" class="chart-area"></div>
+    </div>
+</div>
+
+<div class="monthly-panel">
+    <div class="panel-title">PLF Monthly</div>
+    <div id="plfMonthly" class="chart-area"></div>
+</div>
+
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+/* ---------- Config & state ---------- */
+const apiURL = "{% url 'api_solar_plf' %}";
+
+const googleColors = [
+  "#1a73e8", "#ea4335", "#fbbc05", "#34a853"
+];
+
+const tooltip = document.getElementById('tooltip');
+
+let serverData = null;
+let activeQuarter = null;
+
+/* 🔥 STORE MASTER DATA (IMPORTANT FIX) */
+let allYears = null;
+let allSites = null;
+
+/* ---------- Helpers ---------- */
+function $(id){ return document.getElementById(id); }
+function fmt(n, d=2){ return (Number(n) || 0).toFixed(d); }
+
+function showTooltip(html, x, y){
+  tooltip.innerHTML = html;
+  tooltip.style.left = (x+12)+'px';
+  tooltip.style.top = (y+12)+'px';
+  tooltip.style.opacity = 1;
+}
+function hideTooltip(){ tooltip.style.opacity = 0; }
+
+/* ---------- Reset ---------- */
+function resetAll(){
+  activeQuarter = null;
+  $('yearSelect').value = "";
+  $('monthSelect').value = "";
+  $('dayInput').value = "";
+  loadAndRender();
+}
+
+/* ---------- API ---------- */
+async function fetchFromServer(params = {}){
+  const p = new URLSearchParams(params);
+  const res = await fetch(apiURL + "?" + p.toString());
+  if(!res.ok) return null;
+  return await res.json();
+}
+
+/* ---------- MAIN LOAD ---------- */
+async function loadAndRender(){
+  const params = {};
+  if($('siteSelect').value) params.site = $('siteSelect').value;
+  if($('yearSelect').value) params.year = $('yearSelect').value;
+  if($('monthSelect').value) params.month = $('monthSelect').value;
+  if($('dayInput').value) params.day = $('dayInput').value;
+
+  const data = await fetchFromServer(params);
+  if(!data){
+    alert("API Error");
+    return;
+  }
+
+  serverData = data;
+  fillDropdownsFromData(data);
+  renderAll();
+}
+
+/* ---------- DROPDOWNS (FIXED) ---------- */
+function fillDropdownsFromData(data){
+
+  /* ---- SITES ---- */
+  if(!allSites && data.sites){
+    allSites = [...data.sites];
+  }
+
+  const siteSel = $('siteSelect');
+  const selSite = siteSel.value;
+  siteSel.innerHTML = '<option value="">All Sites</option>';
+  (allSites || []).forEach(s=>{
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    siteSel.appendChild(o);
+  });
+  siteSel.value = selSite;
+
+  /* ---- YEARS (🔥 FIX) ---- */
+  if(!allYears && data.years){
+    allYears = [...data.years];
+  }
+
+  const yearSel = $('yearSelect');
+  const selYear = yearSel.value;
+  yearSel.innerHTML = '<option value="">All Years</option>';
+  (allYears || []).forEach(y=>{
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    yearSel.appendChild(o);
+  });
+  yearSel.value = selYear;
+}
+
+/* ---------- RENDER KPIs + CHARTS ---------- */
+function renderAll(){
+  const k = serverData.kpis || {};
+
+  $('kpiDaily').textContent   = fmt(k.daily);
+  $('kpiMonthly').textContent = fmt(k.monthly);
+  $('kpiYearly').textContent  = fmt(k.yearly);
+
+  drawQuarterlyChart(serverData.plf_quarterly || []);
+  drawYearlyChart(serverData.plf_yearly_chart || []);
+  drawMonthlyChart(serverData.plf_monthly_chart || []);
+}
+
+/* ---------- SVG HELPER ---------- */
+function createSvg(id, h){
+  const el = document.querySelector(id);
+  el.innerHTML = "";
+  const w = el.clientWidth;
+  const svg = d3.select(el).append("svg")
+    .attr("width", w)
+    .attr("height", h);
+  return {svg, w, h};
+}
+
+/* ---------- QUARTERLY ---------- */
+function drawQuarterlyChart(data){
+  const {svg, w, h} = createSvg('#plfQuarterly', 360);
+  const m = {t:20,l:50,r:20,b:60};
+  const g = svg.append("g").attr("transform",`translate(${m.l},${m.t})`);
+  const cw = w-m.l-m.r, ch = h-m.t-m.b;
+
+  const x = d3.scaleBand().domain(data.map(d=>d.quarter)).range([0,cw]).padding(0.3);
+  const y = d3.scaleLinear().domain([0,d3.max(data,d=>d.value)*1.2||1]).range([ch,0]);
+
+  g.append("g").call(d3.axisLeft(y));
+  g.append("g").attr("transform",`translate(0,${ch})`).call(d3.axisBottom(x));
+
+  g.selectAll("rect").data(data).enter().append("rect")
+    .attr("x",d=>x(d.quarter))
+    .attr("y",ch)
+    .attr("width",x.bandwidth())
+    .attr("height",0)
+    .attr("fill",(d,i)=>googleColors[i%4])
+    .on("mousemove",(e,d)=>showTooltip(`<b>${d.quarter}</b><br>${fmt(d.value)}%`,e.pageX,e.pageY))
+    .on("mouseleave",hideTooltip)
+    .transition().duration(600)
+    .attr("y",d=>y(d.value))
+    .attr("height",d=>ch-y(d.value));
+}
+
+/* ---------- YEARLY ---------- */
+function drawYearlyChart(data){
+  const {svg, w, h} = createSvg('#plfYearly', 360);
+  const m = {t:20,l:50,r:20,b:60};
+  const g = svg.append("g").attr("transform",`translate(${m.l},${m.t})`);
+  const cw = w-m.l-m.r, ch = h-m.t-m.b;
+
+  const x = d3.scaleBand().domain(data.map(d=>d.year)).range([0,cw]).padding(0.3);
+  const y = d3.scaleLinear().domain([0,d3.max(data,d=>d.value)*1.2||1]).range([ch,0]);
+
+  g.append("g").call(d3.axisLeft(y));
+  g.append("g").attr("transform",`translate(0,${ch})`).call(d3.axisBottom(x));
+
+  g.selectAll("rect").data(data).enter().append("rect")
+    .attr("x",d=>x(d.year))
+    .attr("y",ch)
+    .attr("width",x.bandwidth())
+    .attr("height",0)
+    .attr("fill",(d,i)=>googleColors[i%4])
+    .on("mousemove",(e,d)=>showTooltip(`<b>${d.year}</b><br>${fmt(d.value)}%`,e.pageX,e.pageY))
+    .on("mouseleave",hideTooltip)
+    .on("click",(e,d)=>{
+      $('yearSelect').value = d.year;
+      loadAndRender();
+    })
+    .transition().duration(600)
+    .attr("y",d=>y(d.value))
+    .attr("height",d=>ch-y(d.value));
+}
+
+/* ---------- MONTHLY ---------- */
+function drawMonthlyChart(data){
+  const {svg, w, h} = createSvg('#plfMonthly', 380);
+  const m = {t:20,l:55,r:20,b:70};
+  const g = svg.append("g").attr("transform",`translate(${m.l},${m.t})`);
+  const cw = w-m.l-m.r, ch = h-m.t-m.b;
+
+  const x = d3.scaleBand().domain(data.map(d=>d.month)).range([0,cw]).padding(0.2);
+  const y = d3.scaleLinear().domain([0,d3.max(data,d=>d.value)*1.2||1]).range([ch,0]);
+
+  g.append("g").call(d3.axisLeft(y));
+  g.append("g").attr("transform",`translate(0,${ch})`)
+    .call(d3.axisBottom(x)).selectAll("text").attr("transform","rotate(-30)").style("text-anchor","end");
+
+  g.selectAll("rect").data(data).enter().append("rect")
+    .attr("x",d=>x(d.month))
+    .attr("y",ch)
+    .attr("width",x.bandwidth())
+    .attr("height",0)
+    .attr("fill",(d,i)=>googleColors[i%4])
+    .on("mousemove",(e,d)=>showTooltip(`<b>${d.month}</b><br>${fmt(d.value)}%`,e.pageX,e.pageY))
+    .on("mouseleave",hideTooltip)
+    .transition().duration(600)
+    .attr("y",d=>y(d.value))
+    .attr("height",d=>ch-y(d.value));
+}
+
+/* ---------- EVENTS ---------- */
+$('resetFilters').addEventListener('click', resetAll);
+['siteSelect','yearSelect','monthSelect','dayInput'].forEach(id=>{
+  $(id).addEventListener('change',()=>{
+    activeQuarter = null;
+    loadAndRender();
+  });
+});
+
+/* ---------- INIT ---------- */
+loadAndRender();
+</script>
+
+{% endblock %}
