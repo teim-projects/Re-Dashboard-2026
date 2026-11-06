@@ -1,0 +1,460 @@
+{% extends "basesolar.html" %}
+{% load static %}
+
+{% block content %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+/* ===== Compact Filters + KPI Row ===== */
+.top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 90px;
+    gap: 5px;
+}
+
+/* Filter boxes */
+.filter-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    width: 130px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.filter-label {
+    font-size: 11px;
+    color: #566373;
+    margin-bottom: 2px;
+}
+
+.filter-control {
+    width: 100%;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid #e2e6ef;
+    font-size: 13px;
+}
+
+/* KPI Cards (Compact) */
+.kpi-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 155px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.kpi-title {
+    font-size: 11px;
+    color: #607089;
+}
+
+.kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 2px;
+    color: #0b3f78;
+}
+
+/* Reset Button */
+.floating-reset-btn {
+    padding: 8px 12px;
+    background: #eef5ff;
+    border: 1px solid #d7e7ff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Chart Cards */
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.card {
+    background: #fff;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
+
+.chart-canvas {
+    width: 100%;
+    height: 300px;
+}
+
+/* ⭐ Premium Tooltip Style */
+.d3-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 8px 12px;
+    color: #ffffff;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4em;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+    z-index: 999;
+    backdrop-filter: blur(3px);
+    transition: opacity 0.15s ease-out;
+}
+
+</style>
+
+<div class="container-fluid">
+
+    <!-- ⭐ FILTER + KPI SINGLE ROW ⭐ -->
+    <div class="top-row">
+
+        <!-- Filters -->
+        <div class="filter-card">
+            <div class="filter-label">Select Site</div>
+            <select id="site" class="filter-control"></select>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-label">Select Year</div>
+            <select id="year" class="filter-control"></select>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-label">Select Month</div>
+            <select id="month" class="filter-control">
+                <option value="">All Months</option>
+                {% for n, name in months %}
+                    <option value="{{ n }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-label">Select Day</div>
+            <select id="day" class="filter-control">
+                <option value="">All Days</option>
+                {% for d in days %}
+                    <option value="{{ d }}">{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button id="btn-reset" class="floating-reset-btn">Reset</button>
+
+        <!-- KPIs -->
+        <div class="kpi-card">
+            <div class="kpi-title">Avg Generation Hours</div>
+            <div class="kpi-value" id="kpi-gen">0</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-title">Avg Operating Hours</div>
+            <div class="kpi-value" id="kpi-op">0</div>
+        </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-grid">
+        <div class="card">
+            <h6>Operating Hours By Year</h6>
+            <div id="chart-op" class="chart-canvas"></div>
+            <div id="legend-op" class="mt-2"></div>
+        </div>
+
+        <div class="card">
+            <h6>Generation Hours By Year</h6>
+            <div id="chart-gen" class="chart-canvas"></div>
+            <div id="legend-gen" class="mt-2"></div>
+        </div>
+    </div>
+
+    <div class="card mt-3 mb-5">
+        <h6>Comparison Between Generation And Operating Hours</h6>
+        <div id="chart-compare" style="height:160px"></div>
+    </div>
+<!-- Tooltip Required for D3 Hover -->
+<!-- Premium Tooltip -->
+<div id="tooltip" class="d3-tooltip" style="opacity:0;"></div>
+
+</div>
+<script>
+const API = "{% url 'api_generation_operating' %}";
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const colorForYear = (y, idx) =>
+  ["#0b69a3", "#e66726", "#2ca02c", "#8b5cf6", "#ef476f"][idx % 5];
+
+/* ---------------------------
+   GLOBAL STATE
+--------------------------- */
+let state = {
+  years: [],                 // filtered years (from API)
+  monthly_by_year: {},
+  sites: [],
+  selectedYearsGen: new Set(),
+  selectedYearsOp: new Set()
+};
+
+/* 🔥 MASTER DATA (FIX) */
+let masterYears = null;
+let masterSites = null;
+
+let firstLoad = true;
+const tooltip = d3.select("#tooltip");
+
+/* ---------------------------
+   MAIN LOAD
+--------------------------- */
+async function loadAndDraw() {
+  const params = new URLSearchParams();
+
+  const site  = document.getElementById("site").value;
+  const year  = document.getElementById("year").value;
+  const month = document.getElementById("month").value;
+  const day   = document.getElementById("day").value;
+
+  if (site)  params.append("site", site);
+  if (year)  params.append("year", year);
+  if (month) params.append("month", month);
+  if (day)   params.append("day", day);
+
+  const res  = await fetch(API + "?" + params.toString());
+  const data = await res.json();
+
+  /* ---- STORE MASTER DATA ONCE ---- */
+  if (!masterYears && data.years) {
+    masterYears = [...data.years];
+  }
+  if (!masterSites && data.sites) {
+    masterSites = [...data.sites];
+  }
+
+  /* ---- FILTERED DATA FOR CHARTS ---- */
+  state.years = data.years || [];
+  state.monthly_by_year = data.monthly_by_year || {};
+  state.sites = data.sites || [];
+
+  setOptions();
+
+  /* ---- KPIs ---- */
+  document.getElementById("kpi-gen").textContent =
+    data.kpis ? (data.kpis.generation_daily_avg || 0) : 0;
+
+  document.getElementById("kpi-op").textContent =
+    data.kpis ? (data.kpis.operating_daily_avg || 0) : 0;
+
+  /* ---- DEFAULT SELECT ALL YEARS (ONCE) ---- */
+  if (firstLoad) {
+    state.selectedYearsGen = new Set(masterYears || []);
+    state.selectedYearsOp  = new Set(masterYears || []);
+    firstLoad = false;
+  }
+
+  drawLineCharts();
+  drawComparison(data.comparison || {});
+}
+
+/* ---------------------------
+   DROPDOWNS (FIXED)
+--------------------------- */
+function setOptions() {
+  const siteSel = document.getElementById("site");
+  const yearSel = document.getElementById("year");
+
+  const prevSite = siteSel.value;
+  const prevYear = yearSel.value;
+
+  /* ---- Sites (MASTER) ---- */
+  siteSel.innerHTML = "<option value=''>All Sites</option>";
+  (masterSites || []).forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s;
+    opt.text  = s;
+    siteSel.appendChild(opt);
+  });
+
+  /* ---- Years (MASTER) ---- */
+  yearSel.innerHTML = "<option value=''>All Years</option>";
+  (masterYears || []).forEach(y => {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.text  = y;
+    yearSel.appendChild(opt);
+  });
+
+  siteSel.value = prevSite;
+  yearSel.value = prevYear;
+}
+
+/* ---------------------------
+   DRAW BOTH LINE CHARTS
+--------------------------- */
+function drawLineCharts(){
+  drawSingleLine("#chart-op", "op", "#legend-op");
+  drawSingleLine("#chart-gen", "gen", "#legend-gen");
+}
+
+function drawSingleLine(containerSelector, metricKey, legendSelector){
+
+  const container = d3.select(containerSelector);
+  container.selectAll("*").remove();
+
+  const width  = container.node().clientWidth;
+  const height = container.node().clientHeight || 320;
+
+  const margin = {top:20, right:24, bottom:36, left:48};
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
+
+  const years = state.years;
+
+  const series = years.map((y, idx) => {
+    const months = state.monthly_by_year[y] || [];
+    const values = [];
+
+    for (let m = 1; m <= 12; m++) {
+      const item = months[m-1] || {};
+      const v = metricKey === "gen" ? item.gen : item.op;
+      values.push(v === null ? null : +v);
+    }
+    return {year: y, values, color: colorForYear(y, idx)};
+  });
+
+  const allVals = series.flatMap(s => s.values.filter(v => v != null));
+  const yMax = allVals.length ? d3.max(allVals) : 1;
+  const yMin = allVals.length ? d3.min(allVals) : 0;
+  const yPad = Math.max((yMax - yMin) * 0.12, 0.2);
+
+  const x = d3.scaleLinear().domain([1,12]).range([0, innerW]);
+  const y = d3.scaleLinear().domain([Math.max(0, yMin - yPad), yMax + yPad]).range([innerH, 0]);
+
+  const svg = container.append("svg").attr("width", width).attr("height", height);
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  g.append("g").call(d3.axisLeft(y).ticks(6));
+  g.append("g")
+    .attr("transform", `translate(0,${innerH})`)
+    .call(d3.axisBottom(x).ticks(12).tickFormat(i => MONTHS[i-1]));
+
+  const line = d3.line()
+    .defined(d => d != null)
+    .x((d,i) => x(i+1))
+    .y(d => y(d))
+    .curve(d3.curveMonotoneX);
+
+  const seriesGroup = g.append("g");
+
+  series.forEach((s, idx) => {
+    seriesGroup.append("path")
+      .datum(s.values)
+      .attr("fill","none")
+      .attr("stroke", s.color)
+      .attr("stroke-width", 2.5)
+      .attr("d", line)
+      .style("opacity",
+        (metricKey==="gen" ? state.selectedYearsGen : state.selectedYearsOp).has(s.year)
+        ? 1 : 0.1
+      );
+  });
+
+  /* ---- Legend ---- */
+  const legend = d3.select(legendSelector);
+  legend.html("");
+
+  years.forEach((y,idx)=>{
+    const item = legend.append("div")
+      .style("display","inline-flex")
+      .style("align-items","center")
+      .style("margin-right","12px")
+      .style("cursor","pointer")
+      .on("click",()=>toggleYear(y, metricKey));
+
+    item.append("div")
+      .style("width","10px")
+      .style("height","10px")
+      .style("border-radius","50%")
+      .style("background", colorForYear(y,idx))
+      .style("margin-right","6px");
+
+    item.append("span").text(y);
+  });
+}
+
+/* ---------------------------
+   TOGGLE YEAR
+--------------------------- */
+function toggleYear(year, key){
+  const setRef = key === "gen" ? state.selectedYearsGen : state.selectedYearsOp;
+  if(setRef.has(year)) setRef.delete(year);
+  else setRef.add(year);
+  drawLineCharts();
+}
+
+/* ---------------------------
+   COMPARISON BARS
+--------------------------- */
+function drawComparison(comparison){
+  const container = d3.select("#chart-compare");
+  container.selectAll("*").remove();
+
+  const w = container.node().clientWidth;
+  const h = 160;
+
+  const svg = container.append("svg").attr("width", w).attr("height", h);
+  const g = svg.append("g").attr("transform", "translate(120,20)");
+
+  const gen = +comparison.generation_total || 0;
+  const op  = +comparison.operating_total  || 0;
+  const max = Math.max(gen, op, 1);
+
+  const x = d3.scaleLinear().domain([0,max]).range([0, w-160]);
+
+  const data = [
+    {label:"Generation", value:gen, color:"#1f6fb6"},
+    {label:"Operating",  value:op,  color:"#002f6c"}
+  ];
+
+  g.selectAll("rect")
+    .data(data)
+    .enter().append("rect")
+    .attr("y",(d,i)=>i*50)
+    .attr("width",d=>x(d.value))
+    .attr("height",26)
+    .attr("rx",8)
+    .attr("fill",d=>d.color);
+}
+
+/* ---------------------------
+   EVENTS
+--------------------------- */
+["site","year","month","day"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", loadAndDraw);
+});
+
+document.getElementById("btn-reset").addEventListener("click", ()=>{
+  document.getElementById("site").value = "";
+  document.getElementById("year").value = "";
+  document.getElementById("month").value = "";
+  document.getElementById("day").value = "";
+  loadAndDraw();
+});
+
+/* ---------------------------
+   INIT
+--------------------------- */
+loadAndDraw();
+
+window.addEventListener("resize", ()=>{
+  clearTimeout(window._rs);
+  window._rs = setTimeout(loadAndDraw, 250);
+});
+</script>
+
+
+{% endblock %}

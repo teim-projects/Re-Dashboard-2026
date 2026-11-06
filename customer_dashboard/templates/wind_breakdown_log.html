@@ -1,0 +1,325 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% block content %}
+
+<div class="container my-4" style="margin-top: 80px !important;">
+  <div class="card shadow-sm border-0">
+    <div class="card-header   text-white    " 
+         >
+              <!-- Filter Buttons -->
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+      <i class="fas fa-filter"></i> DATE RANGE
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#providerModal">
+      <i class="fas fa-filter"></i> OEM PROVIDER
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#customerModal">
+      <i class="fas fa-filter"></i> CUSTOMER
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#stateModal">
+      <i class="fas fa-filter"></i> STATE NAME
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#siteModal">
+      <i class="fas fa-filter"></i> SITE NAME
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#wtgModal">
+      <i class="fas fa-filter"></i> WTG NUMBER
+    </button>
+
+      <!-- Active filters chips -->
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3" >
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+      <span class="badge bg-secondary">Active filters:</span>
+      {% if date_from %}<span class="badge bg-light text-dark">From: {{ date_from }}</span>{% endif %}
+      {% if date_to %}<span class="badge bg-light text-dark">To: {{ date_to }}</span>{% endif %}
+      {% for x in selected_providers %}<span class="badge bg-info text-dark">Provider: {{ x }}</span>{% endfor %}
+      {% for x in selected_customers %}<span class="badge bg-info text-dark">Customer: {{ x }}</span>{% endfor %}
+      {% for x in selected_states %}<span class="badge bg-info text-dark">State: {{ x }}</span>{% endfor %}
+      {% for x in selected_sites %}<span class="badge bg-info text-dark">Site: {{ x }}</span>{% endfor %}
+      {% for x in selected_wtgs %}<span class="badge bg-info text-dark">WTG: {{ x }}</span>{% endfor %}
+      <a class="btn btn-sm btn-outline-danger ms-2" href="?clear_filters=1">Clear all</a>
+    {% endif %}
+  </div>
+  </div>
+ 
+    </div>
+
+    <div class="card-body">
+
+ <!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex gap-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for p in providers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}"
+             {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+          <label class="form-check-label">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+<!-- Customer, State, Site, WTG modals same as you provided -->
+<!-- ... (kept unchanged for brevity) ... -->
+ 
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label">{{ c }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in states %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in sites %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for w in wtgs %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}"
+              {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label">{{ w }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted">No WTG numbers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+ 
+<div>
+  <table id="breakdownTable" class="table table-striped table-bordered align-middle w-100" >
+    <thead class="table-dark text-center">
+      <tr>
+        <th>Date</th>
+        <th>State</th>
+        <th>Site</th>
+        <th>WTG No.</th>
+
+        <th>Breakdown Remark</th>
+        <th>Breakdown Hours</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if data %}
+        {% for row in data %}
+        <tr>
+                    <td>{{ row.date }}</td>
+          <td>{{ row.state }}</td>
+          <td>{{ row.site }}</td>
+          <td>{{ row.wtg|default:"-" }}</td>
+
+          <td>{{ row.remark|default:"-" }}</td>
+          <td>{{ row.breakdown_hours|default:"0" }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-3">No breakdown data found.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+ <style>
+    .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px !important;
+    border-top-right-radius: 15px !important;
+    font-size: 18px;
+    font-weight: 500;
+    text-align: center !important;
+  }
+
+ </style>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const totalRecords = {{ data|length }};
+    const totalHours = {{ total_hours|default:0 }};
+
+    // Show SweetAlert summary
+    Swal.fire({
+        title: '⚙️ Breakdown Summary',
+        html: `
+            <p><b>Total Breakdown Records:</b> ${totalRecords}</p>
+            <p><b>Total Breakdown Hours:</b> ${totalHours}</p>
+        `,
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#3085d6',
+        background: '#f9f9f9',
+        color: '#333',
+        showClass: {
+            popup: 'animate__animated animate__fadeInDown'
+        },
+        hideClass: {
+            popup: 'animate__animated animate__fadeOutUp'
+        }
+    });
+});
+</script>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script>
+$(document).ready(function() {
+    console.log("📊 DataTable initialization started (Safe Mode)");
+    if ($('#breakdownTable').length) {
+        $('#breakdownTable').DataTable({
+            pageLength: 10,
+            order: [[3, 'desc']],
+            autoWidth: false,
+            responsive: true,
+            language: {
+                search: "🔍 Search:",
+                lengthMenu: "Show _MENU_ entries per page",
+                zeroRecords: "No matching breakdowns found",
+                info: "Showing _START_ to _END_ of _TOTAL_ breakdowns",
+                infoEmpty: "No breakdowns available"
+            }
+        });
+    } else {
+        console.warn("⚠️ breakdownTable element not found!");
+    }
+});
+</script>
+
+
+    </div>
+  </div>
+</div>
+
+<!-- DataTables Scripts -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+   {% include 'fotter.html' %}
+
+
+
+{% endblock %}

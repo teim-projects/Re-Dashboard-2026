@@ -1,0 +1,65 @@
+{% extends "basesolar.html" %}
+{% load static %}
+{% block title %}Solar Installation Summary{% endblock %}
+
+{% block content %}
+<div class="row gimg">
+  <div class="col-md-12  d-flex justify-content-center align-items-center text-white"
+       style="background-image: url('{% static 'images/solardashboard.webp' %}');
+              background-size: cover;
+              background-repeat: no-repeat;
+              background-position: center;
+              height: 100vh;">
+<h1 class="animated-text text-center">
+  Hello, {{ request.user.username }}!<br>
+  Welcome to Solar Dashboard<i class="fas fa-fan spinning-fan ms-3"></i>
+</h1>
+
+
+
+  </div>
+</div>
+
+<!-- Animation Styles -->       
+<style>
+  .gimg {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* Prevent horizontal scrollbar */
+}
+  .animated-text {
+    animation: fadeInUp 2s ease-out;
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  .spinning-fan {
+    font-size: 2.5rem;
+    color: #ffffff;
+    animation: spinFan 6s linear infinite;
+    text-shadow: 0px 0px 5px  black;
+  }
+ 
+  @keyframes spinFan {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+</style>
+{% endblock %}

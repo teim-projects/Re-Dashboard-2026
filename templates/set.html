@@ -1,0 +1,303 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Add inside <head> of basewind.html -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="icon" type="image/png" href="{% static 'images/TeimLogo.png' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <title>{% block title %}Renewable Energy Dashboard{% endblock %}</title>
+
+  <style>
+    body {
+      background-color: #f6f9fc;
+    }
+
+    .sidebar-toggle {
+      display: none;
+      position: fixed;
+      top: 15px;
+      right: 10px;
+      z-index: 1100;
+      /* background-color: #2196f3; */
+      color: rgb(0, 0, 0);
+      border: none;
+      padding: 5px 15px;
+      border-radius: 5px;
+    }
+
+     @media (max-width: 576px)  {
+      .sidebar-toggle {
+        display: block;
+      }
+
+      .fixed-panel {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-in-out;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100%;
+        z-index: 1050;
+
+      }
+
+      .fixed-panel.active {
+        transform: translateX(0);
+      }
+
+      body.sidebar-open::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+      }
+    }
+
+
+
+.fixed-panel {
+  background-color: rgb(31, 22, 37);
+  color: white;
+  padding: 20px 10px;
+  overflow-y: auto;
+  height: 100vh;
+
+  /* Firefox */
+  scrollbar-width: none;   /* hides scrollbar */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+/* Chrome, Edge, Safari */
+.fixed-panel::-webkit-scrollbar {
+  display: none; /* hides scrollbar */
+}
+
+.fixed-panel .nav-link {
+  color: #000000;
+  background-color: #ffffff;
+  margin: 10px auto;          /* ✅ center horizontally */
+  border-radius: 10px;
+  font-weight: bold;
+  padding: 10px;
+  box-shadow: 0 5px 6px rgb(0 0 0 / 30%);
+  transition: box-shadow 0.2s ease;
+  font-size: 13px;
+  max-width: 200px;
+ }
+
+    .fixed-panel .nav-link:hover {
+      box-shadow: 0 6px 10px rgba(255, 254, 254, 0.5);
+    }
+
+
+    .fixed-panel .nav-link.active {
+      background-color: #2196f3;
+      color: white !important;
+      box-shadow: 0 6px 10px rgba(255, 254, 254, 0.5);
+
+    }
+
+    .content-wrapper {
+      
+        height: 100vh;
+      overflow: auto;
+     }
+
+ 
+    h5 {
+        font-weight: 600;
+        color: #718096;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+        border-left: 4px solid #764ba2;
+        padding-left: 10px;
+    }
+
+
+  </style>
+
+  {% block style_css %}{% endblock %}
+</head>
+
+<body style="overflow-x: hidden;">
+  {% block sidebar %}
+  {% include 'sidebaruser.html' %}
+  {% endblock sidebar %}
+
+  
+
+  <!-- Main layout -->
+  <div class="container-fluid ">
+    <div class="row">
+
+      <!-- Sidebar -->
+      <div class="col-md-3 col-12   col-lg-2 col-xl-2 col-xxl-3 p-0 box1">
+        <div class="fixed-panel" id="dashboardPanel">
+          {% block fixedcontent %}
+<h4 class="text-white mb-4 text-center mt-4 shadow mb-3" style="padding-top: 40px !important;">
+    <i class="fa-solid fa-desktop"></i> Dashboard 
+</h4> 
+ <style>
+/* Make icons perfectly aligned */
+.solaricon {
+    font-size: 18px;
+    background: linear-gradient(45deg, #00a8ff, #fbc531);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 10px;
+}
+</style>
+
+
+
+
+
+{% with request.resolver_match.url_name as current %}
+
+<!-- Dashboard Home -->
+<a class="nav-link navcontent {% if current == 'solar_dashboard' %}active{% endif %}"
+   href="{% url 'solar_dashboard' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-house"></i></span>
+  Dashboard Home
+</a>
+
+
+
+<!-- Installation Summary 1 -->
+<a class="nav-link navcontent {% if request.resolver_match.url_name == 'wind_summary1' %}active{% endif %}"
+   href="{% url 'solar_summary1' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-chart-pie"></i></span>
+  Install Summary
+</a>
+
+<!-- Installation Summary 2 -->
+<a class="nav-link navcontent {% if request.resolver_match.url_name == 'wind_installation_summary2' %}active{% endif %}"
+   href="{% url 'solar_installation_summary2' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-layer-group"></i></span>
+  Capacity View
+</a>
+<!-- Summary Dashboard -->
+<a class="nav-link navcontent {% if current == 'solar_summary_dashboard' %}active{% endif %}"
+   href="{% url 'solar_summary_dashboard' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-chart-pie"></i></span>
+  Overall Dashboard
+</a>
+
+<!-- Generation Report -->
+<a class="nav-link navcontent {% if current == 'solar_generation_report' %}active{% endif %}"
+   href="{% url 'solar_generation_report' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-solar-panel"></i></span>
+  Generation Report
+</a>
+
+<!-- Overall Breakdown -->
+<a class="nav-link navcontent {% if current == 'solar_overall_breakdown_analysis' %}active{% endif %}"
+   href="{% url 'solar_overall_breakdown_analysis' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-arrow-trend-down"></i></span>
+  Overall Breakdown
+</a>
+
+<!-- Generation Analytics -->
+<a class="nav-link navcontent {% if current == 'solar_dashboard_genration' %}active{% endif %}"
+   href="{% url 'solar_dashboard_genration' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-sun"></i></span>
+  Generation Analytics
+</a>
+
+<!-- PLF Performance -->
+<a class="nav-link navcontent {% if current == 'solar_plf_dashboard' %}active{% endif %}"
+   href="{% url 'solar_plf_dashboard' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-gauge"></i></span>
+  PLF Performance
+</a>
+
+<!-- Generation & Operating -->
+<a class="nav-link navcontent {% if current == 'solar_generation_operating' %}active{% endif %}"
+   href="{% url 'solar_generation_operating' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-chart-line"></i></span>
+  Gen & Operating Hours
+</a>
+
+<!-- Weather Breakdown -->
+<a class="nav-link navcontent {% if current == 'solar_weather_breakdown_dashboard' %}active{% endif %}"
+   href="{% url 'solar_weather_breakdown_dashboard' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-cloud-sun"></i></span>
+  Weather Breakdown
+</a>
+
+<!-- Generation & Weather -->
+<a class="nav-link navcontent {% if current == 'solar_brekdown_genration_whether_dashboard' %}active{% endif %}"
+   href="{% url 'solar_brekdown_genration_whether_dashboard' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-screwdriver-wrench"></i></span>
+  Generation & Weather
+</a>
+
+<!-- Generation by Day -->
+<a class="nav-link navcontent {% if current == 'solar_generation_by_day' %}active{% endif %}"
+   href="{% url 'solar_generation_by_day' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-calendar-day"></i></span>
+  Generation by Day
+</a>
+
+<!-- Trend Analysis -->
+<a class="nav-link navcontent {% if current == 'solar_trend_analysis' %}active{% endif %}"
+   href="{% url 'solar_trend_analysis' %}">
+  <span class="sidebar-icon solaricon"><i class="fa-solid fa-chart-line"></i></span>
+  Trend Analysis
+</a>
+
+{% endwith %}
+
+ 
+         
+          </nav>
+
+          {% endblock %}
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <div class="col-12 col-md-9 col-lg-10 col-xl-10 col-xxl-9 content-wrapper box1" style="padding: 0px;">
+        {% block content %}{% endblock %}
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  {% block scripts %}
+  <script>
+    const toggleBtn = document.getElementById("toggleSidebar");
+    const panel = document.getElementById("dashboardPanel");
+
+    toggleBtn.addEventListener("click", () => {
+      panel.classList.toggle("active");
+      document.body.classList.toggle("sidebar-open");
+    });
+
+    document.body.addEventListener("click", (e) => {
+      if (document.body.classList.contains("sidebar-open") &&
+        !panel.contains(e.target) &&
+        !toggleBtn.contains(e.target)) {
+        panel.classList.remove("active");
+        document.body.classList.remove("sidebar-open");
+      }
+    });
+  </script>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  {% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,991 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block style_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+
+<style>
+  :root {
+    --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    --card-radius: 16px;
+    --transition-speed: 0.25s;
+  }
+
+  body {
+    background-color: #f8fafc;
+  }
+
+  /* Page Header & Filter Bar */
+  .page-header-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  /* KPI Cards */
+  .kpi-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+    padding: 1.25rem;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .kpi-icon-bubble {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+  }
+
+  /* Section Cards */
+  .visual-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    margin-bottom: 1.5rem;
+  }
+  .visual-card-header {
+    background: transparent;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 1.1rem 1.5rem;
+  }
+
+  /* Chart Switcher Buttons */
+  .btn-group-segmented .btn {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px !important;
+    margin: 0 2px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    transition: all 0.2s ease;
+  }
+  .btn-group-segmented .btn.active, .btn-group-segmented .btn:hover {
+    background: #1e293b;
+    color: #ffffff;
+    border-color: #1e293b;
+    box-shadow: 0 2px 6px rgba(30, 41, 59, 0.2);
+  }
+
+  /* DataTables Custom Styling */
+  .table thead th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0.75rem;
+  }
+  .table tbody td {
+    font-size: 0.875rem;
+    vertical-align: middle;
+    padding: 0.75rem;
+  }
+  .badge-status {
+    padding: 0.35rem 0.65rem;
+    font-weight: 600;
+    font-size: 0.75rem;
+    border-radius: 6px;
+  }
+  .badge-optimal { background-color: #dcfce7; color: #15803d; }
+  .badge-normal { background-color: #e0f2fe; color: #0369a1; }
+  .badge-underperforming { background-color: #fee2e2; color: #b91c1c; }
+
+  /* Spinning Fan */
+  .spin-icon {
+    animation: fanSpin 4s linear infinite;
+  }
+  @keyframes fanSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3" style="margin-top: 85px;">
+
+  <!-- PAGE HEADER & BREADCRUMB -->
+  <div class="page-header-card">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1" style="font-size: 11px;">
+            <i class="fa-solid fa-bolt"></i> PRIORITY VISUAL #2 & #3
+          </span>
+          <span class="text-muted small">Wind Turbine Analytics</span>
+        </div>
+        <h3 class="fw-bold text-dark mt-1 mb-0">Energy Generation (kWh)</h3>
+        <p class="text-muted small mb-0">Fleet energy yield, monthly trend trajectory, and Top 10 / Bottom 10 turbine ranking</p>
+      </div>
+
+      <!-- FILTER TRIGGER BUTTONS -->
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+          <i class="fa-regular fa-calendar-days text-primary me-1"></i> Date Range
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#providerModal">
+          <i class="fa-solid fa-industry text-info me-1"></i> OEM Provider
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#customerModal">
+          <i class="fa-solid fa-user text-success me-1"></i> Customer
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#stateModal">
+          <i class="fa-solid fa-map-location-dot text-warning me-1"></i> State
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#siteModal">
+          <i class="fa-solid fa-map-pin text-danger me-1"></i> Site
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#wtgModal">
+          <i class="fa-solid fa-bolt text-purple me-1"></i> Turbine WTG
+        </button>
+      </div>
+    </div>
+
+    <!-- ACTIVE APPLIED FILTER CHIPS -->
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+    <div class="d-flex flex-wrap align-items-center gap-2 pt-3 mt-3 border-top">
+      <span class="small text-muted fw-bold"><i class="fa-solid fa-filter me-1"></i>Active:</span>
+      {% if date_from and date_to %}
+      <span class="badge rounded-pill bg-primary-subtle text-primary px-3 py-1">
+        <i class="fa-regular fa-calendar me-1"></i>{{ date_from }} → {{ date_to }}
+      </span>
+      {% endif %}
+      {% for p in selected_providers %}
+      <span class="badge rounded-pill bg-info-subtle text-info px-3 py-1"><i class="fa-solid fa-industry me-1"></i>{{ p }}</span>
+      {% endfor %}
+      {% for c in selected_customers %}
+      <span class="badge rounded-pill bg-success-subtle text-success px-3 py-1"><i class="fa-solid fa-user me-1"></i>{{ c }}</span>
+      {% endfor %}
+      {% for s in selected_states %}
+      <span class="badge rounded-pill bg-warning-subtle text-warning px-3 py-1"><i class="fa-solid fa-location-dot me-1"></i>{{ s }}</span>
+      {% endfor %}
+      {% for s in selected_sites %}
+      <span class="badge rounded-pill bg-danger-subtle text-danger px-3 py-1"><i class="fa-solid fa-map-pin me-1"></i>{{ s }}</span>
+      {% endfor %}
+      {% for w in selected_wtgs %}
+      <span class="badge rounded-pill bg-secondary-subtle text-secondary px-3 py-1"><i class="fa-solid fa-bolt me-1"></i>{{ w }}</span>
+      {% endfor %}
+      <a href="?clear_filters=1" class="btn btn-sm btn-link text-danger p-0 ms-2 small text-decoration-none">
+        <i class="fa-solid fa-xmark me-1"></i>Reset All
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- VISUAL #1: FLEET SUMMARY KPI CARDS (5-METRIC DECK) -->
+  <div class="row g-3 mb-4">
+    <!-- Card 1: Total Generation -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Fleet Generation</span>
+          <div class="kpi-icon-bubble bg-success-subtle text-success">
+            <i class="fa-solid fa-bolt-lightning"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ total_generation|intcomma }}</h3>
+        <div class="d-flex align-items-center gap-1 mt-2 text-success small">
+          <i class="fa-solid fa-circle-check"></i>
+          <span class="fw-semibold">kWh Total Yield</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Average Generation per WTG -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Avg Yield / WTG</span>
+          <div class="kpi-icon-bubble bg-primary-subtle text-primary">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ avg_generation|intcomma }}</h3>
+        <div class="d-flex align-items-center gap-1 mt-2 text-primary small">
+          <i class="fa-solid fa-calculator"></i>
+          <span class="fw-semibold">kWh Fleet Benchmark</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Top Performing Turbine -->
+    <div class="col-xl-2 col-md-4">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Top Turbine</span>
+          <div class="kpi-icon-bubble bg-warning-subtle text-warning">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 text-truncate">{{ top_wtg.wtg|default:"--" }}</h4>
+        <div class="mt-2 text-muted small font-monospace">
+          {{ top_wtg.generation|intcomma }} kWh
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: Lowest Producing Turbine -->
+    <div class="col-xl-2 col-md-4">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Lowest WTG</span>
+          <div class="kpi-icon-bubble bg-danger-subtle text-danger">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 text-truncate">{{ bottom_wtg.wtg|default:"--" }}</h4>
+        <div class="mt-2 text-muted small font-monospace">
+          {{ bottom_wtg.generation|intcomma }} kWh
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 5: Fleet Active WTGs -->
+    <div class="col-xl-2 col-md-4">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Turbine Fleet</span>
+          <div class="kpi-icon-bubble bg-info-subtle text-info">
+            <i class="fa-solid fa-fan spin-icon"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0">{{ wtg_count }}</h3>
+        <div class="d-flex align-items-center gap-1 mt-2 text-info small">
+          <i class="fa-solid fa-check-double"></i>
+          <span class="fw-semibold">Reporting Units</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #3: TOP 10 / BOTTOM 10 TURBINE RANKING & VISUAL #2: MONTHLY GENERATION TREND -->
+  <div class="row g-4 mb-4">
+
+    <!-- VISUAL #3: TOP 10 / BOTTOM 10 TURBINE RANKING (HORIZONTAL BAR CHART) -->
+    <div class="col-xl-7 col-lg-12">
+      <div class="visual-card h-100 d-flex flex-column">
+        <div class="visual-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-ranking-star text-primary"></i>
+              <h5 class="fw-bold text-dark mb-0">Turbine Generation Ranking</h5>
+            </div>
+            <small class="text-muted">Conforming to 50+ fleet rules: Horizontal ranking for Top & Bottom turbines</small>
+          </div>
+
+          <!-- RANKING TOGGLE BUTTONS -->
+          <div class="btn-group btn-group-segmented" role="group" id="rankingSwitcher">
+            <button type="button" class="btn active" data-view="top10">
+              <i class="fa-solid fa-trophy text-warning me-1"></i>Top 10
+            </button>
+            <button type="button" class="btn" data-view="bottom10">
+              <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>Bottom 10
+            </button>
+            <button type="button" class="btn" data-view="top25">
+              <i class="fa-solid fa-bars-staggered me-1"></i>Top 25
+            </button>
+            <button type="button" class="btn" data-view="all">
+              <i class="fa-solid fa-layer-group me-1"></i>All Fleet
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body p-3 flex-grow-1">
+          <!-- Main Chart Container -->
+          <div id="wtgRankingChart" style="min-height: 480px; width: 100%;"></div>
+
+          <!-- Chart Pagination & Footer Bar -->
+          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
+            <div class="d-flex align-items-center gap-2">
+              <span id="rankingSummaryBadge" class="badge bg-light text-dark border px-2 py-1 font-monospace">Showing Top 10 Turbines</span>
+              <span class="small text-muted fw-bold ms-2">Per Page:</span>
+              <select id="chartPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
+                <option value="10" selected>10 WTGs</option>
+                <option value="15">15 WTGs</option>
+                <option value="25">25 WTGs</option>
+                <option value="all">All WTGs</option>
+              </select>
+            </div>
+            <nav aria-label="Chart Pagination">
+              <ul class="pagination pagination-sm mb-0" id="chartPaginationNav"></ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISUAL #2: MONTHLY GENERATION TREND (LINE & AREA CHART) -->
+    <div class="col-xl-5 col-lg-12">
+      <div class="visual-card h-100 d-flex flex-column">
+        <div class="visual-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-chart-line text-success"></i>
+              <h5 class="fw-bold text-dark mb-0">Generation Trajectory</h5>
+            </div>
+            <small class="text-muted">Monthly fleet generation trends over time</small>
+          </div>
+          <span class="badge bg-success-subtle text-success px-3 py-1 fw-bold">
+            <i class="fa-solid fa-arrow-trend-up me-1"></i>Trend Curve
+          </span>
+        </div>
+
+        <div class="card-body p-3 flex-grow-1">
+          <!-- Trend Chart Container -->
+          <div id="monthlyTrendChart" style="min-height: 480px; width: 100%;"></div>
+
+          <!-- Trend Footer Info -->
+          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top text-muted small">
+            <span><i class="fa-solid fa-calendar-check text-success me-1"></i> Aggregated monthly energy output</span>
+            <span class="badge bg-light text-muted border px-2 py-1 font-monospace">Smooth Spline Area</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TURBINE FULL DATA TABLE SECTION -->
+  <div class="visual-card">
+    <div class="visual-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-table-list text-purple"></i>
+          <h5 class="fw-bold text-dark mb-0">Fleet Turbine Generation Details</h5>
+        </div>
+        <small class="text-muted">Search, sort, filter, and export full turbine generation logs</small>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark border px-3 py-2 fw-semibold">
+          Total: {{ wtg_count }} Turbines
+        </span>
+      </div>
+    </div>
+
+    <div class="card-body p-3">
+      <div class="table-responsive">
+        <table id="generationTable" class="table table-hover table-striped w-100 align-middle">
+          <thead>
+            <tr>
+              <th style="width: 70px;" class="text-center">Rank</th>
+              <th>Turbine ID / Loc No</th>
+              <th>OEM Manufacturer</th>
+              <th class="text-end">Generation (kWh)</th>
+              <th style="width: 180px;">Fleet Share (%)</th>
+              <th class="text-center" style="width: 110px;">Diff vs Avg</th>
+              <th class="text-center" style="width: 140px;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in table_data %}
+            <tr>
+              <td class="text-center fw-bold">
+                {% if row.rank == 1 %}
+                  <span class="badge bg-warning text-dark rounded-circle px-2 py-1">🥇 1</span>
+                {% elif row.rank == 2 %}
+                  <span class="badge bg-secondary text-white rounded-circle px-2 py-1">🥈 2</span>
+                {% elif row.rank == 3 %}
+                  <span class="badge bg-danger-subtle text-danger rounded-circle px-2 py-1">🥉 3</span>
+                {% else %}
+                  <span class="text-muted">#{{ row.rank }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="fa-solid fa-fan text-primary opacity-75"></i>
+                  <strong class="text-dark">{{ row.wtg_no }}</strong>
+                </div>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark border">{{ row.oem }}</span>
+              </td>
+              <td class="text-end font-monospace fw-bold text-dark">
+                {{ row.generation|intcomma }}
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1" style="height: 6px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ row.share }}%;"></div>
+                  </div>
+                  <span class="small font-monospace text-muted">{{ row.share }}%</span>
+                </div>
+              </td>
+              <td class="text-center font-monospace small">
+                {% if row.diff_avg >= 0 %}
+                  <span class="text-success fw-bold">+{{ row.diff_avg }}%</span>
+                {% else %}
+                  <span class="text-danger fw-bold">{{ row.diff_avg }}%</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if row.status == "Optimal" %}
+                  <span class="badge-status badge-optimal"><i class="fa-solid fa-circle-check me-1"></i>Optimal</span>
+                {% elif row.status == "Underperforming" %}
+                  <span class="badge-status badge-underperforming"><i class="fa-solid fa-circle-exclamation me-1"></i>Low Yield</span>
+                {% else %}
+                  <span class="badge-status badge-normal"><i class="fa-solid fa-circle me-1"></i>Normal</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FILTER MODALS (Preserved and Styled) -->
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold"><i class="fa-regular fa-calendar-days text-primary me-2"></i>Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label small fw-bold">From Date</label>
+            <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-bold">To Date</label>
+            <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+          </div>
+        </div>
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Range</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- OEM Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-industry text-info me-2"></i>Select OEM Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+        {% for p in providers %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}" id="prov_{{ forloop.counter }}"
+              {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="prov_{{ forloop.counter }}">{{ p }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted mb-0">No OEM providers found in database.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-user text-success me-2"></i>Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+        {% for c in customers %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}" id="cust_{{ forloop.counter }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="cust_{{ forloop.counter }}">{{ c }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted mb-0">No customers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-map-location-dot text-warning me-2"></i>Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+        {% for s in states %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}" id="st_{{ forloop.counter }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="st_{{ forloop.counter }}">{{ s }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted mb-0">No states found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-map-pin text-danger me-2"></i>Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+        {% for s in sites %}
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}" id="site_{{ forloop.counter }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="site_{{ forloop.counter }}">{{ s }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted mb-0">No sites found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title fw-bold"><i class="fa-solid fa-bolt text-purple me-2"></i>Select Turbine WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+        <div class="row">
+          {% for w in wtgs %}
+            <div class="col-md-4 col-sm-6 mb-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}" id="wtg_{{ forloop.counter }}"
+                  {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+                <label class="form-check-label font-monospace fw-semibold" for="wtg_{{ forloop.counter }}">{{ w }}</label>
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-muted mb-0">No WTGs found.</p>
+          {% endfor %}
+        </div>
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Scripts: jQuery, DataTables, ApexCharts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // Parse Data safely
+  let top10Data = [];
+  let bottom10Data = [];
+  let top25Data = [];
+  let allWtgsData = [];
+  let monthlyTrendData = { labels: [], values: [] };
+
+  try { top10Data = JSON.parse(`{{ top_10_json|escapejs }}`) || []; } catch(e) { console.error(e); }
+  try { bottom10Data = JSON.parse(`{{ bottom_10_json|escapejs }}`) || []; } catch(e) { console.error(e); }
+  try { top25Data = JSON.parse(`{{ top_25_json|escapejs }}`) || []; } catch(e) { console.error(e); }
+  try { allWtgsData = JSON.parse(`{{ all_wtgs_json|escapejs }}`) || []; } catch(e) { console.error(e); }
+  try { monthlyTrendData = JSON.parse(`{{ monthly_trend_json|escapejs }}`) || { labels: [], values: [] }; } catch(e) { console.error(e); }
+
+  const totalGeneration = {{ total_generation|default:0 }};
+  const avgGeneration = {{ avg_generation|default:0 }};
+
+  // 1. Initialize DataTable
+  $('#generationTable').DataTable({
+    paging: true,
+    pageLength: 10,
+    lengthMenu: [5, 10, 25, 50, 100],
+    ordering: true,
+    order: [[0, 'asc']], // Order by rank asc
+    responsive: true,
+    language: {
+      search: "<i class='fa-solid fa-magnifying-glass me-1'></i> Search Turbine:",
+      lengthMenu: "Show _MENU_ WTGs / page",
+      info: "Showing _START_ to _END_ of _TOTAL_ turbines"
+    }
+  });
+
+  // 2. VISUAL #3: Horizontal Bar Chart (WTG Ranking)
+  let rankingChart = null;
+
+  function renderRankingChart(dataItems, isBottom = false) {
+    const categories = dataItems.map(d => d.wtg);
+    const seriesData = dataItems.map(d => d.generation);
+
+    // Dynamic bar colors: Top 10 = emerald teal, Bottom 10 = amber red
+    const primaryColor = isBottom ? '#f59e0b' : '#0ea5e9';
+    const secondaryColor = isBottom ? '#ef4444' : '#10b981';
+
+    const options = {
+      series: [{
+        name: 'Generation (kWh)',
+        data: seriesData
+      }],
+      chart: {
+        type: 'bar',
+        height: Math.max(450, dataItems.length * 36),
+        toolbar: { show: true, tools: { download: true } },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      plotOptions: {
+        bar: {
+          horizontal: true,
+          borderRadius: 6,
+          barHeight: '68%',
+          distributed: false,
+          dataLabels: { position: 'top' }
+        }
+      },
+      colors: [isBottom ? '#ef4444' : '#0ea5e9'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'horizontal',
+          shadeIntensity: 0.25,
+          gradientToColors: [secondaryColor],
+          inverseColors: false,
+          opacityFrom: 0.95,
+          opacityTo: 0.85,
+          stops: [0, 100]
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: function (val) {
+          if (val >= 1e6) return (val / 1e6).toFixed(2) + ' M';
+          if (val >= 1e3) return (val / 1e3).toFixed(1) + ' k';
+          return val.toLocaleString();
+        },
+        offsetX: 30,
+        style: {
+          fontSize: '11px',
+          fontWeight: 700,
+          colors: ['#334155']
+        }
+      },
+      xaxis: {
+        categories: categories,
+        labels: {
+          formatter: function (val) {
+            if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M';
+            if (val >= 1e3) return (val / 1e3).toFixed(0) + 'k';
+            return val;
+          },
+          style: { fontSize: '11px', colors: '#64748b' }
+        },
+        title: { text: 'Generation (kWh)', style: { fontSize: '12px', fontWeight: 600, color: '#64748b' } }
+      },
+      yaxis: {
+        labels: {
+          style: { fontSize: '12px', fontWeight: 600, colors: '#1e293b' }
+        }
+      },
+      grid: {
+        borderColor: '#f1f5f9',
+        strokeDashArray: 4
+      },
+      tooltip: {
+        theme: 'light',
+        y: {
+          formatter: function (val) {
+            const share = totalGeneration > 0 ? ((val / totalGeneration) * 100).toFixed(2) : '0';
+            const diffAvg = avgGeneration > 0 ? (((val - avgGeneration) / avgGeneration) * 100).toFixed(1) : '0';
+            const sign = diffAvg >= 0 ? '+' : '';
+            return `${val.toLocaleString()} kWh (${share}% of Fleet | ${sign}${diffAvg}% vs Avg)`;
+          }
+        }
+      }
+    };
+
+    if (rankingChart) {
+      rankingChart.destroy();
+    }
+    rankingChart = new ApexCharts(document.querySelector("#wtgRankingChart"), options);
+    rankingChart.render();
+  }
+
+  // Pagination & Ranking Controller for Chart
+  let currentChartSource = [...allWtgsData];
+  let chartPageSize = 10;
+  let chartCurrentPage = 1;
+
+  function getChartTotalPages() {
+    if (chartPageSize === "all") return 1;
+    return Math.max(1, Math.ceil(currentChartSource.length / chartPageSize));
+  }
+
+  function updateChartPaginationNav() {
+    const nav = document.getElementById("chartPaginationNav");
+    const summaryBadge = document.getElementById("rankingSummaryBadge");
+    if (!nav) return;
+    const totalPages = getChartTotalPages();
+
+    if (chartPageSize === "all" || totalPages <= 1) {
+      nav.innerHTML = "";
+      if (summaryBadge) summaryBadge.textContent = `Showing All ${currentChartSource.length} Turbines`;
+      return;
+    }
+
+    const startIdx = (chartCurrentPage - 1) * chartPageSize + 1;
+    const endIdx = Math.min(chartCurrentPage * chartPageSize, currentChartSource.length);
+    if (summaryBadge) summaryBadge.textContent = `Showing WTGs ${startIdx}-${endIdx} of ${currentChartSource.length} (Page ${chartCurrentPage}/${totalPages})`;
+
+    let html = `<li class="page-item ${chartCurrentPage === 1 ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToChartPage(${chartCurrentPage - 1})">&laquo; Prev</button>
+    </li>`;
+
+    for (let p = 1; p <= totalPages; p++) {
+      if (totalPages > 6 && Math.abs(p - chartCurrentPage) > 2 && p !== 1 && p !== totalPages) {
+        if (p === 2 || p === totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        continue;
+      }
+      html += `<li class="page-item ${p === chartCurrentPage ? 'active' : ''}">
+        <button type="button" class="page-link" onclick="goToChartPage(${p})">${p}</button>
+      </li>`;
+    }
+
+    html += `<li class="page-item ${chartCurrentPage === totalPages ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToChartPage(${chartCurrentPage + 1})">Next &raquo;</button>
+    </li>`;
+    nav.innerHTML = html;
+  }
+
+  function renderCurrentChartPage(isBottom = false) {
+    let subset;
+    if (chartPageSize === "all") {
+      subset = [...currentChartSource];
+    } else {
+      const start = (chartCurrentPage - 1) * chartPageSize;
+      subset = currentChartSource.slice(start, start + chartPageSize);
+    }
+    renderRankingChart(subset, isBottom);
+    updateChartPaginationNav();
+  }
+
+  window.goToChartPage = function(p) {
+    const total = getChartTotalPages();
+    if (p < 1 || p > total) return;
+    chartCurrentPage = p;
+    renderCurrentChartPage(false);
+  };
+
+  const pageSizeSelect = document.getElementById("chartPageSize");
+  if (pageSizeSelect) {
+    pageSizeSelect.addEventListener("change", function () {
+      chartPageSize = this.value === "all" ? "all" : parseInt(this.value);
+      chartCurrentPage = 1;
+      renderCurrentChartPage(false);
+    });
+  }
+
+  // Switcher Buttons
+  const switcherBtns = document.querySelectorAll("#rankingSwitcher .btn");
+  switcherBtns.forEach(btn => {
+    btn.addEventListener("click", function () {
+      switcherBtns.forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      const view = this.getAttribute("data-view");
+
+      if (view === "top10") {
+        currentChartSource = [...allWtgsData];
+        chartPageSize = 10;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "10";
+        renderCurrentChartPage(false);
+      } else if (view === "bottom10") {
+        currentChartSource = [...allWtgsData].reverse();
+        chartPageSize = 10;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "10";
+        renderCurrentChartPage(true);
+      } else if (view === "top25") {
+        currentChartSource = [...allWtgsData];
+        chartPageSize = 25;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "25";
+        renderCurrentChartPage(false);
+      } else if (view === "all") {
+        currentChartSource = [...allWtgsData];
+        chartPageSize = "all";
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "all";
+        renderCurrentChartPage(false);
+      }
+    });
+  });
+
+  // Initial render with pagination
+  renderCurrentChartPage(false);
+
+  // 3. VISUAL #2: Monthly Generation Trend (Area Line Chart)
+  if (monthlyTrendData.labels && monthlyTrendData.labels.length > 0) {
+    const trendOptions = {
+      series: [{
+        name: 'Monthly Generation (kWh)',
+        data: monthlyTrendData.values
+      }],
+      chart: {
+        type: 'area',
+        height: 480,
+        toolbar: { show: true, tools: { download: true, zoom: true, reset: true } },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      stroke: {
+        curve: 'smooth',
+        width: 3
+      },
+      colors: ['#10b981'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shadeIntensity: 1,
+          opacityFrom: 0.45,
+          opacityTo: 0.05,
+          stops: [0, 95, 100]
+        }
+      },
+      dataLabels: { enabled: false },
+      markers: {
+        size: monthlyTrendData.labels.length > 20 ? 0 : 4,
+        colors: ['#10b981'],
+        strokeColors: '#fff',
+        strokeWidth: 2,
+        hover: { size: 6 }
+      },
+      xaxis: {
+        categories: monthlyTrendData.labels,
+        labels: {
+          rotate: -45,
+          rotateAlways: monthlyTrendData.labels.length > 12,
+          style: { fontSize: '11px', colors: '#64748b' }
+        }
+      },
+      yaxis: {
+        labels: {
+          formatter: function (val) {
+            if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M';
+            if (val >= 1e3) return (val / 1e3).toFixed(0) + 'k';
+            return val;
+          },
+          style: { fontSize: '11px', colors: '#64748b' }
+        },
+        title: { text: 'Generation (kWh)', style: { fontSize: '12px', fontWeight: 600, color: '#64748b' } }
+      },
+      grid: {
+        borderColor: '#f1f5f9',
+        strokeDashArray: 4
+      },
+      tooltip: {
+        theme: 'light',
+        x: { format: 'yyyy-MM' },
+        y: {
+          formatter: function (val) {
+            return val.toLocaleString() + ' kWh';
+          }
+        }
+      }
+    };
+
+    const monthlyChart = new ApexCharts(document.querySelector("#monthlyTrendChart"), trendOptions);
+    monthlyChart.render();
+  } else {
+    document.querySelector("#monthlyTrendChart").innerHTML = '<div class="alert alert-info text-center m-4">No monthly generation trend data available.</div>';
+  }
+
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1570 @@
+{% extends 'basewind.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+<style>
+    /* Clean Pure White Page Background */
+    html, body, .content-wrapper, .box1 {
+        background: #ffffff !important;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: #0f172a;
+    }
+
+    /* Modal Wrapper / Backdrop - Clears Top Fixed Navbar */
+    .crm-modal-backdrop {
+        background: #ffffff;
+        min-height: calc(100vh - 65px);
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 85px 16px 40px 16px;
+    }
+
+    /* Floating Pop-up Modal Container - Sleek & Spacious */
+    .crm-modal-container {
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.08), 0 0 0 1px #e2e8f0;
+        width: 100%;
+        max-width: 860px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        animation: crmFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes crmFadeIn {
+        from { opacity: 0; transform: scale(0.98) translateY(8px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    /* Modal Header - Clean White & Balanced */
+    .crm-modal-header {
+        padding: 18px 24px 14px 24px;
+        background: #ffffff;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+
+    .crm-modal-title {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.2px;
+    }
+
+    .crm-modal-subtitle {
+        margin: 3px 0 0 0;
+        font-size: 0.82rem;
+        color: #94a3b8;
+    }
+
+    .crm-close-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-size: 1.05rem;
+        transition: all 0.15s ease;
+        text-decoration: none !important;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .crm-close-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    /* Plant Type Switcher (Wind / Solar) */
+    .crm-type-switch {
+        display: inline-flex;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 3px;
+        gap: 3px;
+    }
+
+    .type-btn {
+        border: none;
+        background: transparent;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.15s ease;
+    }
+
+    .type-btn:hover {
+        color: #0f172a;
+    }
+
+    .type-btn.active.wind {
+        background: #ffffff;
+        color: #059669;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .type-btn.active.solar {
+        background: #ffffff;
+        color: #d97706;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Simple Pastel Colors KPI Ribbon - Balanced Size */
+    .crm-pastel-kpis {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        padding: 12px 24px 10px 24px;
+        background: #ffffff;
+    }
+
+    .pastel-card {
+        border-radius: 9px;
+        padding: 10px 12px;
+        transition: all 0.15s ease;
+    }
+
+    .pastel-card-blue {
+        background: #f0f7ff;
+        border: 1px solid #bae6fd;
+    }
+    .pastel-card-blue .pastel-label { color: #1e40af; }
+    .pastel-card-blue .pastel-value { color: #1e3a8a; }
+    .pastel-card-blue .pastel-sub   { color: #3b82f6; }
+
+    .pastel-card-purple {
+        background: #faf5ff;
+        border: 1px solid #e9d5ff;
+    }
+    .pastel-card-purple .pastel-label { color: #6b21a8; }
+    .pastel-card-purple .pastel-value { color: #581c87; }
+    .pastel-card-purple .pastel-sub   { color: #8b5cf6; }
+
+    .pastel-card-green {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+    }
+    .pastel-card-green .pastel-label { color: #15803d; }
+    .pastel-card-green .pastel-value { color: #14532d; }
+    .pastel-card-green .pastel-sub   { color: #22c55e; }
+
+    .pastel-card-amber {
+        background: #fffbeb;
+        border: 1px solid #fed7aa;
+    }
+    .pastel-card-amber .pastel-label { color: #b45309; }
+    .pastel-card-amber .pastel-value { color: #78350f; }
+    .pastel-card-amber .pastel-sub   { color: #f59e0b; }
+
+    .pastel-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.35px;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+    }
+
+    .pastel-value {
+        font-size: 1.18rem;
+        font-weight: 700;
+        line-height: 1.15;
+    }
+
+    .pastel-sub {
+        font-size: 10px;
+        font-weight: 500;
+        margin-top: 2px;
+        opacity: 0.85;
+    }
+
+    /* Stepper Tabs Bar - Balanced & Clean */
+    .crm-tabs-bar {
+        background: #f8fafc;
+        border-top: 1px solid #f1f5f9;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 7px 24px;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+    }
+
+    .crm-tab-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        padding: 6px 13px;
+        border-radius: 7px;
+        font-size: 12.8px;
+        font-weight: 600;
+        color: #64748b;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .crm-tab-btn:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    .crm-tab-btn.active {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        color: #2563eb;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .crm-tab-btn.completed {
+        color: #059669;
+    }
+
+    .tab-badge {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10.5px;
+        font-weight: 700;
+        background: #e2e8f0;
+        color: #475569;
+        transition: all 0.15s ease;
+    }
+
+    .crm-tab-btn.active .tab-badge {
+        background: #2563eb;
+        color: #ffffff;
+    }
+
+    .crm-tab-btn.completed .tab-badge {
+        background: #10b981;
+        color: #ffffff;
+    }
+
+    /* Modal Body with Custom Scrollbar - Spacious & Comfortable */
+    .crm-modal-body {
+        padding: 18px 24px;
+        background: #ffffff;
+        max-height: 58vh;
+        overflow-y: auto;
+    }
+
+    .crm-modal-body::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .crm-modal-body::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+
+    .crm-modal-body::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .crm-modal-body::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    /* Form Field Layout - Crisp CRM Design */
+    .crm-form-group {
+        margin-bottom: 14px;
+    }
+
+    .crm-label {
+        font-size: 12.8px;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .crm-input {
+        width: 100%;
+        height: 40px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 7px;
+        padding: 7px 12px;
+        font-size: 13.5px;
+        color: #0f172a;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+
+    .crm-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2.5px rgba(59, 130, 246, 0.12);
+        outline: none;
+    }
+
+    .crm-input::placeholder {
+        color: #94a3b8;
+        font-size: 12.5px;
+    }
+
+    .crm-input.readonly-calc {
+        background: #f8fafc;
+        font-weight: 600;
+        color: #0f172a;
+        border-color: #e2e8f0;
+        cursor: default;
+    }
+
+    .crm-badge-tag {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 7px;
+        border-radius: 5px;
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    .crm-badge-tag.auto {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #dbeafe;
+    }
+
+    .crm-badge-tag.fix {
+        background: #fffbeb;
+        color: #b45309;
+        border: 1px solid #fef3c7;
+    }
+
+    .crm-hint {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 3px;
+    }
+
+    /* Highlight Banner in Pastel Green */
+    .crm-pastel-highlight {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 14px;
+    }
+
+    .crm-pastel-highlight-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #15803d;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .crm-pastel-highlight-val {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #14532d;
+        line-height: 1.15;
+    }
+
+    /* Modal Footer with Part-wise Next and Back Buttons */
+    .crm-modal-footer {
+        background: #ffffff;
+        border-top: 1px solid #e2e8f0;
+        padding: 13px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .btn-crm-back {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #475569;
+        border-radius: 7px;
+        padding: 7px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+        cursor: pointer;
+    }
+
+    .btn-crm-back:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #94a3b8;
+    }
+
+    .btn-crm-next {
+        background: #2563eb;
+        border: 1px solid #2563eb;
+        color: #ffffff;
+        border-radius: 7px;
+        padding: 7px 22px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+    }
+
+    .btn-crm-next:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+    }
+
+    .btn-crm-save {
+        background: #10b981;
+        border: 1px solid #10b981;
+        color: #ffffff;
+        border-radius: 7px;
+        padding: 7px 22px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(16, 185, 129, 0.2);
+    }
+
+    .btn-crm-save:hover {
+        background: #059669;
+        border-color: #059669;
+    }
+
+    /* Compact modern table */
+    .table-crm {
+        width: 100%;
+        margin-top: 10px;
+        border-collapse: separate;
+        border-spacing: 0;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        font-size: 12px;
+    }
+
+    .table-crm thead th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 7px 10px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .table-crm tbody td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+    }
+
+    .table-crm tbody tr:last-child td { border-bottom: none; }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .crm-modal-backdrop {
+            padding: 75px 8px 30px 8px;
+        }
+        .crm-modal-container {
+            max-width: 100%;
+            border-radius: 10px;
+        }
+        .crm-pastel-kpis {
+            grid-template-columns: repeat(2, 1fr);
+            padding: 8px 14px;
+            gap: 6px;
+        }
+        .crm-modal-header,
+        .crm-tabs-bar,
+        .crm-modal-body,
+        .crm-modal-footer {
+            padding-left: 14px;
+            padding-right: 14px;
+        }
+        .col-md-6 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .crm-pastel-kpis {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="crm-modal-backdrop">
+
+    <!-- Floating Clean White Pop-up Modal Container -->
+    <div class="crm-modal-container">
+
+        <!-- Modal Header -->
+        <div class="crm-modal-header">
+            <div>
+                <h3 class="crm-modal-title">Open Access Tariff & Savings Calculator</h3>
+                <p class="crm-modal-subtitle">Manage utility tariff, open access breakdown and buyer generation savings</p>
+            </div>
+            <div class="d-flex align-items-center">
+                <!-- Wind / Solar Switcher -->
+                <div class="crm-type-switch mr-2">
+                    <button type="button" class="type-btn {% if input.plant_type == 'wind' or not input.plant_type %}active wind{% endif %}" id="btn-type-wind" onclick="setPlantType('wind')">
+                        <i class="fa-solid fa-wind mr-1"></i> Wind
+                    </button>
+                    <button type="button" class="type-btn {% if input.plant_type == 'solar' %}active solar{% endif %}" id="btn-type-solar" onclick="setPlantType('solar')">
+                        <i class="fa-solid fa-sun mr-1"></i> Solar
+                    </button>
+                </div>
+                <a href="{% url 'calculation_history' %}" class="crm-close-btn" title="View Saved History">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Above KPI: Simple Minimalist Pastel Colors -->
+        <div class="crm-pastel-kpis">
+            <!-- Pastel 1: Existing DISCOM Tariff -->
+            <div class="pastel-card pastel-card-blue">
+                <div class="pastel-label">DISCOM TARIFF</div>
+                <div class="pastel-value" id="mini_discom_tariff">₹ {{ result.total_discom_tariff|floatformat:2 }}</div>
+                <div class="pastel-sub">Part 1 Excl. Demand</div>
+            </div>
+
+            <!-- Pastel 2: Delivered Buyer Tariff -->
+            <div class="pastel-card pastel-card-purple">
+                <div class="pastel-label">DELIVERED TARIFF</div>
+                <div class="pastel-value" id="mini_delivered_tariff">₹ {{ result.delivered_tariff|floatformat:2 }}</div>
+                <div class="pastel-sub">Buyer Net Rate</div>
+            </div>
+
+            <!-- Pastel 3: Per Unit Savings -->
+            <div class="pastel-card pastel-card-green">
+                <div class="pastel-label">PER UNIT SAVINGS</div>
+                <div class="pastel-value" id="mini_per_unit">₹ {{ result.per_unit_savings|floatformat:2 }}</div>
+                <div class="pastel-sub">₹/kWh Savings</div>
+            </div>
+
+            <!-- Pastel 4: Total Annual Savings -->
+            <div class="pastel-card pastel-card-amber">
+                <div class="pastel-label">TOTAL ANNUAL SAVINGS</div>
+                <div class="pastel-value" id="mini_annual_savings">₹ {{ result.estimated_savings|floatformat:0 }}</div>
+                <div class="pastel-sub">1st × (3rd − 11th)</div>
+            </div>
+        </div>
+
+        <!-- Step Navigation Tabs (Part 1, Part 2, Part 3) -->
+        <div class="crm-tabs-bar">
+            <button type="button" class="crm-tab-btn active" id="p-step-1" onclick="goToStep(1)">
+                <span class="tab-badge" id="p-num-1">1</span> Part 1: Utility Tariff
+            </button>
+            <button type="button" class="crm-tab-btn" id="p-step-2" onclick="goToStep(2)">
+                <span class="tab-badge" id="p-num-2">2</span> Part 2: Open Access Breakdown
+            </button>
+            <button type="button" class="crm-tab-btn" id="p-step-3" onclick="goToStep(3)">
+                <span class="tab-badge" id="p-num-3">3</span> Part 3: Generation & Savings
+            </button>
+        </div>
+
+        <!-- Pop-up Form -->
+        <form method="post" id="oaForm">
+            {% csrf_token %}
+            <input type="hidden" name="plant_type" id="plant_type_input" value="{{ input.plant_type|default:'wind' }}">
+            <input type="hidden" name="save_result" id="save_result_input" value="">
+
+            <div class="crm-modal-body">
+
+                <!-- ============================================== -->
+                <!-- STEP 1: Existing DISCOM Tariff                 -->
+                <!-- ============================================== -->
+                <div class="step-pane" id="step-pane-1">
+
+                    <!-- Prominently Printed Total Banner in Pastel Tint -->
+                    <div class="crm-pastel-highlight d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="crm-pastel-highlight-title">Total DISCOM Tariff (Excluding Contract Demand)</div>
+                            <div class="text-muted" style="font-size: 11px;">= Wheeling (0.81) + Energy (8.44) + FAC (0.35) + TOSE (0.27) + Duty</div>
+                        </div>
+                        <div class="crm-pastel-highlight-val" id="part1_total_badge">
+                            ₹ {{ result.total_discom_tariff|floatformat:4 }} / kWh
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- 1) Contract Demand -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="contract_demand">
+                                    <span>Contract Demand (kVA)</span>
+                                    <span class="crm-badge-tag">User Input</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc" name="contract_demand" id="contract_demand" value="{{ input.contract_demand }}" placeholder="Enter kVA">
+                                <div class="crm-hint">Not fixed, user input (excluded from per-unit total)</div>
+                            </div>
+                        </div>
+
+                        <!-- 2) unit@MSEDCL tariff -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="unit_msedcl">
+                                    <span>Unit @ MSEDCL Tariff (kWh) <span class="text-danger">*</span></span>
+                                    <span class="crm-badge-tag auto">From Bill</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc" name="unit_msedcl" id="unit_msedcl" value="{{ input.unit_msedcl }}" placeholder="take from bill">
+                                <div class="crm-hint">Placeholder: take from bill (used to calculate duty rate)</div>
+                            </div>
+                        </div>
+
+                        <!-- 3) Electricity Duty (Bill Amount) -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="duty_from_bill">
+                                    <span>Electricity Duty Amount (₹) <span class="text-danger">*</span></span>
+                                    <span class="crm-badge-tag auto">Default ₹ 4,86,181.4</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc" name="duty_from_bill" id="duty_from_bill" value="{{ input.duty_from_bill|default:'486181.4' }}" placeholder="take it bill">
+                                <div class="crm-hint">Placeholder: take it bill (default 486181.4)</div>
+                            </div>
+                        </div>
+
+                        <!-- 4) Electricity Duty (Per Unit Rate) -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label">
+                                    <span>Electricity Duty Rate (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= 486181.4 / Unit@MSEDCL</span>
+                                </label>
+                                <input type="text" class="crm-input readonly-calc" id="part1_duty_display" value="₹ {{ result.part1_duty|floatformat:4 }} / kWh" readonly>
+                                <div class="crm-hint">Per-unit rate computed from bill duty amount</div>
+                            </div>
+                        </div>
+
+                        <!-- 5) Wheeling Charges -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="wheeling_charge">
+                                    <span>Wheeling Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">Default 0.81</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc" name="wheeling_charge" id="wheeling_charge" value="{{ input.wheeling_charge|default:'0.81' }}">
+                                <div class="crm-hint">DISCOM wheeling charges (pre-filled, editable)</div>
+                            </div>
+                        </div>
+
+                        <!-- 6) Energy Charges -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="energy_charge">
+                                    <span>Energy Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">Default 8.44</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc" name="energy_charge" id="energy_charge" value="{{ input.energy_charge|default:'8.44' }}">
+                                <div class="crm-hint">Base energy charges (pre-filled, editable)</div>
+                            </div>
+                        </div>
+
+                        <!-- 7) FAC Charges -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="fac_charge">
+                                    <span>FAC Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">Default 0.35</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc" name="fac_charge" id="fac_charge" value="{{ input.fac_charge|default:'0.35' }}">
+                                <div class="crm-hint">Fuel Adjustment Charge (pre-filled, editable)</div>
+                            </div>
+                        </div>
+
+                        <!-- 8) TOSE Charges -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="tose_charge">
+                                    <span>TOSE Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">Default 0.27</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc" name="tose_charge" id="tose_charge" value="{{ input.tose_charge|default:'0.27' }}">
+                                <div class="crm-hint">Tax on Sale of Electricity (pre-filled, editable)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- STEP 2: Open Access Tariff Breakdown           -->
+                <!-- ============================================== -->
+                <div class="step-pane" id="step-pane-2" style="display:none;">
+
+                    <!-- Net Tariff Banner -->
+                    <div class="crm-pastel-highlight d-flex justify-content-between align-items-center" style="background:#f0fdf4; border-color:#bbf7d0;">
+                        <div>
+                            <div class="crm-pastel-highlight-title" style="color:#15803d;">13. Net Tariff for Client (₹/kWh)</div>
+                            <div class="text-muted" style="font-size: 11px;" id="p2_banner_subtitle">{% if input.plant_type == 'solar' %}= Sum of items 5th + 6th + 7th + 8th + 9th + 12th (Excluding CSS/TOSE & Duty){% else %}= Sum of items 5th to 12th (Proposed Power Tariff to Scheduling Charges){% endif %}</div>
+                        </div>
+                        <div class="crm-pastel-highlight-val" style="color:#14532d;" id="part2_net_tariff_badge">
+                            ₹ {{ result.net_tariff_client|floatformat:4 }} / kWh
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- 0) Present DISCOM Tariff -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label">
+                                    <span>0. Present DISCOM Tariff (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= Part 1 Total</span>
+                                </label>
+                                <input type="text" class="crm-input readonly-calc" id="p2_present_discom_tariff" value="₹ {{ result.present_discom_tariff|floatformat:4 }}" readonly>
+                                <div class="crm-hint">Auto-fetched total of Part 1 excluding contract demand</div>
+                            </div>
+                        </div>
+
+                        <!-- 1) Expected Yearly Escalation -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="expected_escalation">
+                                    <span>1. Expected Yearly Escalation by DISCOM (%)</span>
+                                    <span class="crm-badge-tag fix">Default 0.00%</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc" name="expected_escalation" id="expected_escalation" value="{{ input.expected_escalation|default:'0.00' }}" placeholder="0.00">
+                                <div class="crm-hint">Expected yearly escalation by DISCOM</div>
+                            </div>
+                        </div>
+
+                        <!-- 2) Project Capacity -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="project_capacity">
+                                    <span>2. Project Capacity</span>
+                                    <span class="crm-badge-tag">From MTR</span>
+                                </label>
+                                <input type="text" class="crm-input live-calc" name="project_capacity" id="project_capacity" value="{{ input.project_capacity }}" placeholder="from mtr">
+                                <div class="crm-hint">Placeholder: from mtr (e.g. 2.1 MW)</div>
+                            </div>
+                        </div>
+
+                        <!-- 3) Generation (Wind or Solar) -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="wind_generation">
+                                    <span>3. <span id="label_gen_title">{% if input.plant_type == 'solar' %}Solar{% else %}Wind{% endif %} Generation (kWh)</span> <span class="text-danger">*</span></span>
+                                    <span class="crm-badge-tag auto">Key Driver</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc" name="wind_generation" id="wind_generation" value="{{ input.wind_generation }}" placeholder="from mtr">
+                                <div class="crm-hint" id="hint_gen">Placeholder: from mtr (drives OA duty & scheduling per unit)</div>
+                            </div>
+                        </div>
+
+                        <!-- 4) Annual Degradation -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="annual_degradation">
+                                    <span>4. Annual Degradation in Generation (%)</span>
+                                    <span class="crm-badge-tag fix">Default 0.00%</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc" name="annual_degradation" id="annual_degradation" value="{{ input.annual_degradation|default:'0.00' }}" placeholder="0.00">
+                                <div class="crm-hint">Default 0.00%</div>
+                            </div>
+                        </div>
+
+                        <!-- 5) Proposed Power Tariff -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="proposed_power_tariff">
+                                    <span>5. Proposed Power Tariff (Energy Charge)</span>
+                                    <span class="crm-badge-tag fix">Fixed 3.50</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc" name="proposed_power_tariff" id="proposed_power_tariff" value="{{ input.proposed_power_tariff|default:'3.50' }}">
+                                <div class="crm-hint">Base energy charge for open access power</div>
+                            </div>
+                        </div>
+
+                        <!-- 6) Transmission Losses (@3.28%) -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label">
+                                    <span>6. Transmission Losses (@3.28%)</span>
+                                    <span class="crm-badge-tag auto">= 5th × 3.28%</span>
+                                </label>
+                                <input type="text" class="crm-input readonly-calc" id="transmission_losses_val" value="₹ {{ result.transmission_losses|floatformat:4 }}" readonly>
+                                <div class="crm-hint">Proposed Power Tariff × 3.28%</div>
+                            </div>
+                        </div>
+
+                        <!-- 7) Wheeling Losses (@7.50%) -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label">
+                                    <span>7. Wheeling Losses (@7.50%)</span>
+                                    <span class="crm-badge-tag auto">= 5th × 7.5%</span>
+                                </label>
+                                <input type="text" class="crm-input readonly-calc" id="wheeling_losses_val" value="₹ {{ result.wheeling_losses|floatformat:4 }}" readonly>
+                                <div class="crm-hint">Proposed Power Tariff × 7.5%</div>
+                            </div>
+                        </div>
+
+                        <!-- 8) Transmission Charges -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="transmission_charges">
+                                    <span>8. Transmission Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag">From TSC</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc" name="transmission_charges" id="transmission_charges" value="{{ input.transmission_charges|default:'0.00' }}" placeholder="from tsc">
+                                <div class="crm-hint">Placeholder: from tsc</div>
+                            </div>
+                        </div>
+
+                        <!-- 9) Wheeling Charges -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="oa_wheeling_charges">
+                                    <span>9. Wheeling Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">Default 0.81</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc" name="oa_wheeling_charges" id="oa_wheeling_charges" value="{{ input.oa_wheeling_charges|default:'0.81' }}">
+                                <div class="crm-hint">Open access wheeling charge</div>
+                            </div>
+                        </div>
+
+                        <!-- 10) Additional Sur-Charges & CSS & TOSE -->
+                        <div class="col-md-6" id="container_part2_item10" {% if input.plant_type == 'solar' %}style="display:none;"{% endif %}>
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="css_from_bill">
+                                    <span>10. Additional Sur-Charges & CSS & TOSE</span>
+                                    <span class="crm-badge-tag auto">= 0 + 2.07 + TOSE</span>
+                                </label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="number" step="0.0001" class="crm-input live-calc" name="css_from_bill" id="css_from_bill" value="{{ input.css_from_bill|default:'2.07' }}" placeholder="2.07" style="max-width: 120px;">
+                                    <span class="text-muted" style="font-size: 12px;">+ TOSE (<span id="tose_sub_val">0.27</span>) =</span>
+                                    <span class="font-weight-bold ml-1 text-primary" id="additional_surcharges_css_tose_val" style="font-size: 13px;">₹ {{ result.additional_surcharges_css_tose|floatformat:4 }}</span>
+                                </div>
+                                <div class="crm-hint">Combined surcharge rate</div>
+                            </div>
+                        </div>
+
+                        <!-- 11) Electricity Duty for Open Access -->
+                        <div class="col-md-6" id="container_part2_item11" {% if input.plant_type == 'solar' %}style="display:none;"{% endif %}>
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="oa_duty_amount">
+                                    <span>11. Electricity Duty for Open Access (₹)</span>
+                                    <span class="crm-badge-tag auto">Default 2,50,018.35</span>
+                                </label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="number" step="0.01" class="crm-input live-calc" name="oa_duty_amount" id="oa_duty_amount" value="{{ input.oa_duty_amount|default:'250018.35' }}" placeholder="250018.35" style="max-width: 140px;">
+                                    <span class="text-muted" style="font-size: 12px;">Rate:</span>
+                                    <span class="font-weight-bold ml-1 text-primary" id="p2_duty_val" style="font-size: 13px;">₹ {{ result.electricity_duty|floatformat:4 }}</span>
+                                </div>
+                                <div class="crm-hint">Formula: ₹ 2,50,018.35 / Wind Generation (Part 2)</div>
+                            </div>
+                        </div>
+
+                        <!-- 12) Scheduling & Operating Charges -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label">
+                                    <span>12. Scheduling & Operating Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">44368.99 / Gen</span>
+                                </label>
+                                <input type="text" class="crm-input readonly-calc" id="scheduling_charges_val" value="₹ {{ result.scheduling_operating_charges|floatformat:4 }}" readonly>
+                                <div class="crm-hint">₹ 44,368.99 divided by Generation</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================== -->
+                <!-- STEP 3: Generation & Buyer Savings             -->
+                <!-- ============================================== -->
+                <div class="step-pane" id="step-pane-3" style="display:none;">
+
+                    <!-- Top Pastel Green Savings Summary Box -->
+                    <div class="crm-pastel-highlight d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="crm-pastel-highlight-title"><i class="fa-solid fa-trophy mr-1"></i> 12. Estimated Savings due to <span id="p3_hero_title_text">{% if input.plant_type == 'solar' %}REL Solar Plant{% else %}REL Wind Plant{% endif %}</span> (INR)* = 1st × (3rd − 11th)</div>
+                            <div class="crm-pastel-highlight-val mt-1" id="p3_hero_savings">₹ {{ result.estimated_savings|floatformat:2 }}</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <span class="badge badge-light border text-dark p-1 px-2" style="font-size: 11px;">Per Unit: <strong id="p3_hero_per_unit">₹ {{ result.per_unit_savings|floatformat:4 }} / kWh</strong></span>
+                                <span class="badge badge-light border text-dark p-1 px-2" style="font-size: 11px;">Monthly: <strong id="p3_hero_monthly">₹ {{ result.monthly_savings|floatformat:2 }}</strong></span>
+                                <span class="badge badge-light border text-dark p-1 px-2" style="font-size: 11px;">Assured (70%): <strong id="p3_hero_assured">₹ {{ result.assured_savings|floatformat:2 }}</strong></span>
+                            </div>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetPart3Defaults()" title="Reset to auto defaults from Part 1 & 2" style="font-size: 11px; padding: 4px 10px;">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> Reset Auto
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Part 3 Inputs: All 12 Items as Inputs & Defaults -->
+                    <div class="row">
+                        <!-- 1) ESTIMATED GENERATION (kWh) Export Units = Part 2 3rd -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_estimated_generation">
+                                    <span>1. <span id="p3_item1_label">Estimated Generation (kWh) Export Units</span></span>
+                                    <span class="crm-badge-tag auto">= Part 2 3rd</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc p3-input" name="p3_estimated_generation" id="p3_estimated_generation" value="{{ input.p3_estimated_generation|default:result.estimated_generation }}" placeholder="Export Units">
+                                <div class="crm-hint">Default from Part 2 Generation, fully editable</div>
+                            </div>
+                        </div>
+
+                        <!-- 2) ASSURED GENERATION (kWh) = 1st * 70% -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_assured_generation">
+                                    <span>2. Assured Generation (kWh)</span>
+                                    <span class="crm-badge-tag auto">= 1st × 70%</span>
+                                </label>
+                                <input type="number" step="0.01" class="crm-input live-calc p3-input" name="p3_assured_generation" id="p3_assured_generation" value="{{ input.p3_assured_generation|default:result.assured_generation }}" placeholder="70% Assured">
+                                <div class="crm-hint">Default = Estimated Generation × 70%, editable</div>
+                            </div>
+                        </div>
+
+                        <!-- 3) Existing DISCOM tariff (INR/kWh) Energy -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_existing_tariff">
+                                    <span>3. Existing DISCOM Tariff (₹/kWh) Energy</span>
+                                    <span class="crm-badge-tag auto">= Part 1 Total</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_existing_tariff" id="p3_existing_tariff" value="{{ input.p3_existing_tariff|default:result.existing_discom_tariff }}" placeholder="Total Part 1">
+                                <div class="crm-hint">Total of Part 1 excluding contract demand printed on screen</div>
+                            </div>
+                        </div>
+
+                        <!-- 4) REL BASE Tariff (INR/kWh) = Part 2 5th value -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_rel_base_tariff">
+                                    <span>4. REL BASE Tariff (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= Part 2 5th</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_rel_base_tariff" id="p3_rel_base_tariff" value="{{ input.p3_rel_base_tariff|default:result.rel_base_tariff|default:'3.50' }}" placeholder="3.50">
+                                <div class="crm-hint">Base energy charge (Default: Part 2 5th value)</div>
+                            </div>
+                        </div>
+
+                        <!-- 5) Scheduling & System operation + CSS & TOSE = Part 2 10th + 12th -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_scheduling_css_tose">
+                                    <span id="p3_item5_label">{% if input.plant_type == 'solar' %}5. Scheduling & Operating Charges (₹/kWh){% else %}5. Scheduling + CSS & TOSE (₹/kWh){% endif %}</span>
+                                    <span class="crm-badge-tag auto" id="p3_item5_badge">{% if input.plant_type == 'solar' %}= Part 2 (12th){% else %}= Part 2 (10th + 12th){% endif %}</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_scheduling_css_tose" id="p3_scheduling_css_tose" value="{{ input.p3_scheduling_css_tose|default:result.scheduling_css_tose }}" placeholder="Part 2 rate">
+                                <div class="crm-hint" id="p3_item5_hint">{% if input.plant_type == 'solar' %}Scheduling & System Operation Charges{% else %}Scheduling & System Operation + CSS & TOSE{% endif %}</div>
+                            </div>
+                        </div>
+
+                        <!-- 6) Wheeling charges = Part 1 / Part 2 9th -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_wheeling_charges">
+                                    <span>6. Wheeling Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= Part 1 / Part 2 9th</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_wheeling_charges" id="p3_wheeling_charges" value="{{ input.p3_wheeling_charges|default:result.p3_wheeling_charges|default:'0.81' }}" placeholder="0.81">
+                                <div class="crm-hint">Default from Part 1 / Part 2 wheeling charges</div>
+                            </div>
+                        </div>
+
+                        <!-- 7) Wheeling Losses @ 7.50% = Part 2 7th -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_wheeling_losses">
+                                    <span>7. Wheeling Losses @ 7.50% (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= Part 2 7th</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_wheeling_losses" id="p3_wheeling_losses" value="{{ input.p3_wheeling_losses|default:result.p3_wheeling_losses }}" placeholder="Wheeling Losses">
+                                <div class="crm-hint">Default from Part 2 7th item (@7.50%)</div>
+                            </div>
+                        </div>
+
+                        <!-- 8) Transmission Charges = Part 2 8th -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_transmission_charges">
+                                    <span>8. Transmission Charges (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= Part 2 8th</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_transmission_charges" id="p3_transmission_charges" value="{{ input.p3_transmission_charges|default:result.p3_transmission_charges|default:'0.00' }}" placeholder="Transmission Charges">
+                                <div class="crm-hint">Default from Part 2 8th item (from tsc)</div>
+                            </div>
+                        </div>
+
+                        <!-- 9) Transmission Losses @ 3.28% = Part 2 6th -->
+                        <div class="col-md-6">
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_transmission_losses">
+                                    <span>9. Transmission Losses @ 3.28% (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= Part 2 6th</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_transmission_losses" id="p3_transmission_losses" value="{{ input.p3_transmission_losses|default:result.p3_transmission_losses }}" placeholder="Transmission Losses">
+                                <div class="crm-hint">Default from Part 2 6th item (@3.28%)</div>
+                            </div>
+                        </div>
+
+                        <!-- 10) Electricity Duty = Part 2 11th -->
+                        <div class="col-md-6" id="container_p3_item10" {% if input.plant_type == 'solar' %}style="display:none;"{% endif %}>
+                            <div class="crm-form-group">
+                                <label class="crm-label" for="p3_electricity_duty">
+                                    <span>10. Electricity Duty (₹/kWh)</span>
+                                    <span class="crm-badge-tag auto">= Part 2 11th</span>
+                                </label>
+                                <input type="number" step="0.0001" class="crm-input live-calc p3-input" name="p3_electricity_duty" id="p3_electricity_duty" value="{{ input.p3_electricity_duty|default:result.p3_electricity_duty }}" placeholder="Electricity Duty">
+                                <div class="crm-hint">Default from Part 2 11th item</div>
+                            </div>
+                        </div>
+
+                        <!-- 11) Delivered Tariff to Buyer = addition of 4th to 10th -->
+                        <div class="col-md-12">
+                            <div class="crm-pastel-highlight d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="crm-pastel-highlight-title">11. Delivered Tariff to Buyer (₹/kWh)</div>
+                                    <div class="text-muted" style="font-size: 11px;" id="p3_delivered_subtitle">{% if input.plant_type == 'solar' %}= Addition of 4th to 9th of Part 3{% else %}= Addition of 4th to 10th of Part 3{% endif %}</div>
+                                </div>
+                                <div class="crm-pastel-highlight-val" id="p3_delivered_tariff">
+                                    ₹ {{ result.delivered_tariff|floatformat:4 }} / kWh
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Table -->
+                    <div class="table-responsive mt-1">
+                        <table class="table-crm">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Component</th>
+                                    <th>Source / Formula</th>
+                                    <th class="text-right">Rate (₹/kWh)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>4</strong></td>
+                                    <td>REL Base Tariff</td>
+                                    <td>Part 2 item 5 (Proposed Power Tariff)</td>
+                                    <td class="text-right font-weight-bold" id="p3_t_rel_base">₹ {{ result.rel_base_tariff|floatformat:4 }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>5</strong></td>
+                                    <td id="p3_t_sched_label">{% if input.plant_type == 'solar' %}Scheduling Charges{% else %}Scheduling + CSS & TOSE{% endif %}</td>
+                                    <td id="p3_t_sched_source">{% if input.plant_type == 'solar' %}Part 2 item 12{% else %}Part 2 (10th + 12th){% endif %}</td>
+                                    <td class="text-right font-weight-bold" id="p3_t_sched_css">₹ {{ result.scheduling_css_tose|floatformat:4 }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>6</strong></td>
+                                    <td>Wheeling Charges</td>
+                                    <td>Part 1 / Part 2 item 9</td>
+                                    <td class="text-right font-weight-bold" id="p3_t_wheeling">₹ {{ result.p3_wheeling_charges|floatformat:4 }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>7</strong></td>
+                                    <td>Wheeling Losses (@7.50%)</td>
+                                    <td>Part 2 item 7</td>
+                                    <td class="text-right font-weight-bold" id="p3_t_wh_losses">₹ {{ result.p3_wheeling_losses|floatformat:4 }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>8</strong></td>
+                                    <td>Transmission Charges</td>
+                                    <td>Part 2 item 8 (from tsc)</td>
+                                    <td class="text-right font-weight-bold" id="p3_t_trans_chg">₹ {{ result.p3_transmission_charges|floatformat:4 }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>9</strong></td>
+                                    <td>Transmission Losses (@3.28%)</td>
+                                    <td>Part 2 item 6</td>
+                                    <td class="text-right font-weight-bold" id="p3_t_tr_losses">₹ {{ result.p3_transmission_losses|floatformat:4 }}</td>
+                                </tr>
+                                <tr id="p3_t_duty_row" {% if input.plant_type == 'solar' %}style="display:none;"{% endif %}>
+                                    <td><strong>10</strong></td>
+                                    <td>Electricity Duty</td>
+                                    <td>Part 2 item 11</td>
+                                    <td class="text-right font-weight-bold" id="p3_t_duty">₹ {{ result.p3_electricity_duty|floatformat:4 }}</td>
+                                </tr>
+                                <tr style="background: #f0fdf4;">
+                                    <td><strong>11</strong></td>
+                                    <td><strong class="text-success">Delivered Tariff to Buyer (Rs/kWh)</strong></td>
+                                    <td><strong class="text-success" id="p3_t_delivered_source">{% if input.plant_type == 'solar' %}Addition of 4th to 9th{% else %}Addition of 4th to 10th{% endif %}</strong></td>
+                                    <td class="text-right"><strong class="text-success" style="font-size: 1.05rem;" id="p3_t_total_delivered">₹ {{ result.delivered_tariff|floatformat:4 }}</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer: Part-wise Next and Back Buttons -->
+            <div class="crm-modal-footer">
+                <div>
+                    <button type="button" class="btn-crm-back" id="btn-prev-action" onclick="previousStep()" style="display:none;">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn-crm-next" id="btn-next-action" onclick="nextStep()">
+                        Next <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                    <button type="button" class="btn-crm-save" id="btn-save-action" onclick="saveCalculationRecord()" style="display:none;">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Calculation
+                    </button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    let activeStep = 1;
+
+    function goToStep(step) {
+        if (step < 1 || step > 3) return;
+
+        // Hide all panes
+        document.getElementById('step-pane-1').style.display = 'none';
+        document.getElementById('step-pane-2').style.display = 'none';
+        document.getElementById('step-pane-3').style.display = 'none';
+
+        // Show target pane
+        document.getElementById('step-pane-' + step).style.display = 'block';
+
+        // Update stepper items
+        for (let i = 1; i <= 3; i++) {
+            const stepItem = document.getElementById('p-step-' + i);
+            const stepNum = document.getElementById('p-num-' + i);
+
+            stepItem.classList.remove('active');
+            if (i < step) {
+                stepItem.classList.add('completed');
+                stepNum.innerHTML = '<i class="fa-solid fa-check"></i>';
+            } else if (i === step) {
+                stepItem.classList.remove('completed');
+                stepItem.classList.add('active');
+                stepNum.textContent = i;
+            } else {
+                stepItem.classList.remove('completed');
+                stepNum.textContent = i;
+            }
+        }
+
+        // Update footer buttons
+        const prevBtn = document.getElementById('btn-prev-action');
+        const nextBtn = document.getElementById('btn-next-action');
+        const saveBtn = document.getElementById('btn-save-action');
+
+        if (step === 1) {
+            prevBtn.style.display = 'none';
+            nextBtn.style.display = 'inline-flex';
+            nextBtn.innerHTML = 'Next: Part 2 (Open Access) <i class="fa-solid fa-arrow-right"></i>';
+            saveBtn.style.display = 'none';
+        } else if (step === 2) {
+            prevBtn.style.display = 'inline-flex';
+            prevBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Back: Part 1';
+            nextBtn.style.display = 'inline-flex';
+            nextBtn.innerHTML = 'Next: Part 3 (Savings) <i class="fa-solid fa-arrow-right"></i>';
+            saveBtn.style.display = 'none';
+        } else if (step === 3) {
+            prevBtn.style.display = 'inline-flex';
+            prevBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i> Back: Part 2';
+            nextBtn.style.display = 'none';
+            saveBtn.style.display = 'inline-flex';
+        }
+
+        activeStep = step;
+        document.querySelector('.crm-modal-body').scrollTop = 0;
+    }
+
+    function nextStep() {
+        if (activeStep < 3) goToStep(activeStep + 1);
+    }
+
+    function previousStep() {
+        if (activeStep > 1) goToStep(activeStep - 1);
+    }
+
+    let currentPlantType = "{{ input.plant_type|default:'wind' }}";
+
+    function setPlantType(type) {
+        currentPlantType = type;
+        const inputElem = document.getElementById('plant_type_input');
+        if (inputElem) inputElem.value = type;
+
+        // Toggle button active classes
+        const windBtn = document.getElementById('btn-type-wind');
+        const solarBtn = document.getElementById('btn-type-solar');
+        if (type === 'solar') {
+            if (windBtn) windBtn.classList.remove('active', 'wind');
+            if (solarBtn) solarBtn.classList.add('active', 'solar');
+        } else {
+            if (solarBtn) solarBtn.classList.remove('active', 'solar');
+            if (windBtn) windBtn.classList.add('active', 'wind');
+        }
+
+        // Update Part 2 labels and elements
+        const labelGen = document.getElementById('label_gen_title');
+        if (labelGen) labelGen.textContent = (type === 'solar' ? 'Solar Generation (kWh)' : 'Wind Generation (kWh)');
+
+        const p2Item10 = document.getElementById('container_part2_item10');
+        if (p2Item10) p2Item10.style.display = (type === 'solar' ? 'none' : 'block');
+
+        const p2Item11 = document.getElementById('container_part2_item11');
+        if (p2Item11) p2Item11.style.display = (type === 'solar' ? 'none' : 'block');
+
+        const p2BannerSubtitle = document.getElementById('p2_banner_subtitle');
+        if (p2BannerSubtitle) {
+            p2BannerSubtitle.textContent = (type === 'solar'
+                ? '= Sum of items 5th + 6th + 7th + 8th + 9th + 12th (Excluding CSS/TOSE & Duty)'
+                : '= Sum of items 5th to 12th (Proposed Power Tariff to Scheduling Charges)');
+        }
+
+        // Update Part 3 labels and elements
+        const p3HeroTitle = document.getElementById('p3_hero_title_text');
+        if (p3HeroTitle) p3HeroTitle.textContent = (type === 'solar' ? 'REL Solar Plant' : 'REL Wind Plant');
+
+        const p3Item5Label = document.getElementById('p3_item5_label');
+        if (p3Item5Label) p3Item5Label.textContent = (type === 'solar' ? '5. Scheduling & Operating Charges (₹/kWh)' : '5. Scheduling + CSS & TOSE (₹/kWh)');
+
+        const p3Item5Badge = document.getElementById('p3_item5_badge');
+        if (p3Item5Badge) p3Item5Badge.textContent = (type === 'solar' ? '= Part 2 (12th)' : '= Part 2 (10th + 12th)');
+
+        const p3Item5Hint = document.getElementById('p3_item5_hint');
+        if (p3Item5Hint) p3Item5Hint.textContent = (type === 'solar' ? 'Scheduling & System Operation Charges' : 'Scheduling & System Operation + CSS & TOSE');
+
+        const p3Item10 = document.getElementById('container_p3_item10');
+        if (p3Item10) p3Item10.style.display = (type === 'solar' ? 'none' : 'block');
+
+        const p3TSchedLabel = document.getElementById('p3_t_sched_label');
+        if (p3TSchedLabel) p3TSchedLabel.textContent = (type === 'solar' ? 'Scheduling Charges' : 'Scheduling + CSS & TOSE');
+
+        const p3TSchedSource = document.getElementById('p3_t_sched_source');
+        if (p3TSchedSource) p3TSchedSource.textContent = (type === 'solar' ? 'Part 2 item 12' : 'Part 2 (10th + 12th)');
+
+        const p3TDutyRow = document.getElementById('p3_t_duty_row');
+        if (p3TDutyRow) p3TDutyRow.style.display = (type === 'solar' ? 'none' : '');
+
+        const p3TDeliveredSource = document.getElementById('p3_t_delivered_source');
+        if (p3TDeliveredSource) p3TDeliveredSource.textContent = (type === 'solar' ? 'Addition of 4th to 9th' : 'Addition of 4th to 10th');
+
+        const p3DeliveredSubtitle = document.getElementById('p3_delivered_subtitle');
+        if (p3DeliveredSubtitle) p3DeliveredSubtitle.textContent = (type === 'solar' ? '= Addition of 4th to 9th of Part 3' : '= Addition of 4th to 10th of Part 3');
+
+        // Clear user-edited flag on Part 3 scheduling and duty so defaults switch smoothly
+        const elP3SchedCss = document.getElementById('p3_scheduling_css_tose');
+        if (elP3SchedCss) delete elP3SchedCss.dataset.userEdited;
+        const elP3Duty = document.getElementById('p3_electricity_duty');
+        if (elP3Duty) delete elP3Duty.dataset.userEdited;
+
+        recalculateLive();
+    }
+
+    function fmt(num, decimals = 4) {
+        if (isNaN(num) || !isFinite(num)) return (0).toFixed(decimals);
+        return Number(num).toFixed(decimals);
+    }
+
+    function fmtCur(num, decimals = 2) {
+        if (isNaN(num) || !isFinite(num)) return "0.00";
+        return Number(num).toLocaleString('en-IN', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        });
+    }
+
+    // Reactive Live Calculation Engine
+    function recalculateLive() {
+        const isSolar = (currentPlantType === 'solar');
+
+        // --- Part 1 inputs ---
+        const unit_msedcl = parseFloat(document.getElementById('unit_msedcl').value) || 0;
+        const duty_from_bill = parseFloat(document.getElementById('duty_from_bill').value) || 0;
+
+        // Part 1 Electricity Duty = 486181.4 / unit@msedcl
+        let part1_duty = 0;
+        if (unit_msedcl > 0 && duty_from_bill > 0) {
+            part1_duty = duty_from_bill / unit_msedcl;
+        }
+        document.getElementById('part1_duty_display').value = `₹ ${fmt(part1_duty)} / kWh`;
+
+        const wheeling_charge = parseFloat(document.getElementById('wheeling_charge').value) || 0;
+        const energy_charge = parseFloat(document.getElementById('energy_charge').value) || 0;
+        const fac_charge = parseFloat(document.getElementById('fac_charge').value) || 0;
+        const tose_charge = parseFloat(document.getElementById('tose_charge').value) || 0;
+
+        // Total excluding contract demand = wheeling + energy + fac + tose + part1_duty
+        const total_discom_tariff = wheeling_charge + energy_charge + fac_charge + tose_charge + part1_duty;
+
+        document.getElementById('part1_total_badge').textContent = `₹ ${fmt(total_discom_tariff)} / kWh`;
+        document.getElementById('mini_discom_tariff').textContent = `₹ ${fmt(total_discom_tariff, 2)}`;
+
+        // --- Part 2 inputs ---
+        const present_discom_tariff = total_discom_tariff;
+        document.getElementById('p2_present_discom_tariff').value = `₹ ${fmt(present_discom_tariff)}`;
+
+        const wind_generation = parseFloat(document.getElementById('wind_generation').value) || 0;
+        const proposed_power_tariff = parseFloat(document.getElementById('proposed_power_tariff').value) || 0;
+
+        // Transmission & Wheeling Losses
+        const transmission_losses = proposed_power_tariff * 0.0328;
+        document.getElementById('transmission_losses_val').value = `₹ ${fmt(transmission_losses)}`;
+
+        const wheeling_losses = proposed_power_tariff * 0.075;
+        document.getElementById('wheeling_losses_val').value = `₹ ${fmt(wheeling_losses)}`;
+
+        const transmission_charges = parseFloat(document.getElementById('transmission_charges').value) || 0;
+        const oa_wheeling_charges = parseFloat(document.getElementById('oa_wheeling_charges').value) || 0;
+
+        // Additional Sur-Charges & CSS & TOSE = 0 + 2.07 + from part 1 TOSE (Only for Wind)
+        const css_val_raw = document.getElementById('css_from_bill').value;
+        const css_from_bill = (css_val_raw !== "" && !isNaN(css_val_raw)) ? parseFloat(css_val_raw) : 2.07;
+        document.getElementById('tose_sub_val').textContent = fmt(tose_charge);
+        let additional_surcharges_css_tose = 0;
+        if (!isSolar) {
+            additional_surcharges_css_tose = css_from_bill + tose_charge;
+        }
+        document.getElementById('additional_surcharges_css_tose_val').textContent = `₹ ${fmt(additional_surcharges_css_tose)}`;
+
+        // 11) Electricity Duty for Open Access = oa_duty_amount / wind_generation (Only for Wind)
+        const oa_duty_raw = document.getElementById('oa_duty_amount').value;
+        const oa_duty_amount = (oa_duty_raw !== "" && !isNaN(oa_duty_raw)) ? parseFloat(oa_duty_raw) : 250018.35;
+        let electricity_duty = 0;
+        if (!isSolar && wind_generation > 0 && oa_duty_amount > 0) {
+            electricity_duty = oa_duty_amount / wind_generation;
+        }
+        document.getElementById('p2_duty_val').textContent = `₹ ${fmt(electricity_duty)}`;
+
+        // 12) Scheduling & Operating Charges: (16450.0 / gen) + (27918.99 / gen)
+        let scheduling_charges = 0;
+        if (wind_generation > 0) {
+            scheduling_charges = (16450.0 / wind_generation) + (27918.99 / wind_generation);
+        }
+        document.getElementById('scheduling_charges_val').value = `₹ ${fmt(scheduling_charges)}`;
+
+        // 13) Net Tariff for Client
+        let net_tariff_client = proposed_power_tariff
+            + transmission_losses
+            + wheeling_losses
+            + transmission_charges
+            + oa_wheeling_charges
+            + scheduling_charges;
+        if (!isSolar) {
+            net_tariff_client += additional_surcharges_css_tose + electricity_duty;
+        }
+
+        document.getElementById('part2_net_tariff_badge').textContent = `₹ ${fmt(net_tariff_client)} / kWh`;
+
+        // ==============================================
+        // --- Part 3: Reactive Defaults & Calculation ---
+        // ==============================================
+        const elP3EstGen = document.getElementById('p3_estimated_generation');
+        const elP3AssGen = document.getElementById('p3_assured_generation');
+        const elP3ExistTariff = document.getElementById('p3_existing_tariff');
+        const elP3RelBase = document.getElementById('p3_rel_base_tariff');
+        const elP3SchedCss = document.getElementById('p3_scheduling_css_tose');
+        const elP3Wheel = document.getElementById('p3_wheeling_charges');
+        const elP3WhLoss = document.getElementById('p3_wheeling_losses');
+        const elP3TransChg = document.getElementById('p3_transmission_charges');
+        const elP3TrLoss = document.getElementById('p3_transmission_losses');
+        const elP3Duty = document.getElementById('p3_electricity_duty');
+
+        // 1) Estimated Generation default from Part 2 3rd
+        if (!elP3EstGen.dataset.userEdited) {
+            elP3EstGen.value = wind_generation > 0 ? wind_generation : '';
+        }
+        const p3_est_gen = parseFloat(elP3EstGen.value) || 0;
+
+        // 2) Assured Generation default = Estimated Generation * 70%
+        if (!elP3AssGen.dataset.userEdited) {
+            elP3AssGen.value = p3_est_gen > 0 ? (p3_est_gen * 0.70).toFixed(2) : '';
+        }
+        const p3_ass_gen = parseFloat(elP3AssGen.value) || 0;
+
+        // 3) Existing DISCOM Tariff default = Part 1 total excluding contract demand
+        if (!elP3ExistTariff.dataset.userEdited) {
+            elP3ExistTariff.value = total_discom_tariff > 0 ? total_discom_tariff.toFixed(4) : '';
+        }
+        const p3_exist_tariff = parseFloat(elP3ExistTariff.value) || 0;
+
+        // 4) REL BASE Tariff default = Part 2 5th value (proposed_power_tariff)
+        if (!elP3RelBase.dataset.userEdited) {
+            elP3RelBase.value = proposed_power_tariff > 0 ? proposed_power_tariff.toFixed(4) : '';
+        }
+        const p3_rel_base = parseFloat(elP3RelBase.value) || 0;
+
+        // 5) Scheduling default: for Solar = scheduling_charges, for Wind = additional_surcharges_css_tose + scheduling_charges
+        const default_sched_css = isSolar ? scheduling_charges : (additional_surcharges_css_tose + scheduling_charges);
+        if (!elP3SchedCss.dataset.userEdited) {
+            elP3SchedCss.value = default_sched_css > 0 ? default_sched_css.toFixed(4) : (isSolar && scheduling_charges === 0 ? '0.0000' : '');
+        }
+        const p3_sched_css = parseFloat(elP3SchedCss.value) || 0;
+
+        // 6) Wheeling charges default = Part 1 / Part 2 9th (oa_wheeling_charges)
+        if (!elP3Wheel.dataset.userEdited) {
+            elP3Wheel.value = oa_wheeling_charges > 0 ? oa_wheeling_charges.toFixed(4) : '';
+        }
+        const p3_wheel = parseFloat(elP3Wheel.value) || 0;
+
+        // 7) Wheeling Losses @ 7.50% default = Part 2 7th
+        if (!elP3WhLoss.dataset.userEdited) {
+            elP3WhLoss.value = wheeling_losses > 0 ? wheeling_losses.toFixed(4) : '';
+        }
+        const p3_wh_loss = parseFloat(elP3WhLoss.value) || 0;
+
+        // 8) Transmission Charges default = Part 2 8th
+        if (!elP3TransChg.dataset.userEdited) {
+            elP3TransChg.value = transmission_charges.toFixed(4);
+        }
+        const p3_trans_chg = parseFloat(elP3TransChg.value) || 0;
+
+        // 9) Transmission Losses @ 3.28% default = Part 2 6th
+        if (!elP3TrLoss.dataset.userEdited) {
+            elP3TrLoss.value = transmission_losses > 0 ? transmission_losses.toFixed(4) : '';
+        }
+        const p3_tr_loss = parseFloat(elP3TrLoss.value) || 0;
+
+        // 10) Electricity Duty default = Part 2 11th (0 for Solar)
+        if (!elP3Duty.dataset.userEdited) {
+            elP3Duty.value = (!isSolar && electricity_duty > 0) ? electricity_duty.toFixed(4) : (isSolar ? '0.0000' : '');
+        }
+        const p3_duty = isSolar ? 0 : (parseFloat(elP3Duty.value) || 0);
+
+        // 11) Delivered Tariff to Buyer (Rs/kWh)
+        let delivered_tariff = p3_rel_base
+            + p3_sched_css
+            + p3_wheel
+            + p3_wh_loss
+            + p3_trans_chg
+            + p3_tr_loss;
+        if (!isSolar) {
+            delivered_tariff += p3_duty;
+        }
+
+        document.getElementById('p3_delivered_tariff').textContent = `₹ ${fmt(delivered_tariff)} / kWh`;
+
+        // Update Part 3 breakdown table
+        document.getElementById('p3_t_rel_base').textContent = `₹ ${fmt(p3_rel_base)}`;
+        document.getElementById('p3_t_sched_css').textContent = `₹ ${fmt(p3_sched_css)}`;
+        document.getElementById('p3_t_wheeling').textContent = `₹ ${fmt(p3_wheel)}`;
+        document.getElementById('p3_t_wh_losses').textContent = `₹ ${fmt(p3_wh_loss)}`;
+        document.getElementById('p3_t_trans_chg').textContent = `₹ ${fmt(p3_trans_chg)}`;
+        document.getElementById('p3_t_tr_losses').textContent = `₹ ${fmt(p3_tr_loss)}`;
+        document.getElementById('p3_t_duty').textContent = `₹ ${fmt(p3_duty)}`;
+        document.getElementById('p3_t_total_delivered').textContent = `₹ ${fmt(delivered_tariff)}`;
+
+        // 12) Estimated Savings due to Plant (INR)* = 1st * (3rd - 11th)
+        const per_unit_savings = p3_exist_tariff - delivered_tariff;
+        const estimated_savings = p3_est_gen * per_unit_savings;
+        const assured_savings = p3_ass_gen * per_unit_savings;
+        const monthly_savings = estimated_savings / 12.0;
+
+        document.getElementById('p3_hero_savings').textContent = `₹ ${fmtCur(estimated_savings, 2)}`;
+        document.getElementById('p3_hero_per_unit').textContent = `₹ ${fmt(per_unit_savings)} / kWh`;
+        document.getElementById('p3_hero_monthly').textContent = `₹ ${fmtCur(monthly_savings, 2)}`;
+        document.getElementById('p3_hero_assured').textContent = `₹ ${fmtCur(assured_savings, 2)}`;
+
+        // Update Pastel Colors KPI Ribbon
+        document.getElementById('mini_discom_tariff').textContent = `₹ ${fmt(total_discom_tariff, 2)}`;
+        document.getElementById('mini_delivered_tariff').textContent = `₹ ${fmt(delivered_tariff, 2)}`;
+        document.getElementById('mini_per_unit').textContent = `₹ ${fmt(per_unit_savings, 2)}`;
+        document.getElementById('mini_annual_savings').textContent = `₹ ${fmtCur(estimated_savings, 0)}`;
+    }
+
+    // Mark Part 3 inputs as user-edited when directly typed into
+    document.querySelectorAll('.p3-input').forEach(input => {
+        input.addEventListener('input', function() {
+            this.dataset.userEdited = "true";
+            // If user manually changes Estimated Generation, sync Assured Generation if not edited
+            if (this.id === 'p3_estimated_generation') {
+                const elAss = document.getElementById('p3_assured_generation');
+                if (!elAss.dataset.userEdited) {
+                    const est = parseFloat(this.value) || 0;
+                    elAss.value = est > 0 ? (est * 0.70).toFixed(2) : '';
+                }
+            }
+            recalculateLive();
+        });
+    });
+
+    // Reset Part 3 inputs to auto-calculated defaults from Part 1 & Part 2
+    function resetPart3Defaults() {
+        document.querySelectorAll('.p3-input').forEach(input => {
+            delete input.dataset.userEdited;
+        });
+        recalculateLive();
+
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true
+        });
+        Toast.fire({
+            icon: 'success',
+            title: 'Part 3 inputs reset to auto defaults!'
+        });
+    }
+
+    document.querySelectorAll('.live-calc:not(.p3-input)').forEach(input => {
+        input.addEventListener('input', recalculateLive);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setPlantType(currentPlantType);
+        goToStep(1);
+    });
+
+    function saveCalculationRecord() {
+        Swal.fire({
+            title: "Save Open Access Calculation?",
+            text: "This record will be saved to your calculation history.",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonColor: "#10b981",
+            cancelButtonColor: "#64748b",
+            confirmButtonText: "<i class='fa-solid fa-floppy-disk'></i> Yes, Save Record",
+            cancelButtonText: "Cancel"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('save_result_input').value = "1";
+                document.getElementById('oaForm').submit();
+            }
+        });
+    }
+</script>
+{% endblock %}

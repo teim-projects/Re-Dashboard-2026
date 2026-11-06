@@ -1,0 +1,563 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Breakdown &amp; Downtime Intelligence{% endblock %}
+
+{% block style_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<style>
+  :root {
+    --card-radius: 16px;
+    --transition-speed: 0.25s;
+  }
+  body {
+    background-color: #f8fafc;
+  }
+  .page-header-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+    padding: 1.25rem;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .kpi-icon-bubble {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+  }
+  .visual-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    margin-bottom: 1.5rem;
+  }
+  .visual-card-header {
+    background: transparent;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 1.1rem 1.5rem;
+  }
+  .table thead th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0.75rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3" style="margin-top: 85px;">
+
+  <!-- PAGE HEADER & FILTERS -->
+  <div class="page-header-card">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-danger-subtle text-danger fw-bold px-2 py-1" style="font-size: 11px;">
+            <i class="fa-solid fa-screwdriver-wrench"></i> PRIORITY VISUAL #8, #9, #10 &amp; #11
+          </span>
+          <span class="text-muted small">Breakdown &amp; Downtime Analysis</span>
+        </div>
+        <h3 class="fw-bold text-dark mt-1 mb-0">Breakdown Intelligence &amp; Downtime Pareto</h3>
+        <p class="text-muted small mb-0">Root cause Pareto 80/20 analysis, turbine downtime distribution, monthly trend, and outage logs</p>
+      </div>
+
+      <!-- INLINE FILTER FORM -->
+      <form method="get" class="d-flex flex-wrap align-items-center gap-2">
+        <div class="input-group input-group-sm" style="width: auto;">
+          <span class="input-group-text bg-light"><i class="fa-regular fa-calendar text-primary"></i></span>
+          <input type="date" name="from" value="{{ date_from }}" class="form-control" title="From Date">
+          <span class="input-group-text bg-light">→</span>
+          <input type="date" name="to" value="{{ date_to }}" class="form-control" title="To Date">
+        </div>
+
+        <select name="wtg" class="form-select form-select-sm" style="width: auto;">
+          <option value="">All Turbines (Fleet)</option>
+          {% for w in wtgs %}
+          <option value="{{ w }}" {% if wtg_filter == w %}selected{% endif %}>{{ w }}</option>
+          {% endfor %}
+        </select>
+
+        <button type="submit" class="btn btn-primary btn-sm px-3 rounded-pill shadow-sm">
+          <i class="fa-solid fa-filter me-1"></i>Apply
+        </button>
+        <a href="{% url 'breakdown_analysis' %}" class="btn btn-outline-secondary btn-sm px-3 rounded-pill">Reset</a>
+      </form>
+    </div>
+  </div>
+
+  <!-- KPI SUMMARY DECK (5 METRICS) -->
+  <div class="row g-3 mb-4">
+    <!-- Card 1: Total Downtime -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Total Downtime</span>
+          <div class="kpi-icon-bubble bg-danger-subtle text-danger"><i class="fa-solid fa-hourglass-half"></i></div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ total_downtime|intcomma }}</h3>
+        <small class="text-danger fw-semibold mt-1 d-block"><i class="fa-solid fa-clock me-1"></i>Hours Total Lost Time</small>
+      </div>
+    </div>
+
+    <!-- Card 2: Total Breakdown Incidents -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Total Incidents</span>
+          <div class="kpi-icon-bubble bg-primary-subtle text-primary"><i class="fa-solid fa-clipboard-list"></i></div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ total_incidents|intcomma }}</h3>
+        <small class="text-primary fw-semibold mt-1 d-block"><i class="fa-solid fa-triangle-exclamation me-1"></i>Failure Occurrences</small>
+      </div>
+    </div>
+
+    <!-- Card 3: Top Downtime Cause -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Leading Loss Cause</span>
+          <div class="kpi-icon-bubble bg-warning-subtle text-warning"><i class="fa-solid fa-radiation"></i></div>
+        </div>
+        <h5 class="fw-bold text-dark mb-0 text-truncate" title="{{ top_downtime_cause }}">{{ top_downtime_cause }}</h5>
+        <small class="text-warning fw-semibold mt-1 d-block"><i class="fa-solid fa-chart-column me-1"></i>Most Downtime Hours</small>
+      </div>
+    </div>
+
+    <!-- Card 4: Most Repetitive Error -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Most Frequent Failure</span>
+          <div class="kpi-icon-bubble bg-purple-subtle text-purple"><i class="fa-solid fa-arrows-rotate"></i></div>
+        </div>
+        <h5 class="fw-bold text-dark mb-0 text-truncate" title="{{ top_repeat_cause }}">{{ top_repeat_cause }}</h5>
+        <small class="text-purple fw-semibold mt-1 d-block"><i class="fa-solid fa-repeat me-1"></i>{{ top_repeat_count|intcomma }} Recurrences</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #8: BREAKDOWN DOWNTIME PARETO CHART (80/20 RULE) -->
+  <div class="visual-card mb-4">
+    <div class="visual-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-chart-pie text-danger"></i>
+          <h5 class="fw-bold text-dark mb-0">Breakdown Downtime Pareto Chart (80/20 Rule)</h5>
+        </div>
+        <small class="text-muted">Visual #8: Prioritize root causes contributing the vital 80% of downtime hours</small>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-danger-subtle text-danger fw-bold px-3 py-1">Hours (Bars)</span>
+        <span class="badge bg-primary-subtle text-primary fw-bold px-3 py-1">Cumulative % (Line)</span>
+      </div>
+    </div>
+    <div class="card-body p-3">
+      <div id="paretoChart" style="min-height: 440px; width: 100%;"></div>
+    </div>
+  </div>
+
+  <!-- VISUAL #9 & VISUAL #10: TURBINE STACKED BAR & MONTHLY BREAKDOWN TREND -->
+  <div class="row g-4 mb-4">
+    <!-- VISUAL #9: TURBINE-WISE DOWNTIME STACKED BAR CHART -->
+    <div class="col-xl-6 col-lg-12">
+      <div class="visual-card h-100 d-flex flex-column">
+        <div class="visual-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-bars-progress text-warning"></i>
+              <h5 class="fw-bold text-dark mb-0">Turbine-wise Downtime by Cause</h5>
+            </div>
+            <small class="text-muted">Visual #9: Stacked downtime hours per turbine by major cause</small>
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <span class="small text-muted fw-bold">Page:</span>
+            <select id="stackedPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
+              <option value="10" selected>10 WTGs</option>
+              <option value="15">15 WTGs</option>
+              <option value="25">25 WTGs</option>
+              <option value="all">All WTGs</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body p-3 flex-grow-1">
+          <div id="stackedChart" style="min-height: 400px; width: 100%;"></div>
+          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
+            <span id="stackedPaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
+            <nav aria-label="Stacked Chart Pagination">
+              <ul class="pagination pagination-sm mb-0" id="stackedPaginationNav"></ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISUAL #10: MONTHLY BREAKDOWN TREND -->
+    <div class="col-xl-6 col-lg-12">
+      <div class="visual-card h-100 d-flex flex-column">
+        <div class="visual-card-header d-flex justify-content-between align-items-center">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-chart-line text-info"></i>
+              <h5 class="fw-bold text-dark mb-0">Monthly Breakdown Trend</h5>
+            </div>
+            <small class="text-muted">Visual #10: Track incident frequency and downtime trajectory</small>
+          </div>
+          <span class="badge bg-info-subtle text-info fw-bold px-3 py-1">Dual Axis Trend</span>
+        </div>
+        <div class="card-body p-3 flex-grow-1">
+          <div id="monthlyTrendChart" style="min-height: 400px; width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #11: REPETITIVE & EXTENDED BREAKDOWN TABLE -->
+  <div class="visual-card">
+    <div class="visual-card-header d-flex justify-content-between align-items-center">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+          <h5 class="fw-bold text-dark mb-0">Repetitive &amp; Extended Breakdown Records</h5>
+        </div>
+        <small class="text-muted">Visual #11: Major outages (&gt;= 10 Hours) for maintenance investigation</small>
+      </div>
+      <span class="badge bg-light text-dark border px-3 py-2 fw-semibold">
+        Outages Logged: {{ extended_records|length }}
+      </span>
+    </div>
+    <div class="card-body p-3">
+      <div class="table-responsive">
+        <table id="extendedTable" class="table table-hover table-striped w-100 align-middle">
+          <thead>
+            <tr>
+              <th style="width: 110px;">WTG No</th>
+              <th style="width: 110px;">Date</th>
+              <th>Root Cause / Error Description</th>
+              <th class="text-end" style="width: 140px;">Duration (Hours)</th>
+              <th>Action Taken / Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in extended_records %}
+            <tr>
+              <td><strong class="text-dark">{{ r.wtg }}</strong></td>
+              <td class="text-muted font-monospace small">{{ r.date }}</td>
+              <td><span class="fw-semibold text-danger">{{ r.cause }}</span></td>
+              <td class="text-end font-monospace fw-bold text-dark">{{ r.duration }} hrs</td>
+              <td class="small text-muted">{{ r.action|default:"Investigation completed; unit returned to service." }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No major extended outages recorded for current filter criteria.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  let paretoData = { categories: [], durations: [], cumulative_pct: [] };
+  let stackedData = { categories: [], series: [] };
+  let trendData = { labels: [], incidents: [], hours: [] };
+
+  try { paretoData = JSON.parse(`{{ pareto_json|escapejs }}`) || {}; } catch(e){}
+  try { stackedData = JSON.parse(`{{ stacked_json|escapejs }}`) || {}; } catch(e){}
+  try { trendData = JSON.parse(`{{ monthly_trend_json|escapejs }}`) || {}; } catch(e){}
+
+  // 1. DataTables
+  $('#extendedTable').DataTable({
+    paging: true,
+    pageLength: 10,
+    lengthMenu: [5, 10, 25, 50],
+    ordering: true,
+    order: [[3, 'desc']], // duration desc
+    responsive: true
+  });
+
+  // 2. VISUAL #8: Pareto Chart (Dual Axis)
+  if (paretoData.categories && paretoData.categories.length > 0) {
+    const paretoOptions = {
+      series: [
+        {
+          name: 'Downtime Hours',
+          type: 'column',
+          data: paretoData.durations
+        },
+        {
+          name: 'Cumulative %',
+          type: 'line',
+          data: paretoData.cumulative_pct
+        }
+      ],
+      chart: {
+        height: 440,
+        type: 'line',
+        toolbar: { show: true },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      stroke: {
+        width: [0, 3],
+        curve: 'smooth'
+      },
+      plotOptions: {
+        bar: {
+          columnWidth: '50%',
+          borderRadius: 6
+        }
+      },
+      colors: ['#ef4444', '#0ea5e9'],
+      dataLabels: {
+        enabled: true,
+        enabledOnSeries: [1],
+        formatter: function (val) { return val + '%'; },
+        style: { fontSize: '11px', colors: ['#0ea5e9'] }
+      },
+      labels: paretoData.categories,
+      xaxis: {
+        labels: {
+          rotate: -35,
+          style: { fontSize: '11px', colors: '#64748b' }
+        }
+      },
+      yaxis: [
+        {
+          title: { text: 'Downtime Hours', style: { color: '#ef4444', fontWeight: 600 } },
+          labels: { formatter: function (val) { return Math.round(val) + 'h'; } }
+        },
+        {
+          opposite: true,
+          max: 100,
+          min: 0,
+          title: { text: 'Cumulative Percentage', style: { color: '#0ea5e9', fontWeight: 600 } },
+          labels: { formatter: function (val) { return val + '%'; } }
+        }
+      ],
+      annotations: {
+        yaxis: [{
+          y: 80,
+          yAxisIndex: 1,
+          borderColor: '#f59e0b',
+          strokeDashArray: 4,
+          label: {
+            text: '80% Pareto Threshold',
+            style: { color: '#fff', background: '#f59e0b', fontSize: '10px' }
+          }
+        }]
+      },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      tooltip: {
+        theme: 'light',
+        shared: true,
+        intersect: false
+      }
+    };
+    const pChart = new ApexCharts(document.querySelector("#paretoChart"), paretoOptions);
+    pChart.render();
+  }
+
+  // 3. VISUAL #9: Stacked Bar Chart per Turbine with Pagination
+  let sChart = null;
+  let stackedPageSize = 10;
+  let stackedCurrentPage = 1;
+
+  function getStackedTotalPages() {
+    if (!stackedData.categories || stackedData.categories.length === 0) return 1;
+    if (stackedPageSize === "all") return 1;
+    return Math.max(1, Math.ceil(stackedData.categories.length / stackedPageSize));
+  }
+
+  function updateStackedPaginationNav() {
+    const nav = document.getElementById("stackedPaginationNav");
+    const info = document.getElementById("stackedPaginationInfo");
+    if (!nav) return;
+    const totalCategories = (stackedData.categories || []).length;
+    const totalPages = getStackedTotalPages();
+
+    if (stackedPageSize === "all" || totalPages <= 1) {
+      nav.innerHTML = "";
+      if (info) info.textContent = `Showing All ${totalCategories} Turbines`;
+      return;
+    }
+
+    const startIdx = (stackedCurrentPage - 1) * stackedPageSize + 1;
+    const endIdx = Math.min(stackedCurrentPage * stackedPageSize, totalCategories);
+    if (info) info.textContent = `Showing WTGs ${startIdx}-${endIdx} of ${totalCategories} (Page ${stackedCurrentPage}/${totalPages})`;
+
+    let html = `<li class="page-item ${stackedCurrentPage === 1 ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToStackedPage(${stackedCurrentPage - 1})">&laquo; Prev</button>
+    </li>`;
+
+    for (let p = 1; p <= totalPages; p++) {
+      if (totalPages > 6 && Math.abs(p - stackedCurrentPage) > 2 && p !== 1 && p !== totalPages) {
+        if (p === 2 || p === totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        continue;
+      }
+      html += `<li class="page-item ${p === stackedCurrentPage ? 'active' : ''}">
+        <button type="button" class="page-link" onclick="goToStackedPage(${p})">${p}</button>
+      </li>`;
+    }
+
+    html += `<li class="page-item ${stackedCurrentPage === totalPages ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToStackedPage(${stackedCurrentPage + 1})">Next &raquo;</button>
+    </li>`;
+    nav.innerHTML = html;
+  }
+
+  function renderPaginatedStackedChart() {
+    if (!stackedData.series || stackedData.series.length === 0 || !stackedData.categories || stackedData.categories.length === 0) {
+      document.querySelector("#stackedChart").innerHTML = '<div class="alert alert-info text-center m-4">No breakdown categories available.</div>';
+      return;
+    }
+
+    let subCats;
+    let subSeries;
+
+    if (stackedPageSize === "all") {
+      subCats = [...stackedData.categories];
+      subSeries = stackedData.series.map(s => ({
+        name: s.name,
+        data: [...s.data]
+      }));
+    } else {
+      const start = (stackedCurrentPage - 1) * stackedPageSize;
+      const end = start + stackedPageSize;
+      subCats = stackedData.categories.slice(start, end);
+      subSeries = stackedData.series.map(s => ({
+        name: s.name,
+        data: (s.data || []).slice(start, end)
+      }));
+    }
+
+    const stackedOptions = {
+      series: subSeries,
+      chart: {
+        type: 'bar',
+        height: Math.max(380, subCats.length * 36),
+        stacked: true,
+        toolbar: { show: false },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      plotOptions: {
+        bar: {
+          horizontal: true,
+          borderRadius: 4,
+          barHeight: '65%'
+        }
+      },
+      colors: ['#ef4444', '#f59e0b', '#06b6d4', '#6366f1', '#10b981'],
+      xaxis: {
+        categories: subCats,
+        title: { text: 'Downtime Hours', style: { fontWeight: 600 } },
+        labels: { formatter: function(val) { return Math.round(val) + 'h'; } }
+      },
+      yaxis: { labels: { style: { fontWeight: 600 } } },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      legend: { position: 'top', horizontalAlign: 'left' },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val + ' hrs'; } }
+      }
+    };
+
+    if (sChart) sChart.destroy();
+    sChart = new ApexCharts(document.querySelector("#stackedChart"), stackedOptions);
+    sChart.render();
+    updateStackedPaginationNav();
+  }
+
+  window.goToStackedPage = function(p) {
+    const total = getStackedTotalPages();
+    if (p < 1 || p > total) return;
+    stackedCurrentPage = p;
+    renderPaginatedStackedChart();
+  };
+
+  const stackedSizeSelect = document.getElementById("stackedPageSize");
+  if (stackedSizeSelect) {
+    stackedSizeSelect.addEventListener("change", function () {
+      stackedPageSize = this.value === "all" ? "all" : parseInt(this.value);
+      stackedCurrentPage = 1;
+      renderPaginatedStackedChart();
+    });
+  }
+
+  renderPaginatedStackedChart();
+
+  // 4. VISUAL #10: Monthly Breakdown Trend
+  if (trendData.labels && trendData.labels.length > 0) {
+    const trendOptions = {
+      series: [
+        { name: 'Incidents Count', type: 'column', data: trendData.incidents },
+        { name: 'Downtime Hours', type: 'line', data: trendData.hours }
+      ],
+      chart: {
+        height: 400,
+        type: 'line',
+        toolbar: { show: false },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      stroke: { width: [0, 3], curve: 'smooth' },
+      colors: ['#cbd5e1', '#ef4444'],
+      plotOptions: { bar: { columnWidth: '40%', borderRadius: 4 } },
+      dataLabels: { enabled: false },
+      labels: trendData.labels,
+      xaxis: {
+        labels: { rotate: -45, style: { fontSize: '11px', colors: '#64748b' } }
+      },
+      yaxis: [
+        {
+          title: { text: 'Incident Count', style: { color: '#64748b', fontWeight: 600 } },
+          labels: { formatter: function(v) { return Math.round(v); } }
+        },
+        {
+          opposite: true,
+          title: { text: 'Downtime Hours', style: { color: '#ef4444', fontWeight: 600 } },
+          labels: { formatter: function(v) { return Math.round(v) + 'h'; } }
+        }
+      ],
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      tooltip: { theme: 'light', shared: true, intersect: false }
+    };
+    const tChart = new ApexCharts(document.querySelector("#monthlyTrendChart"), trendOptions);
+    tChart.render();
+  }
+});
+</script>
+{% endblock %}

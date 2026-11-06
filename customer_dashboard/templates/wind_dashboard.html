@@ -1,0 +1,757 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block style_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<style>
+  :root {
+    --card-radius: 16px;
+    --transition-speed: 0.25s;
+  }
+  body {
+    background-color: #f8fafc;
+  }
+  .exec-banner {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+    border-radius: var(--card-radius);
+    padding: 1.75rem 2rem;
+    color: #ffffff;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+    margin-bottom: 1.5rem;
+  }
+  .kpi-stat-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+    padding: 1.25rem 1.4rem;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .stat-bubble {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+  }
+  .chart-box {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    margin-bottom: 1.5rem;
+  }
+  .chart-box-header {
+    background: transparent;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 1.1rem 1.5rem;
+  }
+  .btn-segmented .btn {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.35rem 0.8rem;
+    border-radius: 8px !important;
+    margin: 0 2px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    transition: all 0.2s ease;
+  }
+  .btn-segmented .btn.active, .btn-segmented .btn:hover {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+  }
+  .quick-link-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--card-radius);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-decoration: none !important;
+    color: inherit;
+    transition: all 0.2s ease;
+  }
+  .quick-link-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    border-color: #cbd5e1;
+  }
+  .spin-blade {
+    animation: bladeSpin 6s linear infinite;
+  }
+  @keyframes bladeSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3" style="margin-top: 85px;">
+
+  <!-- EXECUTIVE BANNER -->
+  <div class="exec-banner">
+    <div class="row align-items-center">
+      <div class="col-lg-8 col-md-7">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge bg-primary px-3 py-1 fw-bold" style="font-size: 11px;">
+            <i class="fa-solid fa-gauge-high me-1"></i> EXECUTIVE FLEET OVERVIEW
+          </span>
+          <span class="text-white-50 small">Wind Turbine Intelligence</span>
+        </div>
+        <h2 class="fw-bold mb-1">
+          Welcome back, {{ request.user.username }}!
+          <i class="fa-solid fa-fan spin-blade ms-2 text-info opacity-75"></i>
+        </h2>
+        <p class="text-white-50 mb-0 small">
+          Comprehensive multi-site fleet monitoring for 50+ WTGs across Senvion, Regen, Gamesa, Inox, Suzlon &amp; Windworld.
+        </p>
+      </div>
+      <div class="col-lg-4 col-md-5 text-md-end mt-3 mt-md-0">
+        <div class="d-inline-flex gap-2">
+          <a href="{% url 'wind_generation_kwh' %}" class="btn btn-primary btn-sm px-3 py-2 rounded-pill shadow-sm">
+            <i class="fa-solid fa-bolt-lightning me-1"></i> Energy Analysis
+          </a>
+          <a href="{% url 'breakdown_analysis' %}" class="btn btn-outline-light btn-sm px-3 py-2 rounded-pill">
+            <i class="fa-solid fa-screwdriver-wrench me-1"></i> Breakdown
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #1: FLEET SUMMARY KPI DECK (6 CORE METRICS) -->
+  <div class="row g-3 mb-4">
+    <!-- Metric 1: Total Generation -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-stat-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Total Yield</span>
+          <div class="stat-bubble bg-success-subtle text-success">
+            <i class="fa-solid fa-bolt-lightning"></i>
+          </div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ total_generation|intcomma }}</h4>
+        <small class="text-success fw-semibold mt-1 d-block"><i class="fa-solid fa-circle-check me-1"></i>kWh Generated</small>
+      </div>
+    </div>
+
+    <!-- Metric 2: Machine Availability -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-stat-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Fleet MA</span>
+          <div class="stat-bubble bg-primary-subtle text-primary">
+            <i class="fa-solid fa-gear"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ fleet_ma }}%</h3>
+        <small class="text-primary fw-semibold mt-1 d-block"><i class="fa-solid fa-shield-halved me-1"></i>Machine Avail.</small>
+      </div>
+    </div>
+
+    <!-- Metric 3: Fleet PLF -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-stat-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Fleet PLF</span>
+          <div class="stat-bubble bg-info-subtle text-info">
+            <i class="fa-solid fa-percent"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ fleet_plf }}%</h3>
+        <small class="text-info fw-semibold mt-1 d-block"><i class="fa-solid fa-chart-line me-1"></i>Load Factor</small>
+      </div>
+    </div>
+
+    <!-- Metric 4: Total Downtime -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-stat-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Total Downtime</span>
+          <div class="stat-bubble bg-danger-subtle text-danger">
+            <i class="fa-solid fa-hourglass-half"></i>
+          </div>
+        </div>
+        <h4 class="fw-bold text-dark mb-0 font-monospace">{{ total_downtime|intcomma }}</h4>
+        <small class="text-danger fw-semibold mt-1 d-block"><i class="fa-solid fa-clock-rotate-left me-1"></i>Hours Outage</small>
+      </div>
+    </div>
+
+    <!-- Metric 5: Active Turbines -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-stat-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Active WTGs</span>
+          <div class="stat-bubble bg-purple-subtle text-purple">
+            <i class="fa-solid fa-fan"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold text-dark mb-0 font-monospace">{{ wtg_count }}</h3>
+        <small class="text-muted fw-semibold mt-1 d-block"><i class="fa-solid fa-network-wired me-1"></i>Fleet Units</small>
+      </div>
+    </div>
+
+    <!-- Metric 6: Below Threshold / Underperforming -->
+    <div class="col-xl-2 col-md-4 col-sm-6">
+      <div class="kpi-stat-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-muted small fw-bold text-uppercase">Underperforming</span>
+          <div class="stat-bubble bg-warning-subtle text-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold {% if underperforming_count > 0 %}text-danger{% else %}text-success{% endif %} mb-0 font-monospace">
+          {{ underperforming_count }}
+        </h3>
+        <small class="text-muted fw-semibold mt-1 d-block"><i class="fa-solid fa-filter me-1"></i>MA &lt; 90%</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #2 & #3: GENERATION TREND & TOP/BOTTOM 10 TURBINE RANKING -->
+  <div class="row g-4 mb-4">
+    <!-- VISUAL #3: TOP 10 / BOTTOM 10 TURBINE RANKING (HORIZONTAL BAR CHART) -->
+    <div class="col-xl-7 col-lg-12">
+      <div class="chart-box h-100 d-flex flex-column">
+        <div class="chart-box-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-trophy text-warning"></i>
+              <h5 class="fw-bold text-dark mb-0">Top 10 / Bottom 10 Turbine Ranking</h5>
+            </div>
+            <small class="text-muted">Visual #3: Identifying best and worst performing turbines</small>
+          </div>
+
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="btn-group btn-segmented" id="execRankingSwitcher">
+              <button type="button" class="btn active" data-view="top10">
+                <i class="fa-solid fa-trophy text-warning me-1"></i>Top 10
+              </button>
+              <button type="button" class="btn" data-view="bottom10">
+                <i class="fa-solid fa-triangle-exclamation text-danger me-1"></i>Bottom 10
+              </button>
+              <button type="button" class="btn" data-view="top25">Top 25</button>
+              <button type="button" class="btn" data-view="all">All WTGs</button>
+            </div>
+            <div class="d-flex align-items-center gap-1 ms-1">
+              <span class="small text-muted fw-bold">Page:</span>
+              <select id="execPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
+                <option value="10" selected>10 WTGs</option>
+                <option value="15">15 WTGs</option>
+                <option value="25">25 WTGs</option>
+                <option value="all">All WTGs</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body p-3 flex-grow-1">
+          <div id="execRankingChart" style="min-height: 420px; width: 100%;"></div>
+          <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
+            <span id="execPaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
+            <nav aria-label="Ranking Chart Pagination">
+              <ul class="pagination pagination-sm mb-0" id="execPaginationNav"></ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISUAL #2: MONTHLY GENERATION TREND -->
+    <div class="col-xl-5 col-lg-12">
+      <div class="chart-box h-100 d-flex flex-column">
+        <div class="chart-box-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-chart-area text-success"></i>
+              <h5 class="fw-bold text-dark mb-0">Monthly Generation Trend</h5>
+            </div>
+            <small class="text-muted">Visual #2: Monthly trajectory across reporting cycle</small>
+          </div>
+          <span class="badge bg-success-subtle text-success px-3 py-1 fw-bold">Area Spline</span>
+        </div>
+
+        <div class="card-body p-3 flex-grow-1">
+          <div id="execMonthlyTrendChart" style="min-height: 420px; width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL #5: OEM COMPARISON & VISUAL #4: AVAILABILITY HEATMAP PREVIEW -->
+  <div class="row g-4 mb-4">
+    <!-- VISUAL #5: MANUFACTURER-WISE GENERATION BAR CHART -->
+    <div class="col-xl-5 col-lg-12">
+      <div class="chart-box h-100 d-flex flex-column">
+        <div class="chart-box-header d-flex justify-content-between align-items-center">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-industry text-primary"></i>
+              <h5 class="fw-bold text-dark mb-0">Manufacturer Comparison</h5>
+            </div>
+            <small class="text-muted">Visual #5: Generation distribution by OEM brand</small>
+          </div>
+          <span class="badge bg-primary-subtle text-primary px-3 py-1 fw-bold">OEM Breakdown</span>
+        </div>
+
+        <div class="card-body p-3 flex-grow-1">
+          <div id="execOemChart" style="min-height: 380px; width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISUAL #4: TURBINE AVAILABILITY HEATMAP PREVIEW -->
+    <div class="col-xl-7 col-lg-12">
+      <div class="chart-box h-100 d-flex flex-column">
+        <div class="chart-box-header d-flex justify-content-between align-items-center">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-border-all text-info"></i>
+              <h5 class="fw-bold text-dark mb-0">Turbine Availability Heatmap</h5>
+            </div>
+            <small class="text-muted">Visual #4: Machine availability % (Recent 6 months)</small>
+          </div>
+          <span class="badge bg-info-subtle text-info px-3 py-1 fw-bold">Matrix View</span>
+        </div>
+
+        <div class="card-body p-3 flex-grow-1">
+          <div id="execHeatmapChart" style="min-height: 380px; width: 100%;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXTENDED OUTAGE LOG & FAST MODULE NAVIGATION -->
+  <div class="row g-4">
+    <!-- Extended Breakdown Watchlist -->
+    <div class="col-xl-7 col-lg-12">
+      <div class="chart-box h-100">
+        <div class="chart-box-header d-flex justify-content-between align-items-center">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+              <h5 class="fw-bold text-dark mb-0">Extended Downtime Incidents (&gt;= 10 Hours)</h5>
+            </div>
+            <small class="text-muted">Priority #11: Major breakdown occurrences requiring technical investigation</small>
+          </div>
+          <a href="{% url 'breakdown_analysis' %}" class="btn btn-sm btn-link text-primary text-decoration-none fw-bold">
+            Full Pareto Analysis &rarr;
+          </a>
+        </div>
+        <div class="card-body p-3">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>WTG No</th>
+                  <th>Date</th>
+                  <th>Error Description</th>
+                  <th class="text-end">Duration (hrs)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in extended_breakdowns %}
+                <tr>
+                  <td><strong class="text-dark">{{ row.wtg }}</strong></td>
+                  <td class="text-muted small font-monospace">{{ row.date }}</td>
+                  <td><span class="text-truncate d-inline-block" style="max-width: 280px;" title="{{ row.cause }}">{{ row.cause }}</span></td>
+                  <td class="text-end font-monospace fw-bold text-danger">{{ row.duration }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">No extended outage incidents recorded.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Navigation Hub -->
+    <div class="col-xl-5 col-lg-12">
+      <div class="chart-box h-100 p-4">
+        <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-compass text-primary me-2"></i>Navigation Modules</h5>
+        <div class="d-flex flex-column gap-3">
+          <a href="{% url 'wind_generation_kwh' %}" class="quick-link-card">
+            <div class="stat-bubble bg-primary-subtle text-primary">
+              <i class="fa-solid fa-bolt-lightning"></i>
+            </div>
+            <div class="flex-grow-1">
+              <strong class="text-dark d-block">Energy (kWh) Generation</strong>
+              <small class="text-muted">Detailed WTG ranking, production table, and filtering</small>
+            </div>
+            <i class="fa-solid fa-chevron-right text-muted small"></i>
+          </a>
+
+          <a href="{% url 'wind_wtg_plf' %}" class="quick-link-card">
+            <div class="stat-bubble bg-info-subtle text-info">
+              <i class="fa-solid fa-percent"></i>
+            </div>
+            <div class="flex-grow-1">
+              <strong class="text-dark d-block">PLF &amp; Availability</strong>
+              <small class="text-muted">Scatter plot, outlier detection, and availability heatmaps</small>
+            </div>
+            <i class="fa-solid fa-chevron-right text-muted small"></i>
+          </a>
+
+          <a href="{% url 'breakdown_analysis' %}" class="quick-link-card">
+            <div class="stat-bubble bg-danger-subtle text-danger">
+              <i class="fa-solid fa-screwdriver-wrench"></i>
+            </div>
+            <div class="flex-grow-1">
+              <strong class="text-dark d-block">Breakdown Intelligence</strong>
+              <small class="text-muted">80/20 Pareto chart, cause categories, and downtime logs</small>
+            </div>
+            <i class="fa-solid fa-chevron-right text-muted small"></i>
+          </a>
+
+          <a href="{% url 'wind_drill_down' %}" class="quick-link-card">
+            <div class="stat-bubble bg-purple-subtle text-purple">
+              <i class="fa-solid fa-magnifying-glass-chart"></i>
+            </div>
+            <div class="flex-grow-1">
+              <strong class="text-dark d-block">Turbine Drill-Down</strong>
+              <small class="text-muted">Single-turbine timeline, operational losses, and historical logs</small>
+            </div>
+            <i class="fa-solid fa-chevron-right text-muted small"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Scripts: ApexCharts -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  let top10 = [];
+  let bottom10 = [];
+  let top25 = [];
+  let allWtgs = [];
+  let monthlyTrend = { labels: [], values: [] };
+  let oemComparison = { labels: [], values: [] };
+  let heatmapSeries = [];
+
+  try { top10 = JSON.parse(`{{ top_10_json|escapejs }}`) || []; } catch(e){}
+  try { bottom10 = JSON.parse(`{{ bottom_10_json|escapejs }}`) || []; } catch(e){}
+  try { top25 = JSON.parse(`{{ top_25_json|escapejs }}`) || []; } catch(e){}
+  try { allWtgs = JSON.parse(`{{ all_wtgs_json|escapejs }}`) || []; } catch(e){}
+  try { monthlyTrend = JSON.parse(`{{ monthly_trend_json|escapejs }}`) || { labels: [], values: [] }; } catch(e){}
+  try { oemComparison = JSON.parse(`{{ oem_comparison_json|escapejs }}`) || { labels: [], values: [] }; } catch(e){}
+  try { heatmapSeries = JSON.parse(`{{ heatmap_series_json|escapejs }}`) || []; } catch(e){}
+
+  // Fallback to top10 if allWtgs empty
+  if (allWtgs.length === 0 && top10.length > 0) {
+    allWtgs = [...top10];
+  }
+
+  // 1. Executive Turbine Ranking Controller with Pagination
+  let execRankingChart = null;
+  let execSourceData = [...top10];
+  let execPageSize = 10;
+  let execCurrentPage = 1;
+  let isBottomMode = false;
+
+  function getExecTotalPages() {
+    if (execPageSize === "all") return 1;
+    return Math.max(1, Math.ceil(execSourceData.length / execPageSize));
+  }
+
+  function updateExecPaginationNav() {
+    const nav = document.getElementById("execPaginationNav");
+    const info = document.getElementById("execPaginationInfo");
+    if (!nav) return;
+    const totalPages = getExecTotalPages();
+
+    if (execPageSize === "all" || totalPages <= 1) {
+      nav.innerHTML = "";
+      if (info) info.textContent = `Showing All ${execSourceData.length} Turbines`;
+      return;
+    }
+
+    const startIdx = (execCurrentPage - 1) * execPageSize + 1;
+    const endIdx = Math.min(execCurrentPage * execPageSize, execSourceData.length);
+    if (info) info.textContent = `Showing WTGs ${startIdx}-${endIdx} of ${execSourceData.length} (Page ${execCurrentPage}/${totalPages})`;
+
+    let html = `<li class="page-item ${execCurrentPage === 1 ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToExecPage(${execCurrentPage - 1})">&laquo; Prev</button>
+    </li>`;
+
+    for (let p = 1; p <= totalPages; p++) {
+      if (totalPages > 6 && Math.abs(p - execCurrentPage) > 2 && p !== 1 && p !== totalPages) {
+        if (p === 2 || p === totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        continue;
+      }
+      html += `<li class="page-item ${p === execCurrentPage ? 'active' : ''}">
+        <button type="button" class="page-link" onclick="goToExecPage(${p})">${p}</button>
+      </li>`;
+    }
+
+    html += `<li class="page-item ${execCurrentPage === totalPages ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToExecPage(${execCurrentPage + 1})">Next &raquo;</button>
+    </li>`;
+    nav.innerHTML = html;
+  }
+
+  function renderPaginatedExecChart() {
+    let subset;
+    if (execPageSize === "all") {
+      subset = [...execSourceData];
+    } else {
+      const start = (execCurrentPage - 1) * execPageSize;
+      subset = execSourceData.slice(start, start + execPageSize);
+    }
+
+    const categories = subset.map(d => d.wtg);
+    const seriesData = subset.map(d => d.generation);
+
+    const options = {
+      series: [{ name: 'Generation (kWh)', data: seriesData }],
+      chart: {
+        type: 'bar',
+        height: Math.max(380, subset.length * 32),
+        toolbar: { show: false },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      plotOptions: {
+        bar: {
+          horizontal: true,
+          borderRadius: 6,
+          barHeight: '65%',
+          dataLabels: { position: 'top' }
+        }
+      },
+      colors: [isBottomMode ? '#ef4444' : '#0ea5e9'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'horizontal',
+          shadeIntensity: 0.25,
+          gradientToColors: [isBottomMode ? '#f59e0b' : '#10b981'],
+          stops: [0, 100]
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: function (val) {
+          if (val >= 1e6) return (val / 1e6).toFixed(2) + ' M';
+          if (val >= 1e3) return (val / 1e3).toFixed(1) + ' k';
+          return val.toLocaleString();
+        },
+        offsetX: 28,
+        style: { fontSize: '11px', fontWeight: 700, colors: ['#334155'] }
+      },
+      xaxis: {
+        categories: categories,
+        labels: {
+          formatter: function (val) {
+            if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M';
+            if (val >= 1e3) return (val / 1e3).toFixed(0) + 'k';
+            return val;
+          },
+          style: { fontSize: '11px', colors: '#64748b' }
+        }
+      },
+      yaxis: { labels: { style: { fontSize: '12px', fontWeight: 600, colors: '#1e293b' } } },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function (val) { return val.toLocaleString() + ' kWh'; } }
+      }
+    };
+
+    if (execRankingChart) execRankingChart.destroy();
+    execRankingChart = new ApexCharts(document.querySelector("#execRankingChart"), options);
+    execRankingChart.render();
+    updateExecPaginationNav();
+  }
+
+  window.goToExecPage = function(p) {
+    const total = getExecTotalPages();
+    if (p < 1 || p > total) return;
+    execCurrentPage = p;
+    renderPaginatedExecChart();
+  };
+
+  const execPageSizeSelect = document.getElementById("execPageSize");
+  if (execPageSizeSelect) {
+    execPageSizeSelect.addEventListener("change", function () {
+      execPageSize = this.value === "all" ? "all" : parseInt(this.value);
+      execCurrentPage = 1;
+      renderPaginatedExecChart();
+    });
+  }
+
+  // Switcher
+  const execBtns = document.querySelectorAll("#execRankingSwitcher .btn");
+  execBtns.forEach(btn => {
+    btn.addEventListener("click", function() {
+      execBtns.forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      const v = this.getAttribute("data-view");
+      if (v === "top10") {
+        execSourceData = [...top10];
+        isBottomMode = false;
+        execPageSize = 10;
+        execCurrentPage = 1;
+        if (execPageSizeSelect) execPageSizeSelect.value = "10";
+      } else if (v === "bottom10") {
+        execSourceData = [...bottom10];
+        isBottomMode = true;
+        execPageSize = 10;
+        execCurrentPage = 1;
+        if (execPageSizeSelect) execPageSizeSelect.value = "10";
+      } else if (v === "top25") {
+        execSourceData = [...top25];
+        isBottomMode = false;
+        execPageSize = 25;
+        execCurrentPage = 1;
+        if (execPageSizeSelect) execPageSizeSelect.value = "25";
+      } else if (v === "all") {
+        execSourceData = [...allWtgs];
+        isBottomMode = false;
+        execPageSize = "all";
+        execCurrentPage = 1;
+        if (execPageSizeSelect) execPageSizeSelect.value = "all";
+      }
+      renderPaginatedExecChart();
+    });
+  });
+
+  renderPaginatedExecChart();
+
+  // 2. Executive Monthly Trend (Area Chart)
+  if (monthlyTrend.labels && monthlyTrend.labels.length > 0) {
+    const trendOpts = {
+      series: [{ name: 'Generation (kWh)', data: monthlyTrend.values }],
+      chart: {
+        type: 'area',
+        height: 380,
+        toolbar: { show: false },
+        fontFamily: 'Inter, system-ui, sans-serif'
+      },
+      stroke: { curve: 'smooth', width: 3 },
+      colors: ['#10b981'],
+      fill: {
+        type: 'gradient',
+        gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 95, 100] }
+      },
+      dataLabels: { enabled: false },
+      xaxis: {
+        categories: monthlyTrend.labels,
+        labels: { rotate: -45, style: { fontSize: '11px', colors: '#64748b' } }
+      },
+      yaxis: {
+        labels: {
+          formatter: function(val) {
+            if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M';
+            if (val >= 1e3) return (val / 1e3).toFixed(0) + 'k';
+            return val;
+          },
+          style: { fontSize: '11px', colors: '#64748b' }
+        }
+      },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val.toLocaleString() + ' kWh'; } }
+      }
+    };
+    const trendChart = new ApexCharts(document.querySelector("#execMonthlyTrendChart"), trendOpts);
+    trendChart.render();
+  }
+
+  // 3. Visual #5: OEM Comparison (Bar Chart)
+  if (oemComparison.labels && oemComparison.labels.length > 0) {
+    const oemOpts = {
+      series: [{ name: 'Total Generation (kWh)', data: oemComparison.values }],
+      chart: { type: 'bar', height: 350, toolbar: { show: false } },
+      plotOptions: {
+        bar: { borderRadius: 8, columnWidth: '45%', distributed: true }
+      },
+      colors: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'],
+      dataLabels: {
+        enabled: true,
+        formatter: function(val) {
+          if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M';
+          return (val / 1e3).toFixed(0) + 'k';
+        },
+        style: { fontSize: '12px', fontWeight: 700 }
+      },
+      xaxis: {
+        categories: oemComparison.labels,
+        labels: { style: { fontSize: '12px', fontWeight: 600 } }
+      },
+      yaxis: {
+        labels: {
+          formatter: function(val) { return (val / 1e6).toFixed(1) + 'M'; }
+        }
+      },
+      grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+      legend: { show: false },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val.toLocaleString() + ' kWh'; } }
+      }
+    };
+    const oemChart = new ApexCharts(document.querySelector("#execOemChart"), oemOpts);
+    oemChart.render();
+  }
+
+  // 4. Visual #4: Availability Heatmap
+  if (heatmapSeries && heatmapSeries.length > 0) {
+    const heatmapOpts = {
+      series: heatmapSeries,
+      chart: { type: 'heatmap', height: 350, toolbar: { show: false } },
+      plotOptions: {
+        heatmap: {
+          shadeIntensity: 0.5,
+          radius: 4,
+          useWarmShades: false,
+          colorScale: {
+            ranges: [
+              { from: 0, to: 89.9, name: '<90% Low', color: '#fee2e2' },
+              { from: 90, to: 95.9, name: '90-95% Normal', color: '#fef08a' },
+              { from: 96, to: 100, name: '>=96% Optimal', color: '#bbf7d0' }
+            ]
+          }
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        style: { colors: ['#1e293b'], fontSize: '11px', fontWeight: 600 },
+        formatter: function(val) { return val + '%'; }
+      },
+      xaxis: { labels: { style: { fontSize: '11px', colors: '#64748b' } } },
+      yaxis: { labels: { style: { fontSize: '11px', fontWeight: 600, colors: '#1e293b' } } },
+      tooltip: {
+        theme: 'light',
+        y: { formatter: function(val) { return val + '% Machine Availability'; } }
+      }
+    };
+    const heatmapChart = new ApexCharts(document.querySelector("#execHeatmapChart"), heatmapOpts);
+    heatmapChart.render();
+  }
+
+});
+</script>
+{% endblock %}

@@ -1,0 +1,933 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+  <link rel="icon" type="image/png" href="{% static 'images/TeimLogo.png' %}">
+
+  <!-- Bootstrap 4 CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+
+  <!-- AOS CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f8f9fa;
+    }
+
+    .header {
+      background-color: #ffffff;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 500;
+      border-bottom: 1px solid silver;
+    }
+
+    .sidebar {
+      background-color: #ffffff;
+      border-right: 1px solid #e2e8f0;
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.08);
+      color: #1e293b;
+      font-weight: 600;
+      font-size: 15px;
+      padding-top: 20px;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 260px;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 999;
+    }
+
+    .nav-link {
+       margin-bottom: 10px;
+      border-radius: 10px;
+      width: 230px;
+    }
+        .nav-link:hover {
+      color: blue !important;
+    }
+
+    .sidebar.active {
+      transform: translateX(0);
+    }
+
+    .sidebar .nav-link {
+      color: #000000 !important;
+      font-weight: 700 !important;
+      font-size: 15px !important;
+      letter-spacing: 0.2px !important;
+    }
+
+    .sidebar .nav-link i {
+      color: #000000 !important;
+      font-size: 16px !important;
+      margin-right: 8px !important;
+    }
+
+    .sidebar .nav-link i.float-right,
+    .sidebar .nav-link .fa-caret-down {
+      margin-left: auto !important;
+      margin-right: 0 !important;
+      color: #000000 !important;
+    }
+
+    .sidebar .collapse .nav-link {
+      color: #000000 !important;
+      font-weight: 700 !important;
+      font-size: 14.5px !important;
+    }
+
+    .sidebar .collapse .nav-link i {
+      color: #000000 !important;
+    }
+
+    .sidebar .nav-link:hover {
+      background-color: #f1f5f9;
+      color: #000000 !important;
+      font-weight: 800 !important;
+    }
+    .sidebar .nav-link:hover i {
+      color: #000000 !important;
+    }
+      color: #1e293b;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .sidebar .nav-link:hover {
+      background-color: #f1f5f9;
+      color: #000000 !important;
+    }
+
+.sidebar .close-btn {
+    position: absolute;
+    top: 0px;
+    right: 10px;
+    background-color: transparent;
+    border: none;
+    color: #000000;
+    font-weight: 800;
+    font-size: 34px;
+    padding: 0 10px;
+    cursor: pointer;
+    font-weight: bold;
+}
+    .footer{
+border-top: 1px solid silver;
+    }
+    body::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    body::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    body::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 10px;
+    }
+
+    body::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .modal-confirm i {
+      font-size: 50px;
+      color: #f0ad4e;
+    }
+
+    .modal-confirm h5 {
+      font-weight: 600;
+    }
+     :root {
+    --bg-color: #f8f9fa;
+    --text-color: #000;
+    --header-bg: #ffffff;
+    --sidebar-bg: #ffffff;
+    --nav-hover: #f1f5f9;
+    --btn-color: #dc3545;
+  }
+
+  body.dark-mode {
+    --bg-color: #1e1e2f;
+    --text-color: #ffffff;
+    --header-bg: #2c2c3e;
+    --sidebar-bg: #1c1c2b;
+    --nav-hover: #34344e;
+    --btn-color: #ff4757;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .header {
+    background-color: var(--header-bg);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .sidebar {
+    background-color: var(--sidebar-bg);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .sidebar .nav-link:hover {
+    background-color: var(--nav-hover);
+  }
+
+  .btn-danger {
+    background-color: var(--btn-color);
+    border-color: var(--btn-color);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .toggle-switch {
+    position: fixed;
+    top: -5px;
+    right: 15px;
+    z-index: 1000;
+  }
+
+  .toggle-switch input {
+    height: 0;
+    width: 0;
+    visibility: hidden;
+  }
+
+  .toggle-switch label {
+    cursor: pointer;
+    width: 60px;
+    height: 30px;
+    background: #ccc;
+    display: block;
+    border-radius: 100px;
+    position: relative;
+    transition: background 0.3s ease-in-out;
+  }
+
+  .toggle-switch label::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 26px;
+    height: 26px;
+    background: white;
+    border-radius: 90px;
+    transition: 0.3s;
+  }
+
+  .toggle-switch input:checked + label {
+    background: #4c4cff;
+  }
+
+  .toggle-switch input:checked + label::after {
+    left: calc(100% - 2px);
+    transform: translateX(-100%);
+  }
+  /* Default icon hover (light mode) */
+.theme-btn i {
+  color: #333;
+  transition: color 0.3s ease;
+}
+
+.theme-btn:hover i {
+  color: #000; /* Slightly darker on hover */
+}
+
+/* Dark mode icon hover */
+body.dark-mode .theme-btn i {
+  color: #f9e79f;
+}
+/* Dark mode global text color */
+body.dark-mode {
+  background-color: #121212; /* optional: dark background */
+  color: white !important;
+}
+
+body.dark-mode p,
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode h6,
+body.dark-mode span,
+body.dark-mode div,
+body.dark-mode a,
+body.dark-mode li,
+body.dark-mode label,
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
+body.dark-mode th,
+body.dark-mode td {
+  color: rgb(0, 0, 0) !important;
+}
+
+/* Optional: input/select placeholder color in dark mode */
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #cccccc !important;
+}
+
+body.dark-mode table{
+  color: white !important;
+
+}
+
+body.dark-mode .theme-btn:hover i {
+  color: #ffe066; /* Brighter yellow on hover */
+}
+
+/* Default: desktop view */
+.dashboard-option-header {
+  display: block;
+}
+
+.dashboard-option-header-mobile {
+  display: none;
+}
+
+/* On mobile (max-width: 768px) */
+@media (max-width: 768px) {
+  .dashboard-option-header {
+    display: none !important;
+  }
+
+  .dashboard-option-header-mobile {
+    display: block !important;
+    margin-top: 20px;
+  }
+}
+
+.energy-label {
+  display: inline-block;
+  cursor: pointer;
+  border-radius: 25px;
+  padding: 10px 18px;
+  font-weight: 500;
+  color: #007bff;
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  transition: 0.3s;
+  position: relative;
+  font-size: 15px;
+  
+}
+
+.energy-label i.fa-bolt {
+  margin-right: 8px;
+  color: #ff9900;
+}
+
+.check-icon {
+  display: none;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #28a745;
+  color: white;
+  border-radius: 50%;
+  padding: 3px;
+  font-size: 10px;
+}
+
+.energy-input:checked + .energy-label {
+  background-color: #007bff;
+  color: white;
+}
+
+.energy-input:checked + .energy-label .check-icon {
+  display: inline-block;
+}
+
+.energy-label.active {
+  background-color: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
+.energy-label.active .check-icon {
+  display: inline-block;
+}
+.shadow-3d {
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 4px 6px rgba(0, 0, 0, 0.15),
+    0 10px 20px rgba(0, 0, 0, 0.19);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border-radius: 12px;
+}
+
+.shadow-3d:hover {
+  transform: translateY(-5px);
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.18),
+    0 10px 20px rgba(0, 0, 0, 0.22),
+    0 20px 30px rgba(0, 0, 0, 0.25);
+}
+
+label {
+             color: #000000;
+}
+
+
+.sidebar {
+  overflow-y: auto;  /* Enable vertical scrolling */
+  max-height: 100vh; /* Optional: full viewport height */
+}
+
+/* Scrollbar track */
+.sidebar::-webkit-scrollbar {
+  width: 0px;
+}
+
+/* Scrollbar handle */
+.sidebar::-webkit-scrollbar-thumb {
+  background: #6c5ce7;        /* Scroll thumb color */
+  border-radius: 0px;
+}
+
+/* Scrollbar track background */
+.sidebar::-webkit-scrollbar-track {
+  background: #f1f1f1;        /* Scroll track color */
+  border-radius: 0px;
+}
+
+/* Optional: on hover */
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: #4a38c4;
+}
+.nav-link.active {
+  background-color: #ffffff;
+  color: #000000 !important;
+  font-weight: 800 !important;
+  background-color: #e2e8f0 !important;
+  font-weight: bold;
+}
+
+body.dark-mode .navcontent {
+  color: rgb(212, 212, 212) !important;
+}
+body.dark-mode .nav-link.active {
+  background-color: #34344e;
+  color: #ffe066 !important;
+  font-weight: bold;
+}/* Fixed sidebar width on all screens */
+  .haddding {
+        font-weight: 600;
+        color: #718096;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+        border-left: 4px solid #764ba2;
+        padding-left: 10px;
+    }
+
+
+
+    /* ================= AI CIRCLE ================= */
+.ai-circle{
+  width:28px;
+  height:28px;
+   border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  cursor:pointer;
+   /* margin-top: -18px; */
+  margin-left: 15px;
+}
+
+.ii{
+  font-size: 28px;
+
+  background: linear-gradient(
+    60deg,
+    #bc42f4 0%,
+    #8951e4 30%,
+    #3f183c 60%,
+    #2d00cf 100%
+  );
+
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  background-clip: text;
+  color: transparent;
+
+  z-index: 2;
+}
+
+
+/* Pulsing rings */
+.ai-ring{
+  position:absolute;
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  /* border:2px solid rgba(255, 255, 255, 0.897); */
+  animation:pulse 2.5s infinite;
+  font-size: 10px;
+  margin-right: -35px;
+}
+
+.ai-ring.delay{
+  animation-delay:1.2s;
+}
+
+/* @keyframes pulse{
+  0%{transform:scale(1);opacity:1;}
+  100%{transform:scale(1.6);opacity:0;}
+} */
+
+.ai-label{
+  font-size:12px;
+  color:#cbd5f5;
+  margin-top:6px;
+}
+
+/* ================= MODAL ================= */
+.ai-modal{
+  border-radius:16px;
+  background:linear-gradient(145deg,#020617,#0f172a);
+  color:#e5e7eb;
+  box-shadow:0 25px 60px rgba(0,0,0,.5);
+}
+
+.ai-modal .modal-title{
+  font-weight:600;
+  text-align: center !important;
+}
+
+.ai-option{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:14px 16px;
+  margin-bottom:10px;
+  background:rgba(255,255,255,.05);
+  border-radius:12px;
+  text-decoration:none;
+  color:#e5e7eb;
+  transition:all .3s ease;
+}
+
+.ai-option i{
+  font-size:18px;
+  color:#38bdf8;
+}
+
+.ai-option:hover{
+  background:linear-gradient(90deg,#2563eb,#06b6d4);
+  color:#fff;
+  transform:translateX(6px);
+}
+
+
+@media (max-width: 768px){
+  .ai-circle{
+    display:flex !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    margin-top: -15px !important;
+  }
+  .mkk{
+    display: none !important;
+  }
+}
+
+.ddd{
+  display: none;
+}
+ 
+  </style>
+</head>
+
+<body>
+<div class="header d-flex justify-content-between align-items-center px-3" data-aos="fade-down">
+
+  {% if user.is_authenticated %}
+  <div class="d-flex align-items-center">
+    <button class="btn btn-light mr-3" onclick="openSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- ✅ Show Hello button only if NOT superuser -->
+  <!-- ✅ Show Energy Type buttons only if NOT superuser -->
+{% if not request.user.is_superuser %}
+<div class="dashboard-option-header">
+  <div class="d-flex gap-3 flex-wrap">
+
+{% for energy in request.user.userprofile.energy_types.all %}
+  <div class="energy-toggle">
+    <input type="radio" 
+           name="energy_type" 
+           id="energy_btn{{ energy.id }}" 
+           class="energy-input d-none"
+           {% if energy.name|lower in request.resolver_match.url_name %}checked{% endif %}>
+    
+    <label for="energy_btn{{ energy.id }}"
+           class="energy-label {% if energy.name|lower in request.resolver_match.url_name %}active{% endif %}"
+           onclick="window.location.href='{% url energy.name|lower|add:'_dashboard' %}'">
+      <i class="fas fa-bolt"></i> {{ energy.name }}
+    </label>
+  </div>
+{% endfor %}
+
+
+
+  </div>
+</div>
+{% endif %}
+
+  </div>
+  
+<center>
+ <div class="nav-item    " style="display: flex;  ">
+      <h5 class="mb-0 me-3 haddding text-dark"  >Hello, <strong>{{ request.user }}</strong></h5>
+
+<!-- <div class="ai-circle d-none d-md-flex mkk"
+     data-bs-toggle="modal"
+     data-bs-target="#aiAnalysisModal">
+    
+<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#0000F5"><path d="m176-120-56-56 301-302-181-45 198-123-17-234 179 151 216-88-87 217 151 178-234-16-124 198-45-181-301 301Zm24-520-80-80 80-80 80 80-80 80Zm355 197 48-79 93 7-60-71 35-86-86 35-71-59 7 92-79 49 90 22 23 90Zm165 323-80-80 80-80 80 80-80 80ZM569-570Z"/></svg>  <span class="ai-ring delay  " style="color: #ff00ea;">AI</span>
+</div> -->
+
+ </div>
+ </center>
+
+  <!-- Toggle button for small devices -->
+  <button class="sidebar-toggle " id="toggleSidebar">
+    <span>
+       Hello, {{ request.user }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i class="fa fa-chart-bar"></i>
+
+    </span>
+  </button>
+ 
+  {% endif %}
+
+</div>
+
+
+<!-- Sidebar -->
+<div id="sidebar" class="sidebar" style="z-index: 1000; overflow: scroll;">
+  <!-- AI ANALYSIS ICON -->
+<!-- <div class="nav-item text-center my-3">
+  <div class="ai-circle ddd"
+       data-bs-toggle="modal"
+       data-bs-target="#aiAnalysisModal">
+       
+<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#F19E39"><path d="m176-120-56-56 301-302-181-45 198-123-17-234 179 151 216-88-87 217 151 178-234-16-124 198-45-181-301 301Zm24-520-80-80 80-80 80 80-80 80Zm355 197 48-79 93 7-60-71 35-86-86 35-71-59 7 92-79 49 90 22 23 90Zm165 323-80-80 80-80 80 80-80 80ZM569-570Z"/></svg><span class="ai-ring delay  " style="color: #ff00ea;">AI</span>
+   </div>
+</div> -->
+
+  <button class="close-btn" onclick="closeSidebar()">×</button>
+  <center>
+    <div class="text-center mt-5 bg-white pt-1" style="border-radius: 10px; width:70%;">
+      <img src="{% static 'images/TeimLogo.png' %}" alt="TEIM Logo" class="img-fluid" style="height: 70px; width: 100px;" />
+    </div>
+  </center>
+
+  <!-- ✅ Show Hello button only if NOT superuser -->
+   <div class="dashboard-option-header-mobile ml-4">
+    <div class="d-flex gap-3 flex-wrap">
+      <!-- Solar -->
+      <div class="energy-toggle">
+        <input type="radio" name="energy_type" id="energy_btn1" class="energy-input d-none"
+          {% if request.path == '/solar/' %}checked{% endif %}>
+        <label for="energy_btn1"
+               class="energy-label {% if request.path == '/solar/' %}active{% endif %}"
+               onclick="window.location.href='{% url 'solar_dashboard' %}'">
+          <i class="fas fa-sun"></i> Solar
+          <span class="check-icon"><i class="fas fa-check"></i></span>
+        </label>
+      </div>
+
+      <!-- Wind -->
+      <div class="energy-toggle">
+        <input type="radio" name="energy_type" id="energy_btn2" class="energy-input d-none"
+          {% if request.path == '/' %}checked{% endif %}>
+        <label for="energy_btn2"
+               class="energy-label {% if request.path == '/' %}active{% endif %}"
+               onclick="window.location.href='{% url 'wind_dashboard' %}'">
+          <i class="fas fa-wind"></i> Wind
+          <span class="check-icon"><i class="fas fa-check"></i></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+<ul class="nav flex-column mt-4 pl-3">
+
+    <!-- Customer Header -->
+    <li class="nav-item">
+        <a class="nav-link bg-white text-dark text-center" href="{% url 'wind_dashboard' %}">
+            <i class="fas fa-tachometer-alt"></i> Customer Area
+        </a>
+    </li>
+
+    <!-- Dashboard -->
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'wind_dashboard' %}">
+            <i class="fas fa-chart-line"></i> Interactive Dashboard
+        </a>
+    </li>
+
+    <!-- Profile Info -->
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'user_generation_info' %}">
+            <i class="fas fa-id-card"></i> Profile Information
+        </a>
+    </li>
+
+
+    <!-- =================== GENERATION DATA =================== -->
+    <li class="nav-item mt-1">
+        <a class="nav-link" data-toggle="collapse" href="#generationData" role="button">
+            <i class="fas fa-bolt"></i> Generation Data
+            <i class="fas fa-caret-down float-right"></i>
+        </a>
+
+        <div class="collapse ml-3" id="generationData">
+            <ul class="nav flex-column">
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'customer_upload' %}">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Data
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'Modifydata' %}">
+                        <i class="fas fa-edit"></i> Modify Data
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </li>
+
+
+    <!-- =================== PM DATA =================== -->
+    <!-- <li class="nav-item mt-1">
+        <a class="nav-link" data-toggle="collapse" href="#pmData" role="button">
+            <i class="fas fa-tools"></i> PM Data
+            <i class="fas fa-caret-down float-right"></i>
+        </a>
+
+        <div class="collapse ml-3" id="pmData">
+            <ul class="nav flex-column">
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'my_preventive_maintenance' %}">
+                        <i class="fas fa-database"></i> Manage PM Records
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'my_preventive_maintenance' %}">
+                        <i class="fas fa-edit"></i> Modify Data
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </li> -->
+
+
+     <li class="nav-item">
+ <a class="nav-link" href="{% url 'my_preventive_maintenance' %}">
+                        <i class="fas fa-database"></i> Manage PM Records
+                    </a>
+    </li>
+        <li class="nav-item">
+ <a class="nav-link" href="{% url 'customer_upload_dsm' %}">
+                        <i class="fas fa-balance-scale"></i> Upload DSM Data
+                    </a>
+    </li>
+    <!-- Logout -->
+    <li class="nav-item text-center mt-3">
+        <a href="#" class="btn btn-danger" data-toggle="modal" data-target="#logoutModal">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </li>
+
+</ul>
+
+</div>
+
+
+  <!-- Logout Modal -->
+  <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="logoutModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content text-center p-4 modal-confirm">
+        <div class="mb-3">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h5>Do you want to logout?</h5>
+        <div class="d-flex justify-content-center mt-4">
+          <a href="{% url 'logout' %}" class="btn btn-primary mr-2">Yes, Logout</a>
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+ 
+
+
+ <!-- AI ANALYSIS MODAL -->
+<!-- <div class="modal fade" id="aiAnalysisModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content ai-modal">
+
+      <div class="modal-header border-0  ">
+        <h4 class="modal-title ">
+          🤖 AI Advanced Analysis
+        </h4>
+        <button type="button" class="btn-close  " style="color: wheat !important;" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <a href="{% url 'breakdown_analysis' %}" class="ai-option">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Breakdown Analysis
+        </a>
+
+        <a href="{% url 'user_pm_report_dashboard' %}" class="ai-option">
+          <i class="fa-solid fa-tools"></i>
+          Preventive Maintenance
+        </a>
+
+        <a href="{% url 'calculation_history' %}" class="ai-option">
+          <i class="fa-solid fa-calculator"></i>
+          Open Access Calculator
+        </a>
+     <a href="{% url 'dsm_dashboard' %}" class="ai-option">
+          <i class="fas fa-balance-scale"></i>
+          DSM Charges
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div> -->
+
+<!-- {% if not request.user.is_superuser %} -->
+  <!-- Sidebar -->
+  <!-- <nav class="w3-sidebar w3-bar-block w3-collapse" style="padding-top: 100px; z-index: 100;" id="mySidebar">
+    <button class="w3-bar-item w3-button w3-hide-large" onclick="w3_close()">Close ×</button>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+  </nav> -->
+
+  <!-- Overlay for small screens -->
+  <!-- <div class="w3-overlay w3-hide-large" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div> -->
+<!-- {% endif %} -->
+
+ 
+
+<!-- JavaScript -->
+<script>
+  function w3_open() {
+    document.getElementById("mySidebar").style.display = "block";
+    document.getElementById("myOverlay").style.display = "block";
+  }
+
+  function w3_close() {
+    document.getElementById("mySidebar").style.display = "none";
+    document.getElementById("myOverlay").style.display = "none";
+  }
+</script>
+  <!-- Wind Section   End -->
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+  <!-- AOS JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+  <script>
+    AOS.init();
+
+    function openSidebar() {
+      document.getElementById("sidebar").classList.add("active");
+    }
+
+    function closeSidebar() {
+      document.getElementById("sidebar").classList.remove("active");
+    }
+  </script>
+
+ <script>
+  AOS.init();
+
+  function openSidebar() {
+    document.getElementById("sidebar").classList.add("active");
+  }
+
+  function closeSidebar() {
+    document.getElementById("sidebar").classList.remove("active");
+  }
+
+  // Dark Mode Icon Toggle
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const themeIcon = document.getElementById('themeIcon');
+  const body = document.body;
+
+  function setTheme(theme) {
+    if (theme === 'dark') {
+      body.classList.add('dark-mode');
+      themeIcon.classList.remove('fa-moon');
+      themeIcon.classList.add('fa-sun');
+    } else {
+      body.classList.remove('dark-mode');
+      themeIcon.classList.remove('fa-sun');
+      themeIcon.classList.add('fa-moon');
+    }
+    localStorage.setItem('theme', theme);
+  }
+
+  themeToggleBtn.addEventListener('click', () => {
+    const isDark = body.classList.contains('dark-mode');
+    setTheme(isDark ? 'light' : 'dark');
+  });   
+
+  // Load theme on page load
+  window.addEventListener('DOMContentLoaded', () => {
+    const storedTheme = localStorage.getItem('theme') || 'light';
+    setTheme(storedTheme);
+  });
+</script>
+
+</body>
+
+</html>

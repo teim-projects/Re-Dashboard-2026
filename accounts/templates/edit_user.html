@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %} Edit User {% endblock %}
+
+{% block style_css %}
+<style>
+  .form-wrapper {
+    background: #fff;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+
+  .form-label {
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  .form-control,
+  .form-select {
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .btn-custom {
+    width: 140px;
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .energy-label {
+    display: inline-block;
+    cursor: pointer;
+    border-radius: 25px;
+    padding: 10px 18px;
+    font-weight: 500;
+    color: #007bff;
+    background-color: #fff;
+    box-shadow: 0px 0px 10px rgb(174, 156, 141);
+    transition: 0.3s;
+    position: relative;
+    font-size: 15px;
+  }
+
+  .energy-label i.fa-bolt {
+    margin-right: 8px;
+    color: #ff9900;
+  }
+
+  .check-icon {
+    display: none;
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    padding: 3px;
+    font-size: 10px;
+  }
+
+  .energy-input:checked + .energy-label {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+  }
+
+  .energy-input:checked + .energy-label .check-icon {
+    display: inline-block;
+  }
+</style>
+{% endblock style_css %}
+
+{% block content %}
+<div class="container" style="min-height: 100vh;">
+ <div class="row justify-content-center align-items-stretch" style="margin-top: 80px; min-height: 100%;">
+  <!-- Left Column -->
+  <div class="col-md-9  mb-3 " data-aos="fade-down">
+    <div class="form-wrapper h-100 shadow-3d d-flex flex-column">
+      <div class="form-heading">Edit User</div>
+
+      <form method="POST" class="flex-grow-1 d-flex flex-column">
+        {% csrf_token %}
+        <div class="row">
+          <!-- Username -->
+          <div class="col-md-6">
+            <label for="username" class="form-label">Username </label>
+            <input type="text" name="username" class="form-control" value="{{ user_obj.username }}" required>
+          </div>
+
+          <!-- Email -->
+          <div class="col-md-6">
+            <label for="email" class="form-label">Email </label>
+            <input type="email" name="email" class="form-control" value="{{ user_obj.email }}" required>
+          </div>
+
+          
+          <!-- New Password -->
+          <div class="col-md-6 mt-3">
+            <label for="password" class="form-label">New Password (optional)</label>
+            <input type="password" name="password" class="form-control" placeholder="Enter new password">
+          </div>
+
+          <!-- Energy Type -->
+          <div class="col-md-6 mt-3">
+            <label class="form-label">Select Energy Type </label>
+            <div class="d-flex flex-wrap gap-3">
+              {% for energy in energy_choices %}
+                <div class="energy-toggle">
+                  <input type="checkbox" name="energy_types" value="{{ energy.id }}"
+                         id="energy_{{ energy.id }}"
+                         class="energy-input d-none"
+                         {% if energy.id in selected_energy_ids %}checked{% endif %}>
+                  <label for="energy_{{ energy.id }}" class="energy-label">
+                    <i class="fas fa-bolt"></i> {{ energy.name }}
+                    <span class="check-icon"><i class="fas fa-check"></i></span>
+                  </label>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Switches -->
+        <div class="form-check form-switch mt-4">
+          <input class="form-check-input" type="checkbox" name="is_active" {% if user_obj.is_active %}checked{% endif %}>
+          <label class="form-check-label">Is User Active</label>
+        </div>
+
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="is_superuser" {% if user_obj.is_superuser %}checked{% endif %}>
+          <label class="form-check-label">Is Administrator</label>
+        </div>
+
+        <!-- Buttons -->
+        <div class="mt-4 d-flex gap-3 row">
+          <div class="col-md-3"></div>
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-success btn-custom w-100">✔️ Update</button>
+          </div>
+          <div class="col-md-3">
+            <a href="{% url 'user_list' %}" class="btn btn-danger btn-custom w-100">🔙 Cancel</a>
+          </div>
+          <div class="col-md-3"></div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Column (User Details) -->
+
+  <div class="col-md-3 mb-3  " data-aos="fade-down">
+    <div class="card text-white h-100 shadow-3d" style="border-radius: 14px; background: linear-gradient(135deg, #4e54c8, #8f94fb); box-shadow: 0 6px 15px rgba(0,0,0,0.2);">
+      <div class="card-header bg-transparent border-0">
+        <h5 class="mb-0"><strong>User Details</strong></h5>
+      </div>
+  <div class="card-body">
+  <p><strong>Current Login</strong><br>
+    {% if current_login %}
+      {{ current_login|date:"D, d M Y" }}<br>{{ current_login|time:"H:i:s" }} IST
+    {% else %}
+      Not yet logged in
+    {% endif %}
+  </p>
+
+  <p><strong>Last Login</strong><br>
+    {% if last_login %}
+      {{ last_login|date:"D, d M Y" }}<br>{{ last_login|time:"H:i:s" }} IST
+    {% else %}
+      Not yet logged in
+    {% endif %}
+  </p>
+
+<p><strong>Last Password Update</strong><br>
+  {% if last_password_change %}
+    {{ last_password_change|date:"D, d M Y" }}<br>{{ last_password_change|time:"H:i:s" }} IST
+  {% else %}
+    Not available
+  {% endif %}
+</p>
+
+
+  <p><strong>Created On</strong><br>
+    {% if created_on %}
+      {{ created_on|date:"D, d M Y" }}<br>{{ created_on|time:"H:i:s" }} IST
+    {% else %}
+      Not available
+    {% endif %}
+  </p>
+</div>
+
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Footer -->
+<div class="container-fluid footer text-center">
+  <p style="margin: 0; font-weight: 600; color: #000;">
+    © 2025. Powered by
+    <img src="{% static 'images/crono.png' %}" alt="Chronoanalytics Logo" style="height: 20px;">
+    <a href="http://www.chronoanalytics.in/" style="text-decoration: none;
+        background: linear-gradient(to right, #2575fc, #6a11cb);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent; font-size: 1.1rem;">Chronoanalytics Solution</a> All Rights Reserved.
+  </p>
+  <p style="font-weight: 600; color:#000;">
+    Marketed by
+    <img src="{% static 'images/TeimLogo.png' %}" alt="Teim Logo" style="height: 20px;">
+    <a href="http://teim.in/" style="text-decoration: none;
+        background: linear-gradient(to right, #2575fc, #6a11cb);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent; font-size: 1.1rem;">TEIM</a> All Rights Reserved.
+  </p>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+<script>
+  function goBack() {
+    window.history.back();
+  }
+</script>
+{% endblock scripts %}

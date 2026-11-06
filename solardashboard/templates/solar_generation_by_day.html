@@ -1,0 +1,401 @@
+{% extends "basesolar.html" %}
+{% load static %}
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+.page-wrapper { margin-top: 72px; font-family: 'Poppins', sans-serif; padding: 0 18px 24px; }
+.header-strip {
+  background: linear-gradient(90deg,#0054a6,#0079c4);
+  color:#fff; padding:10px 18px; border-radius:10px; text-align:center;
+  font-weight:700; font-size:18px; box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* left filters */
+.layout { display:grid; grid-template-columns: 230px 1fr; gap:14px; margin-top:12px; }
+.filter-panel { background:#eef6ff; padding:14px; border-radius:10px; border-right:1px solid #dfefff; }
+.filter-label { font-size:13px; color:#2b4a6b; font-weight:600; margin-bottom:6px; }
+.filter-select, .filter-input { width:100%; padding:10px 12px; border-radius:10px; border:1px solid #d7e9ff; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,0.03); }
+
+.filter-description { font-size:12px; color:#516c86; margin-top:10px; opacity:0.9; }
+
+/* charts */
+.charts { padding:8px; }
+.card { background:#f7fbff; border-radius:10px; padding:14px; margin-bottom:14px; border:1px solid #dceeff; box-shadow: 0 6px 16px rgba(8,40,96,0.04); }
+.chart-title { text-align:center; font-weight:700; margin-bottom:8px; color:#173e6a; }
+.canvas-wrap { height:320px; position:relative; }
+
+/* small form input */
+.form-row { margin-top:6px; }
+.small-muted { color:#6b7b8d; font-size:13px; margin-top:8px; text-align:center; }
+
+/* responsive */
+@media (max-width:900px) { .layout { grid-template-columns: 1fr; } .filter-panel{ order:2 } }
+</style>
+
+<div class="page-wrapper">
+  <div class="header-strip">GENERATION BY DAY — SOLAR</div>
+<div class="layout">
+    
+    <!-- LEFT FILTER PANEL -->
+    <div class="filter-panel">
+      <div>
+        <div class="filter-label">Year</div>
+<select id="filter-year" class="filter-select">
+    <option value="">All</option>
+    {% for y in years %}
+        <option value="{{ y }}">{{ y }}</option>
+    {% endfor %}
+</select>
+
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="filter-label">Month</div>
+<select id="filter-month" class="filter-select">
+    <option value="">All</option>
+    {% for m_num, m_name in months %}
+        <option value="{{ m_num }}">{{ m_name }}</option>
+    {% endfor %}
+</select>
+
+
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="filter-label">Day</div>
+ <select id="filter-day" class="filter-select">
+    <option value="">All</option>
+    {% for d in days %}
+        <option value="{{ d }}">{{ d }}</option>
+    {% endfor %}
+</select>
+
+      </div>
+
+      <div class="form-row" style="margin-top:12px;">
+        <div class="filter-label">Forecast Days</div>
+        <input id="forecast-days" class="filter-input" type="number" min="1" max="90" value="10" />
+      </div>
+
+      <p class="filter-description">
+        <i class="fa-solid fa-circle-info" style="color:#2b8ef6"></i>
+        quickly check short-term forecast (95% CI)
+      </p>
+    </div>
+
+    <!-- RIGHT CHART AREA -->
+    <div class="charts">
+
+      <!-- CHART 1 -->
+      <div class="card">
+        <div class="chart-title">Generation Hours by Day</div>
+        <div class="canvas-wrap">
+          <canvas id="chart-gh"></canvas>
+        </div>
+      </div>
+
+      <!-- CHART 2 -->
+      <div class="card">
+        <div class="chart-title">Daily Generation by Day</div>
+        <div class="canvas-wrap">
+          <canvas id="chart-gen"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+</div>
+
+</div>
+
+<script>
+const API = "{% url 'api_generation_by_day' %}";
+
+let chartGen = null;
+let chartGh = null;
+
+function createGradient(ctx, area) {
+  const g = ctx.createLinearGradient(0, 0, 0, area.height);
+  g.addColorStop(0, "rgba(47,128,237,0.35)");
+  g.addColorStop(1, "rgba(47,128,237,0.05)");
+  return g;
+}
+
+async function loadAndDraw() {
+  const year = document.getElementById("filter-year").value;
+  const month = document.getElementById("filter-month").value;
+  const day = document.getElementById("filter-day").value;
+  const h = +document.getElementById("forecast-days").value || 10;
+
+  const params = new URLSearchParams();
+  if (year) params.append("year", year);
+  if (month) params.append("month", month);
+  if (day) params.append("day", day);
+  params.append("forecast_days", h);
+
+  const res = await fetch(API + "?" + params.toString());
+  const data = await res.json();
+  if (data.status !== "ok") {
+    // clear charts
+    if (chartGen) chartGen.destroy();
+    if (chartGh) chartGh.destroy();
+    return;
+  }
+
+  drawChartGen(data);
+  drawChartGh(data);
+  // optionally populate year dropdown (if provided in response in future)
+}
+
+// ---------- Generation chart (sum) ----------
+function drawChartGen(data) {
+  const ctx = document.getElementById("chart-gen").getContext("2d");
+  if (chartGen) chartGen.destroy();
+
+  const labelsHistoric = data.days.map(d => d.toString());
+  const start = data.forecast_gen.start_day;
+  const forecastLabels = [];
+  for (let i = 0; i < data.forecast_days; i++) forecastLabels.push((start + i).toString());
+
+  // combined labels for x-axis: historic days followed by forecast days
+  const allLabels = labelsHistoric.concat(forecastLabels);
+
+  // dataset: historic gen (solid)
+  const histData = data.gen_series.slice();
+  // pad histData for forecast-length so line is broken (we will have nulls)
+  const histPlot = histData.concat(Array(data.forecast_days).fill(null));
+
+  // forecast line (placed on forecast positions)
+  const fcastPlot = Array(labelsHistoric.length).fill(null).concat(data.forecast_gen.forecast);
+
+  // upper/lower for cone: we will supply upper dataset (null for historic) and lower dataset (null for historic),
+  const upper = Array(labelsHistoric.length).fill(null).concat(data.forecast_gen.upper);
+  const lower = Array(labelsHistoric.length).fill(null).concat(data.forecast_gen.lower);
+
+  // build chart
+  chartGen = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [
+        {
+          label: 'Daily Generation',
+          data: histPlot,
+          borderColor: '#0b69a3',
+          backgroundColor: '#0b69a3',
+          tension: 0.3,
+          pointRadius: 2,
+          borderWidth: 2,
+          spanGaps: false
+        },
+        // forecast line
+        {
+          label: 'Forecast (SES)',
+          data: fcastPlot,
+          borderColor: '#1f8ef0',
+          backgroundColor: '#1f8ef0',
+          borderWidth: 2,
+          tension: 0.3,
+          borderDash: [],     // user requested solid forecast (style B)
+          pointRadius: 3,
+          pointStyle: 'circle',
+        },
+
+        // Upper bound (invisible line)
+        {
+          label: 'Upper',
+          data: upper,
+          borderColor: 'rgba(0,0,0,0)', // invisible
+          backgroundColor: (ctx) => {
+            const area = ctx.chart.chartArea;
+            if (!area) return null;
+            return createGradient(ctx.chart.ctx, area);
+          },
+          fill: '+1', // fill to the next dataset (lower) -> we'll arrange order so it fills correctly
+          tension: 0.3,
+          pointRadius: 0,
+        },
+
+        // Lower bound - used to create filled cone between Upper and Lower
+        {
+          label: 'Lower',
+          data: lower,
+          borderColor: 'rgba(0,0,0,0)',
+          backgroundColor: (ctx) => {
+            const area = ctx.chart.chartArea;
+            if (!area) return null;
+            return createGradient(ctx.chart.ctx, area);
+          },
+          fill: '-1', // fill to previous dataset (Upper)
+          pointRadius: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            label: function(ctx) {
+              const i = ctx.dataIndex;
+              const val = ctx.parsed.y;
+              const label = ctx.dataset.label || '';
+              // if forecast point, show upper/lower too
+              if (label === 'Forecast (SES)') {
+                const idxForecast = i - (data.days.length);
+                if (idxForecast >= 0 && idxForecast < data.forecast_days) {
+                  const f = data.forecast_gen.forecast[idxForecast];
+                  const u = data.forecast_gen.upper[idxForecast];
+                  const l = data.forecast_gen.lower[idxForecast];
+                  return [
+                    `Forecast: ${Number(f).toLocaleString()}`,
+                    `Upper bound: ${Number(u).toLocaleString()}`,
+                    `Lower bound: ${Number(l).toLocaleString()}`
+                  ];
+                }
+              }
+              return `${label}: ${val !== null ? Number(val).toLocaleString() : '—'}`;
+            }
+          }
+        },
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Day' }
+        },
+        y: {
+          title: { display: true, text: 'Sum of Daily Generation' },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+// ---------- Generation hours chart (average gh) ----------
+function drawChartGh(data) {
+  const ctx = document.getElementById("chart-gh").getContext("2d");
+  if (chartGh) chartGh.destroy();
+
+  const labelsHistoric = data.days.map(d => d.toString());
+  const start = data.forecast_gh.start_day;
+  const forecastLabels = [];
+  for (let i = 0; i < data.forecast_days; i++) forecastLabels.push((start + i).toString());
+  const allLabels = labelsHistoric.concat(forecastLabels);
+
+  const histData = data.gh_series.slice();
+  const histPlot = histData.concat(Array(data.forecast_days).fill(null));
+  const fcastPlot = Array(labelsHistoric.length).fill(null).concat(data.forecast_gh.forecast);
+  const upper = Array(labelsHistoric.length).fill(null).concat(data.forecast_gh.upper);
+  const lower = Array(labelsHistoric.length).fill(null).concat(data.forecast_gh.lower);
+
+  chartGh = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [
+        {
+          label: 'Generation Hours (avg)',
+          data: histPlot,
+          borderColor: '#0b69a3',
+          backgroundColor: '#0b69a3',
+          tension: 0.25,
+          borderWidth: 2,
+          pointRadius: 2
+        },
+        {
+          label: 'Forecast (SES)',
+          data: fcastPlot,
+          borderColor: '#46a3ff',
+          backgroundColor: '#46a3ff',
+          borderWidth: 2,
+          tension: 0.25,
+          pointRadius: 3
+        },
+        {
+          label: 'Upper',
+          data: upper,
+          borderColor: 'rgba(0,0,0,0)',
+          backgroundColor: (ctx) => {
+            const area = ctx.chart.chartArea;
+            if (!area) return null;
+            return createGradient(ctx.chart.ctx, area);
+          },
+          fill: '+1',
+          pointRadius: 0
+        },
+        {
+          label: 'Lower',
+          data: lower,
+          borderColor: 'rgba(0,0,0,0)',
+          backgroundColor: (ctx) => {
+            const area = ctx.chart.chartArea;
+            if (!area) return null;
+            return createGradient(ctx.chart.ctx, area);
+          },
+          fill: '-1',
+          pointRadius: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            label: function(ctx) {
+              const label = ctx.dataset.label || '';
+              const i = ctx.dataIndex;
+              if (label === 'Forecast (SES)') {
+                const idx = i - (data.days.length);
+                if (idx >= 0 && idx < data.forecast_days) {
+                  const f = data.forecast_gh.forecast[idx];
+                  const u = data.forecast_gh.upper[idx];
+                  const l = data.forecast_gh.lower[idx];
+                  return [
+                    `Forecast: ${Number(f)}`,
+                    `Upper bound: ${Number(u)}`,
+                    `Lower bound: ${Number(l)}`
+                  ];
+                }
+              }
+              const val = ctx.parsed.y;
+              return `${label}: ${val !== null ? val : '—'}`;
+            }
+          }
+        },
+        legend: { display: false }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Day' } },
+        y: { title: { display: true, text: 'Average of Generation Hours (Decimal)' } }
+      }
+    }
+  });
+}
+
+// ---------- Wire inputs ----------
+document.getElementById("forecast-days").addEventListener("change", loadAndDraw);
+document.getElementById("filter-year").addEventListener("change", loadAndDraw);
+document.getElementById("filter-month").addEventListener("change", loadAndDraw);
+document.getElementById("filter-day").addEventListener("change", loadAndDraw);
+
+// initial load
+loadAndDraw();
+
+// responsive redraw
+window.addEventListener("resize", () => {
+  clearTimeout(window._rs);
+  window._rs = setTimeout(loadAndDraw, 220);
+});
+</script>
+{% endblock %}

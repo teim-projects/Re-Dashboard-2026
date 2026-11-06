@@ -1,0 +1,502 @@
+{% extends "basesolar.html" %}
+{% load static %}
+
+{% block content %}
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+
+:root{
+    --bg:#f2f0ff;
+    --card:#e6e2ff;
+    --panel:#d2cbff;
+    --primary:#4a3aff;
+    --kpi-bg:#c4baff;
+    --text:#1d1b33;
+}
+
+.container{
+    max-width:1350px;
+    margin:30px auto;
+    padding:10px;
+}
+
+/* ---------- KPI CARDS ---------- */
+.kpi-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+}
+
+.kpi{
+    background:var(--kpi-bg);
+    padding:20px;
+    border-radius:14px;
+    box-shadow:0 4px 16px rgba(0,0,0,0.15);
+}
+.kpi-title{
+    font-size:14px;
+    font-weight:600;
+    color:#2d2b3c;
+}
+.kpi-value{
+    font-size:46px;
+    font-weight:800;
+    margin-top:3px;
+    color:#02021b;
+}
+
+/* ---------- FILTER PANEL ---------- */
+.filter-panel{
+    background:var(--panel);
+    padding:16px;
+    border-radius:14px;
+    display:flex;
+    gap:14px;
+    align-items:flex-end;
+    flex-wrap:wrap; /* FIX: prevents overflow */
+    box-shadow:0 4px 16px rgba(0,0,0,0.15);
+}
+
+.filter-panel label{
+    font-size:13px;
+    font-weight:700;
+    color:#2b2a3a;
+}
+.filter-panel select{
+    padding:8px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:white;
+    min-width:110px;
+}
+
+/* Buttons always stay inside layout */
+.btn-group{
+    display:flex;
+    gap:10px;
+    margin-left:auto;
+}
+
+.filter-panel button{
+    padding:8px 16px;
+    background:var(--primary);
+    color:white;
+    font-weight:600;
+    border-radius:8px;
+    border:none;
+    white-space:nowrap;
+}
+
+/* ---------- MAIN GRID ---------- */
+.main-grid{
+    display:grid;
+    grid-template-columns:1fr 520px;
+    gap:16px;
+    margin-top:20px;
+}
+
+.card{
+    background:var(--card);
+    padding:16px;
+    border-radius:14px;
+    box-shadow:0 4px 16px rgba(0,0,0,0.15);
+}
+
+.card-title{
+    font-weight:700;
+    margin-bottom:8px;
+    font-size:16px;
+}
+
+/* ---------- PIVOT ---------- */
+.pivot{
+    max-height:260px;
+    overflow-y:auto;
+    background:white;
+    border-radius:12px;
+    padding:12px;
+    font-size:14px;
+}
+.pivot-year{
+    font-weight:800;
+    font-size:15px;
+    margin-top:10px;
+}
+.pivot-quarter{
+    margin-left:16px;
+    font-weight:700;
+    margin-top:4px;
+}
+.pivot-month{
+    margin-left:34px;
+}
+
+/* ---------- TOOLTIP ---------- */
+.tooltip{
+    position:fixed;
+    padding:12px 16px;
+    background:white;
+    border-radius:12px;
+    box-shadow:0 6px 22px rgba(0,0,0,0.25);
+    display:none;
+    opacity:0;
+    transition:opacity 0.1s ease-in-out;
+    font-size:14px;
+    z-index:9999;
+}
+.tooltip.visible{
+    display:block;
+    opacity:1;
+}
+
+</style>
+
+<div class="container">
+
+    <!-- KPI + Filters -->
+    <div style="display:flex; gap:16px; margin-top:60px;">
+        
+        <!-- KPI Cards -->
+        <div style="flex:1;">
+            <div class="kpi-grid">
+                <div class="kpi">
+                    <div class="kpi-title">Daily Avg</div>
+                    <div class="kpi-value" id="kpi-daily">0</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-title">Monthly Avg</div>
+                    <div class="kpi-value" id="kpi-monthly">0</div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-title">Yearly Avg</div>
+                    <div class="kpi-value" id="kpi-yearly">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div style="width:380px;">
+            <div class="filter-panel">
+
+                <div>
+                    <label>Year</label>
+                    <select id="filter-year"><option value="">All</option></select>
+                </div>
+
+                <div>
+                    <label>Quarter</label>
+                    <select id="filter-quarter">
+                        <option value="">All</option>
+                        <option value="Q1">Q1</option>
+                        <option value="Q2">Q2</option>
+                        <option value="Q3">Q3</option>
+                        <option value="Q4">Q4</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Day</label>
+                    <select id="filter-day"><option value="">All</option></select>
+                </div>
+
+                <!-- FIXED BUTTON SECTION -->
+                <div class="btn-group">
+                    <button id="btn-apply">Apply</button>
+                    <button id="btn-reset" style="background:#444;">Reset</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GRID: Pivot + Yearly + Monthly -->
+    <div class="main-grid">
+
+        <div style="display:grid; gap:16px;">
+
+            <!-- Pivot Table -->
+            <div class="card">
+                <div class="card-title">Pivot Table (Year → Quarter → Month)</div>
+                <div id="pivot-table" class="pivot"></div>
+            </div>
+
+            <!-- Yearly Chart -->
+            <div class="card">
+                <div class="card-title">Yearly Generation & PLF</div>
+                <div id="yearly-chart" style="height:280px;"></div>
+            </div>
+
+        </div>
+
+        <!-- Monthly Chart -->
+        <div class="card">
+            <div class="card-title">Monthly Generation</div>
+            <div id="monthly-chart" style="height:550px;"></div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Global Tooltip -->
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+/* ---------------- Tooltip ---------------- */
+const tooltip = d3.select("#tooltip");
+
+function showTooltip(event, html){
+    const [x,y] = d3.pointer(event, document.body);
+    tooltip.html(html)
+        .style("left",(x+20)+"px")
+        .style("top",(y+20)+"px")
+        .classed("visible",true);
+}
+function hideTooltip(){
+    tooltip.classed("visible",false);
+}
+
+/* ---------------- API ---------------- */
+// ✅ Correct URL from Django
+const API = "{% url 'api_generation_report' %}";
+
+let state = {};
+
+/* ---------------- Helpers ---------------- */
+function fmtNumber(n){
+    n = Number(n) || 0;
+    if(n >= 1e6) return (n/1e6).toFixed(2)+"M";
+    if(n >= 1e3) return (n/1e3).toFixed(1)+"K";
+    return n.toLocaleString();
+}
+
+/* ---------------- Filters ---------------- */
+const filterYear = document.getElementById("filter-year");
+const filterQuarter = document.getElementById("filter-quarter");
+const filterDay = document.getElementById("filter-day");
+
+function populateFilters(){
+    if(!state.years) return;
+    filterYear.innerHTML = "<option value=''>All</option>";
+    state.years.forEach(y=>{
+        filterYear.innerHTML += `<option value="${y}">${y}</option>`;
+    });
+}
+
+/* ---------------- Fetch Data ---------------- */
+async function fetchData(){
+    try {
+        const params = new URLSearchParams();
+        if(filterYear.value) params.append("year", filterYear.value);
+        if(filterQuarter.value) params.append("quarter", filterQuarter.value);
+        if(filterDay.value) params.append("day", filterDay.value);
+
+        const url = API + "?" + params.toString();
+        console.log("Fetching:", url);
+
+        const res = await fetch(url);
+        if(!res.ok) throw new Error("HTTP " + res.status);
+
+        const data = await res.json();
+        console.log("API DATA:", data);
+
+        state = data;
+
+        populateFilters();
+        renderKPIs();
+        renderPivot();
+        renderYearlyChart();
+        renderMonthlyChart();
+
+    } catch(err){
+        console.error("Fetch failed:", err);
+    }
+}
+
+/* ---------------- KPI Rendering ---------------- */
+function renderKPIs(){
+    if(!state.kpis) return;
+    document.getElementById("kpi-daily").innerHTML = fmtNumber(state.kpis.daily_avg);
+    document.getElementById("kpi-monthly").innerHTML = fmtNumber(state.kpis.monthly_avg);
+    document.getElementById("kpi-yearly").innerHTML = fmtNumber(state.kpis.yearly_avg);
+}
+
+/* ---------------- Pivot Rendering ---------------- */
+function renderPivot(){
+    const div = document.getElementById("pivot-table");
+    div.innerHTML = "";
+
+    if(!state.pivot_rows || !state.pivot_rows.length){
+        div.innerHTML = "<em>No data</em>";
+        return;
+    }
+
+    const grouped = {};
+
+    state.pivot_rows.forEach(row=>{
+        if(!grouped[row.year]) grouped[row.year] = {};
+        if(!grouped[row.year][row.quarter])
+            grouped[row.year][row.quarter] = {total:0, months:[]};
+
+        if(row.type === "quarter"){
+            grouped[row.year][row.quarter].total = row.quarter_total;
+        } else {
+            grouped[row.year][row.quarter].months.push(row);
+        }
+    });
+
+    Object.keys(grouped).forEach(year=>{
+        div.innerHTML += `<div class="pivot-year">${year}</div>`;
+        Object.keys(grouped[year]).forEach(q=>{
+            div.innerHTML += `
+                <div class="pivot-quarter">${q} — Total: ${fmtNumber(grouped[year][q].total)}</div>
+            `;
+            grouped[year][q].months.forEach(m=>{
+                div.innerHTML += `
+                    <div class="pivot-month">
+                        ${m.month}: ${fmtNumber(m.total_daily_generation)}
+                    </div>
+                `;
+            });
+        });
+    });
+}
+
+/* ---------------- Yearly Chart ---------------- */
+function renderYearlyChart(){
+    const el = document.getElementById("yearly-chart");
+    el.innerHTML = "";
+
+    if(!state.yearly_trend || !state.yearly_trend.length) return;
+
+    const data = state.yearly_trend;
+    const width = el.clientWidth - 80;
+    const height = 220;
+
+    const svg = d3.select(el).append("svg")
+        .attr("width", width + 100)
+        .attr("height", height + 60);
+
+    const g = svg.append("g").attr("transform","translate(50,20)");
+
+    const x = d3.scalePoint()
+        .domain(data.map(d=>d.year))
+        .range([0,width]);
+
+    const yGen = d3.scaleLinear()
+        .domain([0, d3.max(data,d=>d.yearly_sum)*1.2])
+        .range([height,0]);
+
+    const yPLF = d3.scaleLinear()
+        .domain([0, d3.max(data,d=>d.plf_yearly)*1.2])
+        .range([height,0]);
+
+    g.append("g").attr("transform",`translate(0,${height})`).call(d3.axisBottom(x));
+    g.append("g").call(d3.axisLeft(yGen).tickFormat(fmtNumber));
+    g.append("g").attr("transform",`translate(${width},0)`)
+        .call(d3.axisRight(yPLF));
+
+    const genLine = d3.line()
+        .x(d=>x(d.year))
+        .y(d=>yGen(d.yearly_sum));
+
+    g.append("path")
+        .datum(data)
+        .attr("d",genLine)
+        .attr("fill","none")
+        .attr("stroke","#4a3aff")
+        .attr("stroke-width",3);
+
+    const plfLine = d3.line()
+        .x(d=>x(d.year))
+        .y(d=>yPLF(d.plf_yearly));
+
+    g.append("path")
+        .datum(data)
+        .attr("d",plfLine)
+        .attr("fill","none")
+        .attr("stroke","#ff7f0e")
+        .attr("stroke-width",2)
+        .attr("stroke-dasharray","6 4");
+
+    g.selectAll(".gen-pt")
+        .data(data)
+        .enter().append("circle")
+        .attr("cx",d=>x(d.year))
+        .attr("cy",d=>yGen(d.yearly_sum))
+        .attr("r",5)
+        .attr("fill","#4a3aff")
+        .on("mousemove",(e,d)=>showTooltip(e,
+            `<b>${d.year}</b><br>Gen: ${fmtNumber(d.yearly_sum)}<br>PLF: ${d.plf_yearly}%`
+        ))
+        .on("mouseout",hideTooltip);
+}
+
+/* ---------------- Monthly Chart ---------------- */
+function renderMonthlyChart(){
+    const el = document.getElementById("monthly-chart");
+    el.innerHTML = "";
+
+    if(!state.monthly_by_year) return;
+    const years = Object.keys(state.monthly_by_year);
+    if(!years.length) return;
+
+    const data = state.monthly_by_year[years[years.length-1]];
+
+    const width = el.clientWidth - 80;
+    const height = 460;
+
+    const svg = d3.select(el).append("svg")
+        .attr("width", width + 100)
+        .attr("height", height + 60);
+
+    const g = svg.append("g").attr("transform","translate(60,20)");
+
+    const x = d3.scaleBand()
+        .domain(data.map(d=>d.month_name))
+        .range([0,width])
+        .padding(0.2);
+
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(data,d=>d.gen)*1.2])
+        .range([height,0]);
+
+    g.append("g")
+        .attr("transform",`translate(0,${height})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("transform","rotate(-30)")
+        .style("text-anchor","end");
+
+    g.append("g").call(d3.axisLeft(y).tickFormat(fmtNumber));
+
+    g.selectAll("rect")
+        .data(data)
+        .enter().append("rect")
+        .attr("x",d=>x(d.month_name))
+        .attr("y",d=>y(d.gen))
+        .attr("width",x.bandwidth())
+        .attr("height",d=>height-y(d.gen))
+        .attr("fill","#4a3aff")
+        .on("mousemove",(e,d)=>showTooltip(e,
+            `<b>${d.month_name}</b><br>Gen: ${fmtNumber(d.gen)}`
+        ))
+        .on("mouseout",hideTooltip);
+}
+
+/* ---------------- Events ---------------- */
+document.getElementById("btn-apply").onclick = fetchData;
+document.getElementById("btn-reset").onclick = ()=>{
+    filterYear.value="";
+    filterQuarter.value="";
+    filterDay.value="";
+    fetchData();
+};
+
+/* ---------------- Initial Load ---------------- */
+fetchData();
+</script>
+
+
+{% endblock %}         
