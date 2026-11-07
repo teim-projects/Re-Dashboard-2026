@@ -20,6 +20,7 @@ urlpatterns = [
     path('wind_breakdown_log/', cd_views.wind_breakdown_log, name="wind_breakdown_log"),
     path('wind_Avg_Machine_Availability/', cd_views.wind_Avg_Machine_Availability, name="wind_Avg_Machine_Availability"),
     path('customer_upload/', cd_views.customer_upload, name="customer_upload"),
+    path('breakdown-classification/', cd_views.breakdown_classification_results, name="breakdown_classification_results"),
     path('Modifydata/', cd_views.Modifydata, name="Modifydata"),
     path('wind_wtg_plf/', cd_views.wind_wtg_plf, name="wind_wtg_plf"),
     path('wind_Grid_Availability/', cd_views.wind_Grid_Availability, name="wind_Grid_Availability"),
@@ -36,6 +37,7 @@ urlpatterns = [
     path('user_completed_maintenance', cd_views.user_completed_maintenance, name='user_completed_maintenance'),
     path('user_pm_report_dashboard', cd_views.user_pm_report_dashboard, name='user_pm_report_dashboard'),
     path("breakdown_analysis", cd_views.breakdown_analysis, name="breakdown_analysis"),
+    path("recurrence-risk/", cd_views.recurrence_risk, name="recurrence_risk"),
     path("customer_upload_dsm", cd_views.customer_upload_dsm, name="customer_upload_dsm"),
 path("email_breakdown_alerts/", cd_views.email_breakdown_alerts, name="email_breakdown_alerts"),
 

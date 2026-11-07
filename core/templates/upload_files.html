@@ -45,6 +45,10 @@
     gap: 15px;
     margin-top: 20px;
   }
+  .classification-link {
+    text-align: center;
+    margin-top: 16px;
+  }
 
   @media (max-width: 576px) {
     .form-heading {
@@ -125,6 +129,12 @@
                     <option value="{{ table.name|lower }}">{{ table.label }}</option>
                   {% endfor %}
                 </select>
+                {% if not expected_tables %}
+                  <div class="form-text text-danger">
+                    No provider tables were found. Create the provider structure first and ensure
+                    its table belongs to a configured user, provider, and energy type.
+                  </div>
+                {% endif %}
               </div>
 
               
@@ -138,6 +148,14 @@
               <button type="submit" class="btn btn-success btn-custom">📤 Upload File</button>
             </div>
           </form>
+          {% if request.user.is_staff %}
+            <div class="classification-link">
+              <button type="button" class="btn btn-outline-primary" id="classificationReviewButton">
+                View breakdown classification scores
+              </button>
+              <div class="form-text mt-2">Select a provider table above; its breakdown records will be opened.</div>
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -173,6 +191,21 @@
   document.getElementById("userSelect").addEventListener("change", autoSelectTable);
   document.getElementById("providerSelect").addEventListener("change", autoSelectTable);
   document.getElementById("energySelect").addEventListener("change", autoSelectTable);
+  const classificationReviewButton = document.getElementById("classificationReviewButton");
+  if (classificationReviewButton) {
+    classificationReviewButton.addEventListener("click", () => {
+      const table = document.getElementById("tableSelect").value;
+      if (!table) {
+        alert("Select a provider table first.");
+        return;
+      }
+      const breakdownTable = table.toLowerCase().endsWith("_breakdowndata")
+        ? table
+        : `${table}_breakdowndata`;
+      const resultsUrl = "{% url 'breakdown_classification_results' %}";
+      window.location.href = `${resultsUrl}?table=${encodeURIComponent(breakdownTable)}`;
+    });
+  }
 </script>
 
 

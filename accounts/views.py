@@ -254,7 +254,10 @@ from accounts.models import Provider, EnergyType
 import pandas as pd
 import os
 import re
-import xlrd
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 from openpyxl import Workbook
 
 from django.contrib.auth.decorators import login_required
@@ -266,7 +269,10 @@ from django.contrib.auth.models import User
 import pandas as pd
 import os
 import re
-import xlrd
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 from openpyxl import Workbook
 from accounts.models import UserProvider 
 from accounts.models import Provider, EnergyType
@@ -288,7 +294,10 @@ def convert_xls_to_xlsx(xls_path, xlsx_path):
 
 import os
 import re
-import xlrd
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 import pandas as pd
 from openpyxl import Workbook
 
@@ -299,7 +308,8 @@ from django.core.files.storage import FileSystemStorage
 from django.db import connection
 from django.contrib.auth.models import User
 
-from accounts.models import Provider, EnergyType, UserProvider
+from accounts.models import Provider, EnergyType, UserProvider, ProviderColumnMapping
+from accounts.breakdown_mapping import MULTI_SOURCE_BREAKDOWN_FIELDS, REQUIRED_BREAKDOWN_FIELDS
 
 
 # --- helper: convert old .xls to .xlsx ---
@@ -314,6 +324,168 @@ def convert_xls_to_xlsx(xls_path, xlsx_path):
 
     wb.save(xlsx_path)
     return xlsx_path
+
+
+BREAKDOWN_CANONICAL_FIELDS = [
+    {"name": "user_id", "label": "User", "sql": "BIGINT NULL", "system": True},
+    {"name": "rds_code", "label": "RDS-PP code", "sql": "VARCHAR(50) DEFAULT 'UNCATEGORIZED'", "internal": True},
+    {"name": "system_name", "label": "System name", "sql": "VARCHAR(150) DEFAULT 'General Maintenance'", "internal": True},
+    {"name": "standard_component", "label": "Standard component", "sql": "VARCHAR(150) DEFAULT 'Unmapped Remark'", "internal": True},
+    {"name": "provider_id", "label": "Provider", "sql": "BIGINT NULL", "system": True},
+    {"name": "classification_status", "label": "Classification status", "sql": "VARCHAR(16) DEFAULT 'PENDING'", "system": True},
+    {"name": "classification_confidence", "label": "Classification confidence", "sql": "FLOAT NULL", "system": True},
+    {"name": "classification_processed_at", "label": "Classification processed at", "sql": "DATETIME NULL", "system": True},
+    {"name": "record_fingerprint", "label": "Record fingerprint", "sql": "CHAR(64) NULL", "system": True},
+    {"name": "site", "label": "Site", "sql": "VARCHAR(150) NULL"},
+    {"name": "state", "label": "State", "sql": "VARCHAR(100) NULL"},
+    {"name": "gen_date", "label": "Event date", "sql": "DATE NULL"},
+    {"name": "loc_no", "label": "Machine / asset ID", "sql": "VARCHAR(100) NULL"},
+    {"name": "breakdown_remarks", "label": "Breakdown remarks", "sql": "TEXT NULL"},
+    {"name": "start_time", "label": "Start time", "sql": "DATETIME NULL"},
+    {"name": "end_time", "label": "End time", "sql": "DATETIME NULL"},
+    {"name": "duration_hrs", "label": "Duration (hours)", "sql": "FLOAT DEFAULT 0"},
+    {"name": "event_category", "label": "Event category", "sql": "VARCHAR(32) NULL"},
+]
+
+BREAKDOWN_HEADER_ALIASES = {
+    "rds_code": {"rds_code", "rds_pp_code", "equipment_code"},
+    "system_name": {"system_name", "system", "subsystem"},
+    "standard_component": {"standard_component", "component", "equipment_component"},
+    "site": {"site", "site_name", "wind_farm", "wind_farm_name", "plant", "plant_name", "project", "project_name", "location"},
+    "state": {"state", "state_name", "statename"},
+    "gen_date": {"gen_date", "date", "breakdown_date", "event_date", "generation_date"},
+    "loc_no": {"loc_no", "loc_no_", "location_no", "location_number", "wtg", "wtg_no", "wec", "machine_id", "asset_id"},
+    "breakdown_remarks": {"breakdown_remarks", "remarks", "remark", "breakdown_details", "description", "event_description"},
+    "start_time": {"start_time", "breakdown_start", "start_datetime"},
+    "end_time": {"end_time", "breakdown_end", "end_datetime"},
+    "duration_hrs": {"duration_hrs", "duration_hours", "duration", "hours", "breakdown_hours"},
+    "event_category": {"event_category", "category", "breakdown_category", "event_type"},
+}
+
+
+def _clean_structure_header(value):
+    return re.sub(r"\W+", "_", str(value).strip()).lower().strip("_")[:255]
+
+
+def _read_provider_structure(file_path, file_ext):
+    if file_ext == ".csv":
+        return {"main": pd.read_csv(file_path)}
+    if file_ext in {".xlsx", ".xlsm"}:
+        return pd.read_excel(file_path, sheet_name=None, engine="openpyxl")
+    if file_ext == ".xlsb":
+        return pd.read_excel(file_path, sheet_name=None, engine="pyxlsb")
+    if file_ext == ".ods":
+        return pd.read_excel(file_path, sheet_name=None, engine="odf")
+    if file_ext == ".xls":
+        return pd.read_excel(file_path, sheet_name=None, engine="xlrd")
+    raise ValueError(f"Unsupported file type: {file_ext}")
+
+
+def _suggest_breakdown_mapping(headers):
+    suggestions = {}
+    used_canonical = set()
+    for header in headers:
+        for field in BREAKDOWN_CANONICAL_FIELDS:
+            canonical = field["name"]
+            if field.get("system") or field.get("internal") or canonical in used_canonical:
+                continue
+            if header in BREAKDOWN_HEADER_ALIASES[canonical] or header == canonical:
+                suggestions[header] = canonical
+                used_canonical.add(canonical)
+                break
+    return suggestions
+
+
+def _create_provider_structure_tables(pending):
+    provider_name = pending["provider_name"]
+    energy_type_name = pending["energy_type_name"]
+    selected_username = pending["selected_username"]
+    provider_obj, _ = Provider.objects.get_or_create(name=provider_name)
+    UserProvider.objects.get_or_create(user_id=pending["user_id"], provider=provider_obj)
+    created_tables = []
+    mappings_by_sheet = pending.get("mappings", {})
+
+    for sheet_index, sheet in enumerate(pending["sheets"]):
+        if not sheet["headers"]:
+            continue
+        is_breakdown = "breakdown" in sheet["name"].strip().lower()
+        base_name = f"{selected_username}_{provider_name}_{energy_type_name}"
+        table_name = f"{base_name}_breakdowndata" if is_breakdown else base_name
+
+        if is_breakdown:
+            mapping = mappings_by_sheet.get(str(sheet_index), {})
+            selected = list(mapping.items())
+            required = REQUIRED_BREAKDOWN_FIELDS
+            mapped_canonical = {canonical for _, canonical in selected}
+            missing = required - mapped_canonical
+            if missing:
+                raise ValueError(
+                    "Map a source column to each required field before continuing: "
+                    + ", ".join(sorted(missing))
+                )
+            column_defs = [
+                f"`{field['name']}` {field['sql']}"
+                for field in BREAKDOWN_CANONICAL_FIELDS
+            ]
+        else:
+            headers = list(dict.fromkeys(sheet["headers"]))
+            if "solar" in energy_type_name:
+                for required_header in ("date", "site", "location"):
+                    if required_header not in headers:
+                        headers.append(required_header)
+            column_defs = []
+            for header in headers:
+                if "solar" in energy_type_name and header == "date":
+                    column_defs.append("`date` DATE NULL")
+                elif "solar" in energy_type_name and header in {"site", "location"}:
+                    column_defs.append(f"`{header}` VARCHAR(255) NULL")
+                else:
+                    column_defs.append(f"`{header}` TEXT NULL")
+
+        column_names = {definition.split("`", 2)[1] for definition in column_defs}
+        for metadata_column in ("provider", "energy_type", "uploaded_by"):
+            if metadata_column not in column_names:
+                column_defs.append(f"`{metadata_column}` TEXT NULL")
+
+        if "solar" in energy_type_name and not is_breakdown:
+            create_sql = f"""
+                CREATE TABLE IF NOT EXISTS `{table_name}` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    {", ".join(column_defs)},
+                    UNIQUE KEY uniq_record (`date`, `site`, `location`)
+                )
+            """
+        else:
+            create_sql = f"""
+                CREATE TABLE IF NOT EXISTS `{table_name}` (
+                    `id` INT AUTO_INCREMENT PRIMARY KEY,
+                    {", ".join(column_defs)}
+                )
+            """
+        with connection.cursor() as cursor:
+            cursor.execute(create_sql)
+            if is_breakdown:
+                cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+                existing_columns = {row[0].lower() for row in cursor.fetchall()}
+                for field in BREAKDOWN_CANONICAL_FIELDS:
+                    if field["name"] not in existing_columns:
+                        cursor.execute(
+                            f"ALTER TABLE `{table_name}` ADD COLUMN "
+                            f"`{field['name']}` {field['sql']}"
+                        )
+                ProviderColumnMapping.objects.filter(table_name=table_name).delete()
+                ProviderColumnMapping.objects.bulk_create([
+                    ProviderColumnMapping(
+                        table_name=table_name,
+                        source_header=source,
+                        canonical_header=canonical,
+                        user_id=pending["user_id"],
+                        provider=provider_obj,
+                    )
+                    for source, canonical in selected
+                ])
+        created_tables.append(table_name)
+    return created_tables
 
 
 @login_required
@@ -353,6 +525,172 @@ def add_provider_with_structure(request):
                 messages.success(request, "Provider and all related tables deleted successfully.")
             except Exception as e:
                 messages.error(request, f"Error deleting provider: {str(e)}")
+            return redirect("add_provider")
+
+        if request.POST.get("action") == "preview_structure":
+            provider_name = re.sub(
+                r"[^a-z0-9_]+",
+                "_",
+                request.POST.get("provider_name", "").strip().lower().replace(" ", "_"),
+            ).strip("_")
+            selected_username = request.POST.get("selected_user", "").strip().lower()
+            energy_type_id = request.POST.get("energy_type")
+            structure_file = request.FILES.get("structure_file")
+
+            if not all([provider_name, selected_username, energy_type_id, structure_file]):
+                messages.error(request, "User, provider, energy type, and structure file are required.")
+                return redirect("add_provider")
+
+            try:
+                user_obj = User.objects.get(username=selected_username, is_superuser=False)
+                energy_type = EnergyType.objects.get(id=energy_type_id)
+            except (User.DoesNotExist, EnergyType.DoesNotExist):
+                messages.error(request, "Select a valid user and energy type.")
+                return redirect("add_provider")
+
+            energy_type_name = re.sub(
+                r"[^a-z0-9_]+",
+                "_",
+                energy_type.name.strip().lower().replace(" ", "_"),
+            ).strip("_")
+            fs = FileSystemStorage()
+            filename = fs.save(structure_file.name, structure_file)
+            try:
+                sheets = _read_provider_structure(
+                    fs.path(filename),
+                    os.path.splitext(filename)[1].lower(),
+                )
+                pending_sheets = []
+                for sheet_name, dataframe in sheets.items():
+                    headers = [_clean_structure_header(header) for header in dataframe.columns]
+                    headers = [header for header in headers if header]
+                    if headers:
+                        pending_sheets.append({"name": str(sheet_name), "headers": headers})
+                if not pending_sheets:
+                    raise ValueError("The uploaded file does not contain any column headers.")
+            except Exception as error:
+                messages.error(request, f"Could not read the structure file: {error}")
+                return redirect("add_provider")
+            finally:
+                fs.delete(filename)
+
+            pending = {
+                "provider_name": provider_name,
+                "selected_username": user_obj.username.lower(),
+                "user_id": user_obj.id,
+                "energy_type_name": energy_type_name,
+                "sheets": pending_sheets,
+            }
+            breakdown_sheets = []
+            for sheet_index, sheet in enumerate(pending_sheets):
+                if "breakdown" not in sheet["name"].strip().lower():
+                    continue
+                suggestions = _suggest_breakdown_mapping(sheet["headers"])
+                breakdown_sheets.append({
+                    "index": sheet_index,
+                    "name": sheet["name"],
+                    "headers": [
+                        {
+                            "index": header_index,
+                            "name": header,
+                            "mapped_to": suggestions.get(header, ""),
+                        }
+                        for header_index, header in enumerate(sheet["headers"])
+                    ],
+                })
+
+            if not breakdown_sheets:
+                try:
+                    created_tables = _create_provider_structure_tables(pending)
+                    messages.success(request, f"Created tables: {', '.join(created_tables)}")
+                except Exception as error:
+                    messages.error(request, f"Could not create provider tables: {error}")
+                return redirect("add_provider")
+            if len(breakdown_sheets) > 1:
+                messages.error(
+                    request,
+                    "Only one breakdown sheet can be configured per provider table. "
+                    "Please upload a structure file with a single breakdown sheet.",
+                )
+                return redirect("add_provider")
+
+            request.session["pending_provider_structure"] = pending
+            return render(request, "add_provider.html", {
+                "providers": Provider.objects.all(),
+                "energy_types": energy_types,
+                "users": staff_users,
+                "breakdown_wizard": True,
+                "breakdown_sheets": breakdown_sheets,
+                "canonical_fields": [
+                    field for field in BREAKDOWN_CANONICAL_FIELDS
+                    if not field.get("system") and not field.get("internal")
+                ],
+                "multi_source_fields": sorted(MULTI_SOURCE_BREAKDOWN_FIELDS),
+                "provider_name": provider_name.replace("_", " ").title(),
+                "energy_type_name": energy_type.name,
+                "selected_username": user_obj.username,
+            })
+
+        if request.POST.get("action") == "confirm_structure":
+            pending = request.session.get("pending_provider_structure")
+            if not pending:
+                messages.error(request, "The structure preview expired. Please upload the structure file again.")
+                return redirect("add_provider")
+
+            mappings = {}
+            try:
+                for sheet_index, sheet in enumerate(pending["sheets"]):
+                    if "breakdown" not in sheet["name"].strip().lower():
+                        continue
+                    mapping = {}
+                    used_canonical = set()
+                    for header_index, source_header in enumerate(sheet["headers"]):
+                        canonical = request.POST.get(f"map_{sheet_index}_{header_index}", "").strip()
+                        if not canonical:
+                            continue
+                        canonical_field = next(
+                            (
+                                field for field in BREAKDOWN_CANONICAL_FIELDS
+                                if field["name"] == canonical
+                                and not field.get("system")
+                                and not field.get("internal")
+                            ),
+                            None,
+                        )
+                        if not canonical_field:
+                            raise ValueError(f"Invalid canonical field selected for '{source_header}'.")
+                        if (
+                            canonical in used_canonical
+                            and canonical not in MULTI_SOURCE_BREAKDOWN_FIELDS
+                        ):
+                            raise ValueError(
+                                f"More than one source column is mapped to '{canonical}'. "
+                                "Only asset ID and remarks support combining source columns."
+                            )
+                        mapping[source_header] = canonical
+                        used_canonical.add(canonical)
+                    required_fields = REQUIRED_BREAKDOWN_FIELDS
+                    missing_fields = required_fields - used_canonical
+                    if missing_fields:
+                        raise ValueError(
+                            "Every breakdown sheet must map Event date, Machine / asset ID, "
+                            "and Breakdown remarks. Missing: "
+                            + ", ".join(sorted(missing_fields))
+                        )
+                    mappings[str(sheet_index)] = mapping
+
+                pending["mappings"] = mappings
+                created_tables = _create_provider_structure_tables(pending)
+            except Exception as error:
+                messages.error(request, f"Could not create provider tables: {error}")
+                return redirect("add_provider")
+
+            request.session.pop("pending_provider_structure", None)
+            messages.success(request, f"Created tables: {', '.join(created_tables)}")
+            return redirect("add_provider")
+
+        if request.POST.get("action") == "cancel_structure":
+            request.session.pop("pending_provider_structure", None)
             return redirect("add_provider")
 
         # ------------------ ADD provider & create tables ------------------
@@ -601,7 +939,10 @@ from django.contrib.auth.models import User
 import pandas as pd
 import os
 import re
-import xlrd
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 from openpyxl import Workbook
 from accounts.models import EnergyType
 
@@ -612,7 +953,11 @@ from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 from django.db import connection
 import pandas as pd
-import os, re, xlrd
+import os, re
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 from openpyxl import Workbook
 
 
@@ -781,7 +1126,10 @@ from django.db import connection
 import pandas as pd
 import os
 import re
-import xlrd
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 from openpyxl import Workbook
 
 # ---------- constants ----------
@@ -793,7 +1141,11 @@ from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 from django.db import connection
 import pandas as pd
-import os, re, xlrd
+import os, re
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 from openpyxl import Workbook
 
 PM_TABLE_NAME = "preventive_maintenance_data"
@@ -950,17 +1302,4 @@ def add_pm_structure(request):
         "pm_table_name": PM_TABLE_NAME,
         "table_exists": table_exists,
     })
-
-
-
-
-
-
-
-
-
-
-
-
-
 

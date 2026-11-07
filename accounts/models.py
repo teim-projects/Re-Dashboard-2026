@@ -41,6 +41,76 @@ class UserProvider(models.Model):
     def __str__(self):
         return f"{self.user.username} ↔ {self.provider.name}"
 
+class ProviderColumnMapping(models.Model):
+    table_name = models.CharField(max_length=255, db_index=True)
+    source_header = models.CharField(max_length=255)
+    canonical_header = models.CharField(max_length=64)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+    provider = models.ForeignKey(Provider, on_delete=models.CASCADE, null=True, blank=True)
+
+    class Meta:
+        unique_together = ("table_name", "source_header")
+
+    def __str__(self):
+        return f"{self.table_name}: {self.source_header} → {self.canonical_header}"
+
+
+class RDSCatalog(models.Model):
+    rds_code = models.CharField(max_length=50, primary_key=True, db_index=True)
+    system_code = models.CharField(max_length=10, db_index=True)
+    system_name = models.CharField(max_length=150, db_index=True)
+    standard_component = models.CharField(max_length=150)
+    subsystem_name = models.CharField(max_length=150, blank=True, default="")
+    canonical_keywords = models.TextField(blank=True, default="")
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "rds_catalog"
+        verbose_name = "RDS-PP Master Taxonomy"
+        ordering = ["system_code", "rds_code"]
+
+    def __str__(self):
+        return f"{self.rds_code} - {self.standard_component}"
+
+
+class BreakdownClassificationJob(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        PROCESSING = "PROCESSING", "Processing"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    table_name = models.CharField(max_length=255)
+    record_id = models.PositiveBigIntegerField()
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "breakdown_classification_job"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["table_name", "record_id"],
+                name="uniq_breakdown_classification_record",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "created_at"], name="bd_job_status_created"),
+        ]
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return f"{self.table_name}#{self.record_id} ({self.status})"
+
+
 
 # accounts/models.py
 from django.db import models

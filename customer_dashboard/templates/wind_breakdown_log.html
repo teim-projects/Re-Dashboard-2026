@@ -14,6 +14,9 @@
     <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#providerModal">
       <i class="fas fa-filter"></i> OEM PROVIDER
     </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#uploadedByModal">
+      <i class="fas fa-filter"></i> UPLOADED BY
+    </button>
     <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#customerModal">
       <i class="fas fa-filter"></i> CUSTOMER
     </button>
@@ -29,11 +32,12 @@
 
       <!-- Active filters chips -->
   <div class="d-flex flex-wrap align-items-center gap-2 mb-3" >
-    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+    {% if date_from or date_to or selected_providers or selected_uploaded_by or selected_customers or selected_states or selected_sites or selected_wtgs %}
       <span class="badge bg-secondary">Active filters:</span>
       {% if date_from %}<span class="badge bg-light text-dark">From: {{ date_from }}</span>{% endif %}
       {% if date_to %}<span class="badge bg-light text-dark">To: {{ date_to }}</span>{% endif %}
       {% for x in selected_providers %}<span class="badge bg-info text-dark">Provider: {{ x }}</span>{% endfor %}
+      {% for x in selected_uploaded_by %}<span class="badge bg-info text-dark">Uploaded by: {{ x }}</span>{% endfor %}
       {% for x in selected_customers %}<span class="badge bg-info text-dark">Customer: {{ x }}</span>{% endfor %}
       {% for x in selected_states %}<span class="badge bg-info text-dark">State: {{ x }}</span>{% endfor %}
       {% for x in selected_sites %}<span class="badge bg-info text-dark">Site: {{ x }}</span>{% endfor %}
@@ -100,6 +104,31 @@
 <!-- Customer, State, Site, WTG modals same as you provided -->
 <!-- ... (kept unchanged for brevity) ... -->
  
+<!-- Uploaded By Modal -->
+<div class="modal fade" id="uploadedByModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select uploader(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for uploader in uploaded_by_options %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="uploaded_by" value="{{ uploader }}"
+              {% if not selected_uploaded_by or uploader in selected_uploaded_by %}checked{% endif %}>
+            <label class="form-check-label">{{ uploader }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No uploader information found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "uploaded_by" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
 <!-- Customer Modal -->
 <div class="modal fade" id="customerModal" tabindex="-1">
   <div class="modal-dialog">
@@ -218,7 +247,8 @@
         <th>State</th>
         <th>Site</th>
         <th>WTG No.</th>
-
+        <th>Provider</th>
+        <th>Uploaded By</th>
         <th>Breakdown Remark</th>
         <th>Breakdown Hours</th>
       </tr>
@@ -231,13 +261,14 @@
           <td>{{ row.state }}</td>
           <td>{{ row.site }}</td>
           <td>{{ row.wtg|default:"-" }}</td>
-
+          <td>{{ row.provider|default:"-" }}</td>
+          <td>{{ row.uploaded_by|default:"-" }}</td>
           <td>{{ row.remark|default:"-" }}</td>
           <td>{{ row.breakdown_hours|default:"0" }}</td>
         </tr>
         {% endfor %}
       {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-3">No breakdown data found.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-3">No breakdown data found.</td></tr>
       {% endif %}
     </tbody>
   </table>

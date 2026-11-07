@@ -7,7 +7,14 @@
 {% for a in alerts %}
 <div style="margin-bottom:12px; padding:10px; border-left:5px solid #4ea8de; background:#f5f7fa;">
     <strong>WTG {{ a.machine }}</strong><br>
+    {% if a.is_extended %}
+    <b>Component:</b> {{ a.component }}<br>
+    <b>Duration:</b> {{ a.duration_hours }} hours<br>
+    <b>Component P90:</b> {{ a.p90_hours }} hours<br>
+    <b>Above threshold:</b> {{ a.excess_hours }} hours<br>
+    {% else %}
     <b>Severity:</b> {{ a.severity }}<br>
+    {% endif %}
     <b>Date:</b> {{ a.date }}<br>
     <b>Message:</b> {{ a.message }}<br>
  </div>

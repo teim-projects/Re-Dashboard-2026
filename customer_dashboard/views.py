@@ -1,232 +1,20 @@
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.shortcuts import render, redirect
+from django.shortcuts import render
+
+def wind_dashboard(request):
+    return render(request, 'wind_dashboard.html')  # Wind Dashboard
+
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.db import connection
+from django.db.utils import ProgrammingError
+
+from django.shortcuts import render
 from django.db import connection
 from django.contrib.auth.decorators import login_required
 from django.db.utils import ProgrammingError
-from collections import defaultdict
-from datetime import datetime, date, timedelta
-import json
-import re
-
-def normalize(col):
-    """Normalize column name for comparison"""
-    return re.sub(r'[^a-z0-9]+', '_', col.lower()).strip('_')
-
-def _pick(col_map, *candidates):
-    """Match candidate names against actual columns (case/space/dot insensitive)."""
-    for cand in candidates:
-        cand_norm = normalize(cand)
-        for k, v in col_map.items():
-            if normalize(k) == cand_norm:
-                return v
-    return None
-
-@login_required
-def wind_dashboard(request):
-    """
-    Executive Overview Dashboard for Wind Fleet
-    Implements 12 Priority Visuals - Section 1: Executive Overview
-    """
-    user = request.user.username.lower()
-    is_admin = request.user.is_superuser or user == 'admin'
-
-    with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES;")
-        all_tables = [r[0] for r in cursor.fetchall()]
-
-    if is_admin:
-        gen_tables = [t for t in all_tables if t.endswith('_wind') and 'breakdown' not in t]
-        bd_tables = [t for t in all_tables if 'breakdown' in t and t.endswith('_wind_breakdowndata')]
-    else:
-        gen_tables = [t for t in all_tables if t.startswith(user + '_') and t.endswith('_wind')]
-        bd_tables = [t for t in all_tables if t.startswith(user + '_') and 'breakdown' in t]
-
-    total_gen = 0.0
-    ma_list = []
-    plf_list = []
-    wtg_set = set()
-    total_downtime = 0.0
-    zero_gen_wtgs = set()
-
-    wtg_gens = defaultdict(float)
-    wtg_ma_dict = defaultdict(list)
-    wtg_plf_dict = defaultdict(list)
-    monthly_gen = defaultdict(float)
-    oem_gen = defaultdict(float)
-    heatmap_matrix = defaultdict(lambda: defaultdict(float))
-    all_months = set()
-
-    for gt in gen_tables:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{gt}`")
-            cols = [r[0] for r in cursor.fetchall()]
-        col_map = {normalize(c): c for c in cols}
-
-        wtg_col = _pick(col_map, "location_no", "turbine_id", "wtg", "wtg_no", "loc_no", "wec", "location")
-        gen_col = _pick(col_map, "wtg_production_kwh", "gen_kwh_day", "gen_kwh", "generation", "kwh")
-        date_col = _pick(col_map, "date", "gen_date")
-        ma_col = _pick(col_map, "wtg_availability", "machine_availability", "actual_ma", "corrected_ma")
-        plf_col = _pick(col_map, "plf_wtg_efficiency", "plf", "monthly_plf")
-
-        oem_name = "OEM"
-        gt_lower = gt.lower()
-        if "senvion" in gt_lower: oem_name = "Senvion"
-        elif "regen" in gt_lower: oem_name = "Regen"
-        elif "gamesa" in gt_lower: oem_name = "Gamesa"
-        elif "inox" in gt_lower: oem_name = "Inox"
-        elif "suzlon" in gt_lower: oem_name = "Suzlon"
-        elif "windworld" in gt_lower: oem_name = "Windworld"
-
-        if not wtg_col or not gen_col:
-            continue
-
-        with connection.cursor() as cursor:
-            cursor.execute(f"""
-                SELECT `{wtg_col}`, 
-                       SUM(CAST(`{gen_col}` AS DECIMAL(15,2))) as s_gen,
-                       AVG(CAST(`{ma_col}` AS DECIMAL(10,2))) as avg_ma,
-                       AVG(CAST(`{plf_col}` AS DECIMAL(10,2))) as avg_plf
-                FROM `{gt}`
-                WHERE `{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''
-                GROUP BY `{wtg_col}`
-            """)
-            for w, g, ma, plf in cursor.fetchall():
-                wtg_name = str(w).strip()
-                wtg_set.add(wtg_name)
-                g_val = float(g or 0)
-                wtg_gens[wtg_name] += g_val
-                oem_gen[oem_name] += g_val
-                total_gen += g_val
-                if ma is not None:
-                    ma_val = float(ma)
-                    if 0 <= ma_val <= 100:
-                        wtg_ma_dict[wtg_name].append(ma_val)
-                        ma_list.append(ma_val)
-                if plf is not None:
-                    plf_val = float(plf)
-                    if 0 <= plf_val <= 100:
-                        wtg_plf_dict[wtg_name].append(plf_val)
-                        plf_list.append(plf_val)
-                if g_val == 0:
-                    zero_gen_wtgs.add(wtg_name)
-
-        if date_col and gen_col:
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT SUBSTRING(`{date_col}`, 1, 7) as ym, SUM(CAST(`{gen_col}` AS DECIMAL(15,2)))
-                    FROM `{gt}`
-                    WHERE `{date_col}` IS NOT NULL AND `{date_col}` != ''
-                    GROUP BY ym
-                    ORDER BY ym ASC
-                """)
-                for ym, g in cursor.fetchall():
-                    if ym and len(ym) == 7:
-                        monthly_gen[ym] += float(g or 0)
-                        all_months.add(ym)
-
-        # Heatmap (Turbine vs Monthly availability)
-        if date_col and ma_col:
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT `{wtg_col}`, SUBSTRING(`{date_col}`, 1, 7) as ym, AVG(CAST(`{ma_col}` AS DECIMAL(10,2)))
-                    FROM `{gt}`
-                    WHERE `{date_col}` IS NOT NULL AND `{date_col}` != ''
-                    GROUP BY `{wtg_col}`, ym
-                """)
-                for w, ym, ma in cursor.fetchall():
-                    if ma is not None and ym and len(ym) == 7:
-                        heatmap_matrix[str(w).strip()][ym] = round(float(ma), 1)
-
-    # Breakdown Downtime
-    extended_breakdowns = []
-    for bdt in bd_tables:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{bdt}`")
-            cols = [r[0] for r in cursor.fetchall()]
-        col_map = {normalize(c): c for c in cols}
-        dur_col = _pick(col_map, "total_duration", "duration", "hours")
-        loc_col = _pick(col_map, "location", "loc_no", "location_no", "wtg", "wtg_no")
-        err_col = _pick(col_map, "error_description", "error_details", "error_code", "cause")
-        date_col = _pick(col_map, "date", "gen_date")
-        act_col = _pick(col_map, "action_taken_remark", "action_taken", "remark")
-
-        if dur_col:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SELECT SUM(CAST(`{dur_col}` AS DECIMAL(15,2))) FROM `{bdt}`")
-                res = cursor.fetchone()[0]
-                if res: total_downtime += float(res)
-
-        if loc_col and err_col and dur_col:
-            with connection.cursor() as cursor:
-                act_sel = f", `{act_col}`" if act_col else ", ''"
-                cursor.execute(f"""
-                    SELECT `{loc_col}`, `{date_col}`, TRIM(`{err_col}`), CAST(`{dur_col}` AS DECIMAL(15,2)) {act_sel}
-                    FROM `{bdt}`
-                    WHERE CAST(`{dur_col}` AS DECIMAL(15,2)) >= 10.0
-                    ORDER BY CAST(`{dur_col}` AS DECIMAL(15,2)) DESC
-                    LIMIT 8
-                """)
-                for r in cursor.fetchall():
-                    extended_breakdowns.append({
-                        "wtg": r[0],
-                        "date": str(r[1])[:10] if r[1] else "",
-                        "cause": ' '.join(str(r[2]).split()),
-                        "duration": float(r[3] or 0),
-                        "action": r[4] if len(r) > 4 else ""
-                    })
-
-    # Calculations
-    avg_fleet_ma = (sum(ma_list) / len(ma_list)) if ma_list else 0.0
-    avg_fleet_plf = (sum(plf_list) / len(plf_list)) if plf_list else 0.0
-    underperforming_wtgs = [w for w, g in wtg_gens.items() if wtg_ma_dict.get(w) and (sum(wtg_ma_dict[w])/len(wtg_ma_dict[w])) < 90.0]
-
-    sorted_wtgs = sorted([{"wtg": k, "generation": round(v, 2)} for k, v in wtg_gens.items()], key=lambda x: x["generation"], reverse=True)
-    top_10 = sorted_wtgs[:10]
-    bottom_10 = sorted(sorted_wtgs[-10:], key=lambda x: x["generation"])
-    top_25 = sorted_wtgs[:25]
-
-    sorted_months = sorted(monthly_gen.keys())
-    recent_months = sorted_months[-24:] if len(sorted_months) > 24 else sorted_months
-    monthly_labels = recent_months
-    monthly_values = [round(monthly_gen[m], 2) for m in recent_months]
-
-    # OEM comparison
-    oem_labels = list(oem_gen.keys())
-    oem_values = [round(oem_gen[k], 2) for k in oem_labels]
-
-    # Heatmap summary (Top 12 WTGs x recent 6 months)
-    recent_6_months = sorted_months[-6:] if len(sorted_months) >= 6 else sorted_months
-    heatmap_series = []
-    top_wtg_names = [d["wtg"] for d in top_10]
-    for w in top_wtg_names:
-        row_data = []
-        for m in recent_6_months:
-            row_data.append({"x": m, "y": heatmap_matrix[w].get(m, round(avg_fleet_ma, 1))})
-        heatmap_series.append({"name": w, "data": row_data})
-
-    context = {
-        "total_generation": round(total_gen, 2),
-        "fleet_ma": round(avg_fleet_ma, 2),
-        "fleet_plf": round(avg_fleet_plf, 2),
-        "total_downtime": round(total_downtime, 1),
-        "wtg_count": len(wtg_set),
-        "zero_gen_count": len(zero_gen_wtgs),
-        "underperforming_count": len(underperforming_wtgs),
-        "top_10": top_10,
-        "bottom_10": bottom_10,
-        "top_25": top_25,
-        "all_wtgs": sorted_wtgs,
-        "top_10_json": json.dumps(top_10),
-        "bottom_10_json": json.dumps(bottom_10),
-        "top_25_json": json.dumps(top_25),
-        "all_wtgs_json": json.dumps(sorted_wtgs),
-        "monthly_trend_json": json.dumps({"labels": monthly_labels, "values": monthly_values}),
-        "oem_comparison_json": json.dumps({"labels": oem_labels, "values": oem_values}),
-        "heatmap_series_json": json.dumps(heatmap_series),
-        "recent_months": recent_6_months,
-        "extended_breakdowns": extended_breakdowns,
-    }
-    return render(request, 'wind_dashboard.html', context)
 
 @login_required
 def wind_summary1(request):
@@ -497,21 +285,17 @@ def _pick(col_map, *candidates):
 
 @login_required
 def wind_generation_kwh(request):
-    """
-    Generation Analysis (kWh)
-    Implements Priority Visuals:
-    - Visual #1: Generation KPI Cards
-    - Visual #2: Monthly / Daily Generation Line Chart
-    - Visual #3: Top 10 / Bottom 10 Turbine Ranking Horizontal Bar Chart
-    - Visual #5: Manufacturer-wise Generation Bar Chart
-    - Full Data Table with sorting, searching, pagination & export
-    """
     user = request.user.username.lower()
-    is_admin = request.user.is_superuser or user == 'admin'
 
+    # ---------------------------------------------------
+    # CLEAR FILTERS (RESET GLOBAL FILTER SESSION)
+    # ---------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
+    # ---------------------------------------------------
+    # RESTORE SAVED FILTERS
+    # ---------------------------------------------------
     saved = request.session.get("wind_filters", {})
 
     def get_or_saved_list(key):
@@ -522,15 +306,30 @@ def wind_generation_kwh(request):
     date_to   = request.GET.get("date_to")   or saved.get("date_to")
 
     providers = get_or_saved_list("provider")
+    uploaded_by = get_or_saved_list("uploaded_by")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ---------------------------------------------------
+    # AUTO DATE RANGE (3 YEARS)
+    # ---------------------------------------------------
+    from datetime import date, timedelta
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=3 * 365)
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to = today.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------
+    # SAVE FILTERS BACK TO SESSION (GLOBAL)
+    # ---------------------------------------------------
     request.session["wind_filters"] = {
         "date_from": date_from,
         "date_to": date_to,
         "provider": providers,
+        "uploaded_by": uploaded_by,
         "customer": customers,
         "state": states,
         "site": sites,
@@ -538,56 +337,49 @@ def wind_generation_kwh(request):
     }
     request.session.modified = True
 
+    # ---------------------------------------------------
+    # FIND USER WIND TABLES
+    # ---------------------------------------------------
     with connection.cursor() as cursor:
         cursor.execute("SHOW TABLES;")
         db_tables = [r[0] for r in cursor.fetchall()]
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith('_wind') and 'breakdown' not in t]
-    else:
-        table_names = [t for t in db_tables if t.startswith(user + "_") and t.endswith("_wind")]
+    table_names = [t for t in db_tables if t.startswith(user + "_") and t.endswith("_wind")]
 
     if not table_names:
         return render(request, "wind_generation_kwh.html", {
             "chart_data": "[]",
-            "top_10_json": "[]",
-            "bottom_10_json": "[]",
-            "top_25_json": "[]",
-            "all_wtgs_json": "[]",
-            "monthly_trend_json": "{}",
-            "oem_comparison_json": "{}",
             "table_data": [],
             "total_generation": 0,
-            "avg_generation": 0,
-            "wtg_count": 0,
-            "top_wtg": None,
-            "bottom_wtg": None,
             "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
-            "selected_providers": providers, "selected_customers": customers,
-            "selected_states": states, "selected_sites": sites, "selected_wtgs": wtgs,
+            "selected_providers": providers,
+            "selected_customers": customers,
+            "selected_states": states,
+            "selected_sites": sites,
+            "selected_wtgs": wtgs,
             "date_from": date_from, "date_to": date_to,
             "no_data": True,
             "no_data_msg": "No wind generation data found."
         })
 
+    # ---------------------------------------------------
+    # PROCESS GENERATION (kWh)
+    # ---------------------------------------------------
+    from collections import defaultdict
     wtg_sum = defaultdict(float)
-    monthly_sum = defaultdict(float)
-    oem_sum = defaultdict(float)
-    wtg_oem_map = {}
     distincts = {k: set() for k in ["providers", "customers", "states", "sites", "wtgs"]}
 
-    earliest_date = None
-    latest_date = None
-
     for table_name in table_names:
+        # Read schema
         with connection.cursor() as cursor:
             cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
             cols = [r[0] for r in cursor.fetchall()]
         col_map = {normalize(c): c for c in cols}
 
-        wtg_col = _pick(col_map, "location_no", "turbine_id", "wtg", "wtg_no", "loc_no", "wec", "location")
-        gen_col = _pick(col_map, "wtg_production_kwh", "gen_kwh_day", "gen_kwh", "generation", "kwh")
-        date_col = _pick(col_map, "date", "gen_date")
+        # Flexible mapping
+        wtg_col = _pick(col_map, "wtg", "wtg_no", "loc_no", "wec")
+        gen_col = _pick(col_map, "gen_kwh_day", "gen_kwh", "generation", "kwh")
+        date_col = _pick(col_map, "gen_date", "date")
         provider_col = _pick(col_map, "provider", "oem")
         customer_col = _pick(col_map, "customer", "customer_name")
         state_col = _pick(col_map, "state")
@@ -596,84 +388,46 @@ def wind_generation_kwh(request):
         if not wtg_col or not gen_col:
             continue
 
-        oem_name = "Unknown OEM"
-        t_lower = table_name.lower()
-        if "senvion" in t_lower: oem_name = "Senvion"
-        elif "regen" in t_lower: oem_name = "Regen"
-        elif "gamesa" in t_lower: oem_name = "Gamesa"
-        elif "inox" in t_lower: oem_name = "Inox"
-        elif "suzlon" in t_lower: oem_name = "Suzlon"
-        elif "windworld" in t_lower: oem_name = "Windworld"
+        # Build conditions
+        conditions, params = [], []
 
-        if date_col and (not date_from or not date_to):
-            with connection.cursor() as cursor:
-                cursor.execute(f"SELECT MIN(`{date_col}`), MAX(`{date_col}`) FROM `{table_name}` WHERE `{date_col}` IS NOT NULL AND `{date_col}` != ''")
-                d_min, d_max = cursor.fetchone()
-                if d_min and (not earliest_date or str(d_min) < str(earliest_date)):
-                    earliest_date = str(d_min)[:10]
-                if d_max and (not latest_date or str(d_max) > str(latest_date)):
-                    latest_date = str(d_max)[:10]
+        if date_from and date_to:
+            conditions.append(f"`{date_col}` BETWEEN %s AND %s")
+            params.extend([date_from, date_to])
 
-        base_conditions, base_params = [], []
-        if date_from and date_to and date_col:
-            base_conditions.append(f"`{date_col}` BETWEEN %s AND %s")
-            base_params.extend([date_from, date_to])
-
-        def add_in_filter(col, values, conds, parms):
+        def add_in(col, values):
             if col and values:
                 placeholders = ",".join(["%s"] * len(values))
-                conds.append(f"`{col}` IN ({placeholders})")
-                parms.extend(values)
+                conditions.append(f"`{col}` IN ({placeholders})")
+                params.extend(values)
 
-        add_in_filter(provider_col, providers, base_conditions, base_params)
-        add_in_filter(customer_col, customers, base_conditions, base_params)
-        add_in_filter(state_col, states, base_conditions, base_params)
-        add_in_filter(site_col, sites, base_conditions, base_params)
-        add_in_filter(wtg_col, wtgs, base_conditions, base_params)
+        add_in(provider_col, providers)
+        add_in(customer_col, customers)
+        add_in(state_col, states)
+        add_in(site_col, sites)
+        add_in(wtg_col, wtgs)
 
-        cond_wtg = list(base_conditions)
-        params_wtg = list(base_params)
-        cond_wtg.append(f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''")
-        where_wtg = f"WHERE {' AND '.join(cond_wtg)}"
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
         query = f"""
-            SELECT `{wtg_col}`, SUM(CAST(`{gen_col}` AS DECIMAL(15,2)))
+            SELECT `{wtg_col}`, SUM(`{gen_col}`)
             FROM `{table_name}`
-            {where_wtg}
+            {where_clause}
             GROUP BY `{wtg_col}`
         """
+
         with connection.cursor() as cursor:
-            cursor.execute(query, params_wtg)
-            for w, g in cursor.fetchall():
-                wtg_key = str(w).strip()
-                val = float(g or 0)
-                wtg_sum[wtg_key] += val
-                oem_sum[oem_name] += val
-                wtg_oem_map[wtg_key] = oem_name
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
 
-        if date_col:
-            cond_m = list(base_conditions)
-            params_m = list(base_params)
-            cond_m.append(f"`{date_col}` IS NOT NULL AND `{date_col}` != ''")
-            where_m = f"WHERE {' AND '.join(cond_m)}"
+        for w, g in rows:
+            wtg_sum[str(w)] += float(g or 0)
 
-            m_query = f"""
-                SELECT SUBSTRING(`{date_col}`, 1, 7) AS ym, SUM(CAST(`{gen_col}` AS DECIMAL(15,2)))
-                FROM `{table_name}`
-                {where_m}
-                GROUP BY ym
-                ORDER BY ym ASC
-            """
-            with connection.cursor() as cursor:
-                cursor.execute(m_query, params_m)
-                for ym, g in cursor.fetchall():
-                    if ym and len(ym) == 7:
-                        monthly_sum[ym] += float(g or 0)
-
+        # Distinct filter values
         def dist(col):
             if not col: return []
             with connection.cursor() as cursor:
-                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table_name}` WHERE `{col}` IS NOT NULL AND `{col}` != '' ORDER BY `{col}`")
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table_name}` ORDER BY `{col}`")
                 return [str(r[0]) for r in cursor.fetchall()]
 
         distincts["providers"].update(dist(provider_col))
@@ -682,51 +436,16 @@ def wind_generation_kwh(request):
         distincts["sites"].update(dist(site_col))
         distincts["wtgs"].update(dist(wtg_col))
 
-    all_wtgs = sorted([{"wtg": k, "generation": round(v, 2), "oem": wtg_oem_map.get(k, "OEM")} for k, v in wtg_sum.items()], key=lambda x: x["generation"], reverse=True)
-    total_generation = sum(wtg_sum.values())
-    wtg_count = len(all_wtgs)
-    avg_generation = (total_generation / wtg_count) if wtg_count > 0 else 0
+    # Final output
+    chart_data = [{"wtg": k, "generation": v} for k, v in wtg_sum.items()]
+    chart_data.sort(key=lambda x: x["generation"], reverse=True)
 
-    top_10 = all_wtgs[:10]
-    bottom_10 = sorted(all_wtgs[-10:], key=lambda x: x["generation"])
-    top_25 = all_wtgs[:25]
-
-    table_data = []
-    for rank, d in enumerate(all_wtgs, 1):
-        share = (d["generation"] / total_generation * 100) if total_generation > 0 else 0
-        diff_avg = ((d["generation"] - avg_generation) / avg_generation * 100) if avg_generation > 0 else 0
-        status = "Optimal" if d["generation"] >= avg_generation else ("Underperforming" if d["generation"] < (avg_generation * 0.7) else "Normal")
-        table_data.append({
-            "rank": rank,
-            "wtg_no": d["wtg"],
-            "oem": d["oem"],
-            "generation": d["generation"],
-            "share": round(share, 2),
-            "diff_avg": round(diff_avg, 1),
-            "status": status
-        })
-
-    sorted_months = sorted(monthly_sum.keys())
-    monthly_labels = sorted_months[-36:] if len(sorted_months) > 36 else sorted_months
-    monthly_values = [round(monthly_sum[m], 2) for m in monthly_labels]
-
-    oem_labels = list(oem_sum.keys())
-    oem_values = [round(oem_sum[k], 2) for k in oem_labels]
+    table_data = [{"wtg_no": d["wtg"], "generation": d["generation"]} for d in chart_data]
 
     return render(request, "wind_generation_kwh.html", {
-        "chart_data": json.dumps(all_wtgs),
-        "top_10_json": json.dumps(top_10),
-        "bottom_10_json": json.dumps(bottom_10),
-        "top_25_json": json.dumps(top_25),
-        "all_wtgs_json": json.dumps(all_wtgs),
-        "monthly_trend_json": json.dumps({"labels": monthly_labels, "values": monthly_values}),
-        "oem_comparison_json": json.dumps({"labels": oem_labels, "values": oem_values}),
+        "chart_data": json.dumps(chart_data),
         "table_data": table_data,
-        "total_generation": round(total_generation, 2),
-        "avg_generation": round(avg_generation, 2),
-        "wtg_count": wtg_count,
-        "top_wtg": top_10[0] if top_10 else None,
-        "bottom_wtg": bottom_10[0] if bottom_10 else None,
+        "total_generation": sum(wtg_sum.values()),
 
         "providers": sorted(distincts["providers"]),
         "customers": sorted(distincts["customers"]),
@@ -740,228 +459,368 @@ def wind_generation_kwh(request):
         "selected_sites": sites,
         "selected_wtgs": wtgs,
 
-        "date_from": date_from or earliest_date,
-        "date_to": date_to or latest_date,
+        "date_from": date_from,
+        "date_to": date_to,
     })
+
+from collections import defaultdict
+from datetime import datetime, date  # ✅ keep original classes
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import json
+
+def _pick(col_map, *candidates):
+    """Return actual-cased column name if it matches any candidate"""
+    for c in candidates:
+        lc = c.lower()
+        if lc in col_map:
+            return col_map[lc]
+    return None
+
+def parse_date_like(v):
+    """Parse date/datetime strings or objects into date object (SAFE)"""
+    # ✅ DO NOT overwrite 'date' or 'datetime'
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    if v is None:
+        return None
+
+    s = str(v).strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d.%m.%Y", "%d-%b-%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except:
+            continue
+    return None  # ✅ return None if no format matches
+
+
+
+
+
+
+def parse_hours(val):
+    """Convert numeric or hh:mm:ss style strings to float hours"""
+    if val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+
+    s = str(val).strip()
+    if " " in s:
+        parts = s.split(" ")
+        try:
+            days = int(parts[0])
+        except:
+            days = 0
+        hms = parts[1] if len(parts) > 1 else "0:0:0"
+    else:
+        days = 0
+        hms = s
+
+    try:
+        hms_parts = [int(p) for p in hms.split(":")]
+    except:
+        hms_parts = [0, 0, 0]
+
+    hours = days * 24 + hms_parts[0] + hms_parts[1] / 60 + hms_parts[2] / 3600
+    return hours
+
+def parse_hours(val):
+    """Convert numeric or hh:mm:ss style strings to float hours"""
+    if val is None:
+        return 0.0
+    if isinstance(val, (int, float)):
+        return float(val)
+
+    s = str(val).strip()
+    if " " in s:
+        parts = s.split(" ")
+        try:
+            days = int(parts[0])
+        except:
+            days = 0
+        hms = parts[1] if len(parts) > 1 else "0:0:0"
+    else:
+        days = 0
+        hms = s
+
+    try:
+        hh, mm, ss = map(int, hms.split(":"))
+    except:
+        hh, mm, ss = 0, 0, 0
+
+    return days * 24 + hh + mm / 60 + ss / 3600
+
+
+def parse_date_like(val):
+    """Parse DB date formats safely"""
+    if isinstance(val, date):
+        return val
+    try:
+        return datetime.strptime(str(val), "%Y-%m-%d").date()
+    except:
+        try:
+            return datetime.strptime(str(val), "%d-%m-%Y").date()
+        except:
+            return None
+
 
 @login_required
 def wind_generation_hours(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == "admin"
+    user = request.user.username.lower()
 
+    # ---------------------------------------------------
+    # CLEAR FILTERS
+    # ---------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
+    # ---------------------------------------------------
+    # RESTORE FILTERS FROM SESSION (GLOBAL)
+    # ---------------------------------------------------
     saved = request.session.get("wind_filters", {})
+
     def get_or_saved_list(key):
         vals = request.GET.getlist(key)
         return vals if vals else saved.get(key, [])
 
     date_from = request.GET.get("date_from") or saved.get("date_from")
     date_to   = request.GET.get("date_to")   or saved.get("date_to")
+
     providers = get_or_saved_list("provider")
+    uploaded_by = get_or_saved_list("uploaded_by")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ---------------------------------------------------
+    # AUTO DEFAULT DATE RANGE (3 YEARS)
+    # ---------------------------------------------------
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=3*365)
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to   = today.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------
+    # SAVE FILTERS BACK INTO SESSION (GLOBAL)
+    # ---------------------------------------------------
     request.session["wind_filters"] = {
-        "date_from": date_from, "date_to": date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
+        "date_from": date_from,
+        "date_to": date_to,
+        "provider": providers,
+        "customer": customers,
+        "state": states,
+        "site": sites,
+        "wtg": wtgs,
     }
     request.session.modified = True
 
+    # ---------------------------------------------------
+    # GET WIND TABLES FOR USER
+    # ---------------------------------------------------
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
+        cursor.execute("SHOW TABLES;")
         db_tables = [row[0] for row in cursor.fetchall()]
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith("_wind") and not t.endswith("_breakdowndata")]
-    else:
-        table_names = [t for t in db_tables if t.startswith(username + "_") and t.endswith("_wind") and not t.endswith("_breakdowndata")]
+    table_names = [
+        t for t in db_tables
+        if t.startswith(user + "_") and t.endswith("_wind")
+    ]
 
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
+    if not table_names:
+        return render(request, "wind_genration_hovers.html", {
+            "chart_data": "[]",
+            "table_data": [],
+            "years": [],
+            "total_hours": 0,
 
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
+            "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
+            "selected_providers": providers,
+            "selected_customers": customers,
+            "selected_states": states,
+            "selected_sites": sites,
+            "selected_wtgs": wtgs,
 
-    if not date_from or not date_to:
-        min_dates, max_dates = [], []
-        for t in table_names:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cursor.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-                if dcol:
-                    cursor.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cursor.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            date_from = date_from or min(min_dates)
-            date_to = date_to or max(max_dates)
+            "date_from": date_from,
+            "date_to": date_to,
 
-    wtg_hrs_list = defaultdict(list)
-    wtg_meta = {}
-    monthly_hrs = defaultdict(list)
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
+            "no_data": True,
+            "no_data_msg": "No wind data found."
+        })
 
-    for t in table_names:
+    # ---------------------------------------------------
+    # PROCESS HOURS DATA
+    # ---------------------------------------------------
+    from collections import defaultdict
+
+    wtg_year_hours = defaultdict(float)
+    distincts = {k: set() for k in ["providers", "customers", "states", "sites", "wtgs"]}
+    years_set = set()
+    total_hours = 0.0
+
+    for table_name in table_names:
+
+        # Load schema
         with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
+            cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+            cols = [r[0] for r in cursor.fetchall()]
+        col_map = {normalize(c): c for c in cols}
 
-        wtg_col = _pick(col_norm, "location_no", "turbine_id", "loc_no", "wec", "wtg", "wtg_no", "locno", "turbine")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-        hrs_col = _pick(col_norm, "production_hours", "gen_hours", "operating_hours", "ohrs", "genhrs", "generationhours")
-        oem_col = _pick(col_norm, "provider", "oem", "oemprovider", "oem_name")
-        site_col = _pick(col_norm, "site", "sitename", "location", "plant", "park")
-        state_col = _pick(col_norm, "state", "statename", "st")
-        month_col = _pick(col_norm, "month", "mon")
+        # Dynamic column names
+        date_col = _pick(col_map, "date", "gen_date", "reading_date", "day_date")
+        wtg_col = _pick(col_map, "wtg", "wtg_no", "loc_no", "wec")
 
-        if not wtg_col or not hrs_col:
+        genhrs_col = _pick(col_map, "genhrs", "gen_hours", "generationhours")
+        ohrs_col   = _pick(col_map, "ohrs", "operatinghours")
+        loss_col   = _pick(col_map, "lhrs", "loss", "losshrs")
+
+        provider_col = _pick(col_map, "provider", "oem")
+        customer_col = _pick(col_map, "customer", "client")
+        state_col    = _pick(col_map, "state")
+        site_col     = _pick(col_map, "site")
+
+        if not date_col or not wtg_col:
             continue
 
-        select_cols = [f"`{wtg_col}`", f"`{hrs_col}`"]
-        if date_col: select_cols.append(f"`{date_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
-        if site_col: select_cols.append(f"`{site_col}`")
-        if state_col: select_cols.append(f"`{state_col}`")
-        if month_col: select_cols.append(f"`{month_col}`")
+        # Build filter conditions
+        conditions, params = [], []
 
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and date_from and date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
+        if date_from and date_to:
+            conditions.append(f"`{date_col}` BETWEEN %s AND %s")
             params.extend([date_from, date_to])
 
-        def add_in(col, vals):
-            if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
-                params.extend(vals)
+        def add_in(col, values):
+            if col and values:
+                placeholders = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({placeholders})")
+                params.extend(values)
 
-        add_in(oem_col, providers)
+        add_in(provider_col, providers)
+        add_in(customer_col, customers)
         add_in(state_col, states)
         add_in(site_col, sites)
         add_in(wtg_col, wtgs)
 
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause}"
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        # Choose hours expression
+        if ohrs_col and loss_col:
+            hour_expr = f"(`{ohrs_col}` - `{loss_col}`)"
+        elif genhrs_col:
+            hour_expr = f"`{genhrs_col}`"
+        elif ohrs_col:
+            hour_expr = f"`{ohrs_col}`"
+        else:
+            continue
+
+        # Main query
+        query = f"""
+            SELECT `{date_col}`, `{wtg_col}`, SUM({hour_expr})
+            FROM `{table_name}`
+            {where_clause}
+            GROUP BY `{date_col}`, `{wtg_col}`
+        """
 
         with connection.cursor() as cursor:
-            cursor.execute(sql, params)
+            cursor.execute(query, params)
             rows = cursor.fetchall()
 
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
-
-        for r in rows:
-            wtg_val = str(r[idx[wtg_col]]).strip()
-            if not wtg_val or wtg_val.lower() in ("none", "total", "all wtg"):
+        # Process rows
+        for d_val, wtg_val, hrs in rows:
+            d_obj = parse_date_like(d_val)
+            if not d_obj:
                 continue
 
-            val = None
-            if r[idx[hrs_col]] not in (None, ""):
-                try: val = float(r[idx[hrs_col]])
-                except: pass
+            year = d_obj.year
+            years_set.add(year)
 
-            if val is not None and val > 0:
-                wtg_hrs_list[wtg_val].append(val)
+            wtg_name = str(wtg_val)
+            hour_val = float(hrs or 0)
 
-            if wtg_val not in wtg_meta:
-                wtg_meta[wtg_val] = {
-                    "oem": str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind")),
-                    "site": str(r[idx[site_col]]).strip() if site_col and r[idx[site_col]] else "Site-1",
-                    "state": str(r[idx[state_col]]).strip() if state_col and r[idx[state_col]] else "Default"
-                }
+            wtg_year_hours[(wtg_name, year)] += hour_val
+            total_hours += hour_val
 
-            m_key = None
-            if date_col and r[idx[date_col]]:
-                m_key = str(r[idx[date_col]])[:7]
-            elif month_col and r[idx[month_col]]:
-                m_key = str(r[idx[month_col]]).strip()
+        # Distinct values
+        def distinct_list(col):
+            if not col:
+                return []
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table_name}` ORDER BY `{col}`")
+                return [str(r[0]) for r in cursor.fetchall() if r[0]]
 
-            if m_key and val is not None and val > 0:
-                monthly_hrs[m_key].append(val)
+        distincts["providers"].update(distinct_list(provider_col))
+        distincts["customers"].update(distinct_list(customer_col))
+        distincts["states"].update(distinct_list(state_col))
+        distincts["sites"].update(distinct_list(site_col))
+        distincts["wtgs"].update(distinct_list(wtg_col))
 
-        def add_distinct(col, key):
-            if not col: return
-            with connection.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT `{col}` FROM `{t}` WHERE `{col}` IS NOT NULL AND `{col}` != ''")
-                for r_ in cur.fetchall():
-                    distincts[key].add(str(r_[0]).strip())
+    # Fill missing years
+    for wtg in distincts["wtgs"]:
+        for yr in years_set:
+            wtg_year_hours.setdefault((wtg, yr), 0.0)
 
-        add_distinct(oem_col, "providers")
-        add_distinct(state_col, "states")
-        add_distinct(site_col, "sites")
-        add_distinct(wtg_col, "wtgs")
+    # Prepare chart data
+    chart_data = [
+        {"wtg": w, "year": y, "hours": round(v, 2)}
+        for (w, y), v in sorted(wtg_year_hours.items(), key=lambda x: (x[0][1], x[0][0]))
+    ]
 
-    wtg_data = []
-    for w, vals in wtg_hrs_list.items():
-        tot_hrs = round(sum(vals), 2)
-        daily_avg = round(tot_hrs / len(vals), 2) if vals else 0.0
-        util_pct = round((daily_avg / 24.0) * 100.0, 1) if daily_avg else 0.0
-        meta = wtg_meta.get(w, {"oem": "Wind", "site": "-", "state": "-"})
-        wtg_data.append({
-            "wtg": w,
-            "total_hrs": tot_hrs,
-            "daily_avg": daily_avg,
-            "util_pct": util_pct,
-            "oem": meta["oem"],
-            "site": meta["site"],
-            "state": meta["state"],
-            "status": "Optimal" if daily_avg >= 20.0 else ("Moderate" if daily_avg >= 15.0 else "Low")
-        })
-
-    wtg_data.sort(key=lambda x: x["total_hrs"], reverse=True)
-    for rank, item in enumerate(wtg_data, 1):
-        item["rank"] = rank
-
-    fleet_tot_hrs = sum(d["total_hrs"] for d in wtg_data)
-    fleet_daily_avg = round(sum(d["daily_avg"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    fleet_util = round((fleet_daily_avg / 24.0) * 100.0, 1) if fleet_daily_avg else 0.0
-    max_wtg = wtg_data[0] if wtg_data else {"wtg": "-", "total_hrs": 0}
-
-    sorted_months = sorted(monthly_hrs.keys())[-12:]
-    month_series = [round(sum(monthly_hrs[m]), 1) for m in sorted_months]
+    table_data = [
+        {"wtg_no": w, "year": y, "hours": round(v, 2)}
+        for (w, y), v in wtg_year_hours.items()
+    ]
 
     context = {
-        "kpi_total_hrs": fleet_tot_hrs,
-        "kpi_daily_avg": fleet_daily_avg,
-        "kpi_util_factor": fleet_util,
-        "kpi_max_wtg": max_wtg["wtg"],
-        "kpi_max_val": max_wtg["total_hrs"],
-        "kpi_total_wtgs": len(wtg_data),
+        "chart_data": json.dumps(chart_data),
+        "table_data": table_data,
+        "years": sorted(years_set),
+        "total_hours": round(total_hours, 2),
 
-        "table_data": wtg_data,
-        "all_wtgs_json": json.dumps(wtg_data),
-
-        "monthly_cats_json": json.dumps(sorted_months),
-        "monthly_gen_json": json.dumps(month_series),
-
-        # Filters
-        "date_from": date_from,
-        "date_to": date_to,
         "providers": sorted(distincts["providers"]),
+        "customers": sorted(distincts["customers"]),
         "states": sorted(distincts["states"]),
         "sites": sorted(distincts["sites"]),
         "wtgs": sorted(distincts["wtgs"]),
+
         "selected_providers": providers,
+        "selected_customers": customers,
         "selected_states": states,
         "selected_sites": sites,
         "selected_wtgs": wtgs,
+
+        "date_from": date_from,
+        "date_to": date_to,
+
+        "no_data": len(chart_data) == 0,
+        "no_data_msg": "No generation hour data found." if len(chart_data) == 0 else ""
     }
 
     return render(request, "wind_genration_hovers.html", context)
+
+
+
+
+
+
+
+
+
+from collections import defaultdict
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import json
+from collections import defaultdict
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
 
 
 def _pick(col_map, *candidates):
@@ -975,232 +834,253 @@ def _pick(col_map, *candidates):
 
 @login_required
 def wind_avg_genration(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == "admin"
+    user = request.user.username.lower()
 
+    # ---------------------------------------------------
+    # CLEAR GLOBAL FILTERS
+    # ---------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
+    # ---------------------------------------------------
+    # RESTORE FILTERS (GLOBAL SESSION)
+    # ---------------------------------------------------
     saved = request.session.get("wind_filters", {})
+
     def get_or_saved_list(key):
         vals = request.GET.getlist(key)
         return vals if vals else saved.get(key, [])
 
     date_from = request.GET.get("date_from") or saved.get("date_from")
     date_to   = request.GET.get("date_to")   or saved.get("date_to")
+
     providers = get_or_saved_list("provider")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ---------------------------------------------------
+    # AUTO DATE RANGE = LAST 1 YEAR
+    # ---------------------------------------------------
+    from datetime import date, timedelta
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=365)
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to   = today.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------
+    # SAVE FILTERS BACK TO SESSION
+    # ---------------------------------------------------
     request.session["wind_filters"] = {
-        "date_from": date_from, "date_to": date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
+        "date_from": date_from,
+        "date_to": date_to,
+        "provider": providers,
+        "customer": customers,
+        "state": states,
+        "site": sites,
+        "wtg": wtgs,
     }
     request.session.modified = True
 
+    # ---------------------------------------------------
+    # FIND ALL <username>_*_wind TABLES
+    # ---------------------------------------------------
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
+        cursor.execute("SHOW TABLES;")
         db_tables = [row[0] for row in cursor.fetchall()]
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith("_wind") and not t.endswith("_breakdowndata")]
-    else:
-        table_names = [t for t in db_tables if t.startswith(username + "_") and t.endswith("_wind") and not t.endswith("_breakdowndata")]
+    table_names = [
+        t for t in db_tables
+        if t.startswith(user + "_") and t.endswith("_wind")
+    ]
 
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
+    if not table_names:
+        context = {
+            "gen_chart_data": "[]",
+            "op_chart_data": "[]",
+            "overall_gen_avg": 0,
+            "overall_op_avg": 0,
 
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
+            "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
+            "selected_providers": providers,
+            "selected_customers": customers,
+            "selected_states": states,
+            "selected_sites": sites,
+            "selected_wtgs": wtgs,
 
-    if not date_from or not date_to:
-        min_dates, max_dates = [], []
-        for t in table_names:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cursor.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-                if dcol:
-                    cursor.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cursor.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            date_from = date_from or min(min_dates)
-            date_to = date_to or max(max_dates)
+            "date_from": date_from,
+            "date_to": date_to,
 
-    wtg_gen_list = defaultdict(list)
-    wtg_meta = {}
-    monthly_gen = defaultdict(list)
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
+            "no_data": True,
+            "no_data_msg": "No generation data found."
+        }
+        return render(request, "wind_avg_genration.html", context)
 
-    for t in table_names:
+    # ---------------------------------------------------
+    # CALCULATION STORAGE
+    # ---------------------------------------------------
+    from collections import defaultdict
+    gen_avg = defaultdict(list)
+    op_avg  = defaultdict(list)
+
+    distincts = {
+        "providers": set(), "customers": set(), "states": set(),
+        "sites": set(), "wtgs": set()
+    }
+
+    # ---------------------------------------------------
+    # PROCESS EACH USER TABLE
+    # ---------------------------------------------------
+    for table_name in table_names:
+
+        # Read schema
         with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
+            cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+            cols = [r[0] for r in cursor.fetchall()]
+        col_map = {normalize(c): c for c in cols}
 
-        wtg_col = _pick(col_norm, "location_no", "turbine_id", "loc_no", "wec", "wtg", "wtg_no", "locno", "turbine")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-        gen_col = _pick(col_norm, "wtg_production_kwh", "gen_kwh_day", "generation_kwh", "genkwh", "units")
-        plf_col = _pick(col_norm, "plf_wtg_efficiency", "plf", "monthly_plf", "cf")
-        oem_col = _pick(col_norm, "provider", "oem", "oemprovider", "oem_name")
-        site_col = _pick(col_norm, "site", "sitename", "location", "plant", "park")
-        state_col = _pick(col_norm, "state", "statename", "st")
-        month_col = _pick(col_norm, "month", "mon")
+        # Flexible dynamic column mapping
+        wtg_col  = _pick(col_map, "wtg","wtg_no","loc_no","wec","turbine","turbineno")
+        gen_col  = _pick(col_map, "genhrs","gen_hours","generationhours","o_hrs")
+        op_col   = _pick(col_map, "ohrs","o_hrs","operatinghours")
+        date_col = _pick(col_map, "date","gen_date","reading_date","day_date")
 
-        if not wtg_col or not gen_col:
+        provider_col = _pick(col_map, "provider","oem")
+        customer_col = _pick(col_map, "customer","client","customername")
+        state_col    = _pick(col_map, "state")
+        site_col     = _pick(col_map, "site","windfarmname","sitename")
+
+        if not wtg_col:
             continue
 
-        select_cols = [f"`{wtg_col}`", f"`{gen_col}`"]
-        if plf_col: select_cols.append(f"`{plf_col}`")
-        if date_col: select_cols.append(f"`{date_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
-        if site_col: select_cols.append(f"`{site_col}`")
-        if state_col: select_cols.append(f"`{state_col}`")
-        if month_col: select_cols.append(f"`{month_col}`")
+        # ---------------------------------------------------
+        # BUILD FILTER CONDITIONS
+        # ---------------------------------------------------
+        conditions, params = [], []
 
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and date_from and date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
+        if date_from and date_to:
+            conditions.append(f"`{date_col}` BETWEEN %s AND %s")
             params.extend([date_from, date_to])
 
-        def add_in(col, vals):
-            if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
-                params.extend(vals)
+        def add_in(col, values):
+            if col and values:
+                q = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({q})")
+                params.extend(values)
 
-        add_in(oem_col, providers)
+        add_in(provider_col, providers)
+        add_in(customer_col, customers)
         add_in(state_col, states)
         add_in(site_col, sites)
         add_in(wtg_col, wtgs)
 
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause}"
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            rows = cursor.fetchall()
+        # ---------------------------------------------------
+        # AVG GENERATION HOURS
+        # ---------------------------------------------------
+        if gen_col:
+            q = f"""
+                SELECT `{wtg_col}`, AVG(`{gen_col}`)
+                FROM `{table_name}`
+                {where_clause}
+                GROUP BY `{wtg_col}`
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(q, params)
+                for w, v in cursor.fetchall():
+                    gen_avg[str(w)].append(float(v or 0))
 
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
+        # ---------------------------------------------------
+        # AVG OPERATING HOURS
+        # ---------------------------------------------------
+        if op_col:
+            q = f"""
+                SELECT `{wtg_col}`, AVG(`{op_col}`)
+                FROM `{table_name}`
+                {where_clause}
+                GROUP BY `{wtg_col}`
+            """
+            with connection.cursor() as cursor:
+                cursor.execute(q, params)
+                for w, v in cursor.fetchall():
+                    op_avg[str(w)].append(float(v or 0))
 
-        for r in rows:
-            wtg_val = str(r[idx[wtg_col]]).strip()
-            if not wtg_val or wtg_val.lower() in ("none", "total", "all wtg"):
-                continue
+        # ---------------------------------------------------
+        # DISTINCT FILTER VALUES
+        # ---------------------------------------------------
+        def distinct_list(col):
+            if not col: return []
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table_name}` ORDER BY `{col}`")
+                return [str(r[0]) for r in cursor.fetchall() if r[0]]
 
-            gval = None
-            if r[idx[gen_col]] not in (None, ""):
-                try: gval = float(r[idx[gen_col]])
-                except: pass
+        distincts["providers"].update(distinct_list(provider_col))
+        distincts["customers"].update(distinct_list(customer_col))
+        distincts["states"].update(distinct_list(state_col))
+        distincts["sites"].update(distinct_list(site_col))
+        distincts["wtgs"].update(distinct_list(wtg_col))
 
-            pval = None
-            if plf_col and r[idx[plf_col]] not in (None, ""):
-                try: pval = float(r[idx[plf_col]])
-                except: pass
+    # ---------------------------------------------------
+    # PREPARE FINAL CHART DATA
+    # ---------------------------------------------------
+    gen_final = {w: sum(v)/len(v) for w, v in gen_avg.items() if v}
+    op_final  = {w: sum(v)/len(v) for w, v in op_avg.items() if v}
 
-            if gval is not None and gval > 0:
-                wtg_gen_list[wtg_val].append({"gen": gval, "plf": pval})
+    gen_chart = [{"wtg": w, "hours": round(h, 2)} for w, h in gen_final.items()]
+    op_chart  = [{"wtg": w, "hours": round(h, 2)} for w, h in op_final.items()]
 
-            if wtg_val not in wtg_meta:
-                wtg_meta[wtg_val] = {
-                    "oem": str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind")),
-                    "site": str(r[idx[site_col]]).strip() if site_col and r[idx[site_col]] else "Site-1",
-                    "state": str(r[idx[state_col]]).strip() if state_col and r[idx[state_col]] else "Default"
-                }
+    gen_chart.sort(key=lambda x: x["hours"], reverse=True)
+    op_chart.sort(key=lambda x: x["hours"], reverse=True)
 
-            m_key = None
-            if date_col and r[idx[date_col]]:
-                m_key = str(r[idx[date_col]])[:7]
-            elif month_col and r[idx[month_col]]:
-                m_key = str(r[idx[month_col]]).strip()
-
-            if m_key and gval is not None and gval > 0:
-                monthly_gen[m_key].append(gval)
-
-        def add_distinct(col, key):
-            if not col: return
-            with connection.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT `{col}` FROM `{t}` WHERE `{col}` IS NOT NULL AND `{col}` != ''")
-                for r_ in cur.fetchall():
-                    distincts[key].add(str(r_[0]).strip())
-
-        add_distinct(oem_col, "providers")
-        add_distinct(state_col, "states")
-        add_distinct(site_col, "sites")
-        add_distinct(wtg_col, "wtgs")
-
-    wtg_data = []
-    for w, recs in wtg_gen_list.items():
-        gen_vals = [x["gen"] for x in recs]
-        tot_kwh = sum(gen_vals)
-        daily_avg = round(tot_kwh / len(gen_vals), 2) if gen_vals else 0.0
-        tot_mwh = round(tot_kwh / 1000.0, 2)
-        plf_vals = [x["plf"] for x in recs if x["plf"] is not None]
-        avg_plf = round(sum(plf_vals) / len(plf_vals), 2) if plf_vals else round((daily_avg / (2000.0 * 24.0)) * 100.0, 1)
-        meta = wtg_meta.get(w, {"oem": "Wind", "site": "-", "state": "-"})
-        wtg_data.append({
-            "wtg": w,
-            "daily_avg": daily_avg,
-            "total_mwh": tot_mwh,
-            "plf": avg_plf,
-            "oem": meta["oem"],
-            "site": meta["site"],
-            "state": meta["state"],
-            "status": "High" if daily_avg >= 10000 else ("Medium" if daily_avg >= 6000 else "Low")
-        })
-
-    wtg_data.sort(key=lambda x: x["daily_avg"], reverse=True)
-    for rank, item in enumerate(wtg_data, 1):
-        item["rank"] = rank
-
-    fleet_daily_avg = round(sum(d["daily_avg"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    fleet_total_mwh = sum(d["total_mwh"] for d in wtg_data)
-    fleet_plf = round(sum(d["plf"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    peak_wtg = wtg_data[0] if wtg_data else {"wtg": "-", "daily_avg": 0}
-
-    sorted_months = sorted(monthly_gen.keys())[-12:]
-    month_series = [round(sum(monthly_gen[m]) / len(monthly_gen[m]), 2) if monthly_gen[m] else 0.0 for m in sorted_months]
-
+    # ---------------------------------------------------
+    # CONTEXT
+    # ---------------------------------------------------
     context = {
-        "kpi_daily_avg": fleet_daily_avg,
-        "kpi_peak_wtg": peak_wtg["wtg"],
-        "kpi_peak_val": peak_wtg["daily_avg"],
-        "kpi_total_mwh": fleet_total_mwh,
-        "kpi_fleet_plf": fleet_plf,
-        "kpi_total_wtgs": len(wtg_data),
+        "gen_chart_data": json.dumps(gen_chart),
+        "op_chart_data": json.dumps(op_chart),
 
-        "table_data": wtg_data,
-        "all_wtgs_json": json.dumps(wtg_data),
+        "overall_gen_avg": round(sum(d["hours"] for d in gen_chart) / len(gen_chart), 2)
+                            if gen_chart else 0,
+        "overall_op_avg": round(sum(d["hours"] for d in op_chart) / len(op_chart), 2)
+                            if op_chart else 0,
 
-        "monthly_cats_json": json.dumps(sorted_months),
-        "monthly_avg_json": json.dumps(month_series),
-
-        # Filters
-        "date_from": date_from,
-        "date_to": date_to,
         "providers": sorted(distincts["providers"]),
+        "customers": sorted(distincts["customers"]),
         "states": sorted(distincts["states"]),
         "sites": sorted(distincts["sites"]),
         "wtgs": sorted(distincts["wtgs"]),
+
         "selected_providers": providers,
+        "selected_customers": customers,
         "selected_states": states,
         "selected_sites": sites,
         "selected_wtgs": wtgs,
+
+        "date_from": date_from,
+        "date_to": date_to,
     }
 
     return render(request, "wind_avg_genration.html", context)
+
+
+
+from collections import defaultdict
+from datetime import datetime, date
+from django.http import HttpResponse
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import json
+
+from collections import defaultdict
+from datetime import datetime, date, timedelta
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import json
 
 
 def _pick(col_map, *candidates):
@@ -1261,246 +1141,296 @@ def to_hours(value):
 
 @login_required
 def wind_Grid_Availability_and_Machine(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == "admin"
+    user = request.user.username.lower()
 
+    # ---------------------------------------------------
+    # CLEAR FILTERS RESET
+    # ---------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
+    # ---------------------------------------------------
+    # RESTORE FILTERS FROM SESSION
+    # ---------------------------------------------------
     saved = request.session.get("wind_filters", {})
+
     def get_or_saved_list(key):
         vals = request.GET.getlist(key)
         return vals if vals else saved.get(key, [])
 
     date_from = request.GET.get("date_from") or saved.get("date_from")
     date_to   = request.GET.get("date_to")   or saved.get("date_to")
+
     providers = get_or_saved_list("provider")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ---------------------------------------------------
+    # AUTO DATE RANGE = LAST 1 YEAR
+    # ---------------------------------------------------
+    from datetime import date, timedelta
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=365)
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to   = today.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------
+    # SAVE FILTERS BACK TO SESSION
+    # ---------------------------------------------------
     request.session["wind_filters"] = {
-        "date_from": date_from, "date_to": date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
+        "date_from": date_from,
+        "date_to": date_to,
+        "provider": providers,
+        "customer": customers,
+        "state": states,
+        "site": sites,
+        "wtg": wtgs,
     }
     request.session.modified = True
 
+    # ---------------------------------------------------
+    # FIND ALL USER WIND TABLES
+    # ---------------------------------------------------
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
+        cursor.execute("SHOW TABLES;")
         db_tables = [row[0] for row in cursor.fetchall()]
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith("_wind") and not t.endswith("_breakdowndata")]
-    else:
-        table_names = [t for t in db_tables if t.startswith(username + "_") and t.endswith("_wind") and not t.endswith("_breakdowndata")]
+    table_names = [
+        t for t in db_tables
+        if t.startswith(user + "_") and t.endswith("_wind")
+    ]
 
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
+    if not table_names:
+        return render(request, "wind_Grid_Availability_and_Machine.html", {
+            "grid_chart_data": "[]",
+            "availability_chart_data": "[]",
+            "plf_yearly_data": "[]",
+            "plf_monthly_data": "{}",
 
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
+            "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
+            "selected_providers": providers,
+            "selected_customers": customers,
+            "selected_states": states,
+            "selected_sites": sites,
+            "selected_wtgs": wtgs,
 
-    if not date_from or not date_to:
-        min_dates, max_dates = [], []
-        for t in table_names:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cursor.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-                if dcol:
-                    cursor.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cursor.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            date_from = date_from or min(min_dates)
-            date_to = date_to or max(max_dates)
+            "date_from": date_from,
+            "date_to": date_to,
 
-    wtg_ma_list = defaultdict(list)
-    wtg_int_list = defaultdict(list)
-    wtg_ext_list = defaultdict(list)
-    wtg_meta = {}
-    monthly_ma = defaultdict(list)
-    monthly_int = defaultdict(list)
-    monthly_ext = defaultdict(list)
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
+            "no_data": True,
+            "no_data_msg": "No wind tables found."
+        })
 
-    for t in table_names:
+    # ---------------------------------------------------
+    # ACCUMULATORS
+    # ---------------------------------------------------
+    distincts = {"providers": set(), "customers": set(), "states": set(),
+                 "sites": set(), "wtgs": set()}
+
+    year_failure_hours = defaultdict(list)
+    month_failure_hours = defaultdict(list)
+    year_plf = defaultdict(list)
+    month_plf = defaultdict(list)
+
+    # ---------------------------------------------------
+    # PROCESS EACH TABLE
+    # ---------------------------------------------------
+    for table in table_names:
+
         with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
+            cursor.execute(f"SHOW COLUMNS FROM `{table}`")
+            cols = [row[0] for row in cursor.fetchall()]
+        col_map = {normalize(c): c for c in cols}
 
-        wtg_col = _pick(col_norm, "location_no", "turbine_id", "loc_no", "wec", "wtg", "wtg_no", "locno", "turbine")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-        ma_col = _pick(col_norm, "wtg_availability", "machine_availability", "actual_ma", "corrected_ma", "ma")
-        int_col = _pick(col_norm, "int_grid_availability", "internal_grid_availability", "iga", "internalgridavailability")
-        ext_col = _pick(col_norm, "ext_grid_availability", "external_grid_availability", "ega", "externalgridavailability", "ga")
-        oem_col = _pick(col_norm, "provider", "oem", "oemprovider", "oem_name")
-        site_col = _pick(col_norm, "site", "sitename", "location", "plant", "park")
-        state_col = _pick(col_norm, "state", "statename", "st")
-        month_col = _pick(col_norm, "month", "mon")
+        date_col = _pick(col_map, "date","gen_date","reading_date","day_date","gen_date")
+        gf_col   = _pick(col_map, "gf","gridfailure","grid_fail","failurehours")
+        ga_col   = _pick(col_map, "ga","gridavailability")
+        gia_col  = _pick(col_map, "gia","gridinternalavailability")
 
-        if not wtg_col:
+        plf_day_col = _pick(col_map, "plf","plf_day","cf","capacityfactor")
+
+        provider_col = _pick(col_map, "provider","oem")
+        customer_col = _pick(col_map, "customer","client")
+        state_col    = _pick(col_map, "state")
+        site_col     = _pick(col_map, "site","windfarmname")
+        wtg_col      = _pick(col_map, "wtg","wtgno","locno","wec")
+
+        if not date_col:
             continue
 
-        select_cols = [f"`{wtg_col}`"]
-        if ma_col: select_cols.append(f"`{ma_col}`")
-        if int_col: select_cols.append(f"`{int_col}`")
-        if ext_col: select_cols.append(f"`{ext_col}`")
-        if date_col: select_cols.append(f"`{date_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
-        if site_col: select_cols.append(f"`{site_col}`")
-        if state_col: select_cols.append(f"`{state_col}`")
-        if month_col: select_cols.append(f"`{month_col}`")
-
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and date_from and date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
-            params.extend([date_from, date_to])
-
-        def add_in(col, vals):
-            if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
-                params.extend(vals)
-
-        add_in(oem_col, providers)
-        add_in(state_col, states)
-        add_in(site_col, sites)
-        add_in(wtg_col, wtgs)
-
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause}"
-
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            rows = cursor.fetchall()
-
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
-
-        for r in rows:
-            wtg_val = str(r[idx[wtg_col]]).strip()
-            if not wtg_val or wtg_val.lower() in ("none", "total", "all wtg"):
-                continue
-
-            mval, ival, eval_ = None, None, None
-            if ma_col and r[idx[ma_col]] not in (None, ""):
-                try: mval = float(r[idx[ma_col]])
-                except: pass
-            if int_col and r[idx[int_col]] not in (None, ""):
-                try: ival = float(r[idx[int_col]])
-                except: pass
-            if ext_col and r[idx[ext_col]] not in (None, ""):
-                try: eval_ = float(r[idx[ext_col]])
-                except: pass
-
-            if mval is not None and mval > 0: wtg_ma_list[wtg_val].append(mval)
-            if ival is not None and ival > 0: wtg_int_list[wtg_val].append(ival)
-            if eval_ is not None and eval_ > 0: wtg_ext_list[wtg_val].append(eval_)
-
-            if wtg_val not in wtg_meta:
-                wtg_meta[wtg_val] = {
-                    "oem": str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind")),
-                    "site": str(r[idx[site_col]]).strip() if site_col and r[idx[site_col]] else "Site-1",
-                    "state": str(r[idx[state_col]]).strip() if state_col and r[idx[state_col]] else "Default"
-                }
-
-            m_key = None
-            if date_col and r[idx[date_col]]:
-                m_key = str(r[idx[date_col]])[:7]
-            elif month_col and r[idx[month_col]]:
-                m_key = str(r[idx[month_col]]).strip()
-
-            if m_key:
-                if mval is not None and mval > 0: monthly_ma[m_key].append(mval)
-                if ival is not None and ival > 0: monthly_int[m_key].append(ival)
-                if eval_ is not None and eval_ > 0: monthly_ext[m_key].append(eval_)
-
+        # ---------------------------------------------------
+        # DISTINCT FILTERS
+        # ---------------------------------------------------
         def add_distinct(col, key):
             if not col: return
-            with connection.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT `{col}` FROM `{t}` WHERE `{col}` IS NOT NULL AND `{col}` != ''")
-                for r_ in cur.fetchall():
-                    distincts[key].add(str(r_[0]).strip())
+            with connection.cursor() as c:
+                c.execute(f"SELECT DISTINCT `{col}` FROM `{table}`")
+                for r in c.fetchall():
+                    if r[0]:
+                        distincts[key].add(str(r[0]).strip())
 
-        add_distinct(oem_col, "providers")
+        add_distinct(provider_col, "providers")
+        add_distinct(customer_col, "customers")
         add_distinct(state_col, "states")
         add_distinct(site_col, "sites")
         add_distinct(wtg_col, "wtgs")
 
-    all_wtgs = sorted(set(list(wtg_ma_list.keys()) + list(wtg_int_list.keys()) + list(wtg_ext_list.keys())))
-    wtg_data = []
-    for w in all_wtgs:
-        m_avg = round(sum(wtg_ma_list[w]) / len(wtg_ma_list[w]), 2) if wtg_ma_list[w] else 0.0
-        i_avg = round(sum(wtg_int_list[w]) / len(wtg_int_list[w]), 2) if wtg_int_list[w] else 0.0
-        e_avg = round(sum(wtg_ext_list[w]) / len(wtg_ext_list[w]), 2) if wtg_ext_list[w] else 0.0
-        c_avg = round((m_avg * i_avg * e_avg) / 10000.0, 2) if (m_avg and i_avg and e_avg) else max(m_avg, i_avg, e_avg)
-        meta = wtg_meta.get(w, {"oem": "Wind", "site": "-", "state": "-"})
-        wtg_data.append({
-            "wtg": w,
-            "ma": m_avg,
-            "int_ga": i_avg,
-            "ext_ga": e_avg,
-            "comb_ga": c_avg,
-            "oem": meta["oem"],
-            "site": meta["site"],
-            "state": meta["state"],
-            "status": "Optimal" if c_avg >= 95.0 else ("Moderate" if c_avg >= 90.0 else "Low")
+        # ---------------------------------------------------
+        # WHERE CLAUSE
+        # ---------------------------------------------------
+        conditions, params = [], []
+
+        if date_from:
+            conditions.append(f"`{date_col}` >= %s")
+            params.append(date_from)
+
+        if date_to:
+            conditions.append(f"`{date_col}` <= %s")
+            params.append(date_to)
+
+        def filter_in(col, values):
+            if col and values:
+                q = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({q})")
+                params.extend(values)
+
+        filter_in(provider_col, providers)
+        filter_in(customer_col, customers)
+        filter_in(state_col, states)
+        filter_in(site_col, sites)
+        filter_in(wtg_col, wtgs)
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        # ---------------------------------------------------
+        # RUN QUERY
+        # ---------------------------------------------------
+        select_cols = [date_col]
+        for c in [gf_col, ga_col, gia_col, plf_day_col]:
+            if c:
+                select_cols.append(c)
+
+        query = f"""
+            SELECT {','.join(f'`{c}`' for c in select_cols)}
+            FROM `{table}`
+            {where_clause}
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+        idx = {c: i for i, c in enumerate(select_cols)}
+
+        # ---------------------------------------------------
+        # PROCESS ROWS
+        # ---------------------------------------------------
+        for r in rows:
+            d = parse_date_like(r[idx[date_col]])
+            if not d:
+                continue
+
+            year = d.year
+            month = d.strftime("%Y-%m")
+
+            # FAILURE HOURS
+            hrs = 0
+            if gf_col and r[idx.get(gf_col)] not in (None, ""):
+                hrs = to_hours(r[idx[gf_col]])
+            elif ga_col:
+                try:
+                    ga = float(r[idx[ga_col]])
+                    hrs = (100 - ga) * 24 / 100
+                except:
+                    hrs = 0
+            elif gia_col:
+                try:
+                    gia = float(r[idx[gia_col]])
+                    hrs = (100 - gia) * 24 / 100
+                except:
+                    hrs = 0
+
+            year_failure_hours[year].append(hrs)
+            month_failure_hours[month].append(hrs)
+
+            # PLF
+            if plf_day_col and r[idx.get(plf_day_col)] not in (None, ""):
+                try:
+                    val = float(r[idx[plf_day_col]])
+                    year_plf[year].append(val)
+                    month_plf[month].append(val)
+                except:
+                    pass
+
+    # ---------------------------------------------------
+    # FINAL JSON DATA
+    # ---------------------------------------------------
+    grid_chart_data = [
+        {"year": y, "avg_failure": round(sum(v)/len(v), 2)}
+        for y, v in year_failure_hours.items()
+    ]
+
+    availability_chart_data = []
+    for m, v in month_failure_hours.items():
+        avg_f = round(sum(v)/len(v), 2)
+        avg_av = round(100 - avg_f, 2)
+        machine = min(100, avg_av + 2)
+
+        availability_chart_data.append({
+            "month": m,
+            "grid_availability": avg_av,
+            "machine_availability": machine
         })
 
-    wtg_data.sort(key=lambda x: x["comb_ga"], reverse=True)
-    for rank, item in enumerate(wtg_data, 1):
-        item["rank"] = rank
+    plf_yearly = [
+        {"year": y, "avg_plf": round(sum(v)/len(v), 2)}
+        for y, v in year_plf.items()
+    ]
 
-    fleet_ma = round(sum(d["ma"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    fleet_int = round(sum(d["int_ga"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    fleet_ext = round(sum(d["ext_ga"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    fleet_comb = round(sum(d["comb_ga"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
+    plf_monthly_wrapped = defaultdict(list)
+    for m, v in month_plf.items():
+        y = m.split("-")[0]
+        plf_monthly_wrapped[y].append({
+            "month": m,
+            "avg_plf": round(sum(v)/len(v), 2)
+        })
 
-    sorted_months = sorted(set(list(monthly_ma.keys()) + list(monthly_int.keys()) + list(monthly_ext.keys())))[-12:]
-    month_ma_series = [round(sum(monthly_ma[m]) / len(monthly_ma[m]), 2) if monthly_ma[m] else 0.0 for m in sorted_months]
-    month_int_series = [round(sum(monthly_int[m]) / len(monthly_int[m]), 2) if monthly_int[m] else 0.0 for m in sorted_months]
-    month_ext_series = [round(sum(monthly_ext[m]) / len(monthly_ext[m]), 2) if monthly_ext[m] else 0.0 for m in sorted_months]
+    # ---------------------------------------------------
+    # RENDER PAGE
+    # ---------------------------------------------------
+    return render(request, "wind_Grid_Availability_and_Machine.html", {
+        "grid_chart_data": json.dumps(grid_chart_data),
+        "availability_chart_data": json.dumps(availability_chart_data),
+        "plf_yearly_data": json.dumps(plf_yearly),
+        "plf_monthly_data": json.dumps(plf_monthly_wrapped),
 
-    context = {
-        "kpi_fleet_ma": fleet_ma,
-        "kpi_fleet_int": fleet_int,
-        "kpi_fleet_ext": fleet_ext,
-        "kpi_fleet_comb": fleet_comb,
-        "kpi_total_wtgs": len(wtg_data),
-
-        "table_data": wtg_data,
-        "all_wtgs_json": json.dumps(wtg_data),
-
-        "monthly_cats_json": json.dumps(sorted_months),
-        "monthly_ma_json": json.dumps(month_ma_series),
-        "monthly_int_json": json.dumps(month_int_series),
-        "monthly_ext_json": json.dumps(month_ext_series),
-
-        # Filters
-        "date_from": date_from,
-        "date_to": date_to,
         "providers": sorted(distincts["providers"]),
+        "customers": sorted(distincts["customers"]),
         "states": sorted(distincts["states"]),
         "sites": sorted(distincts["sites"]),
         "wtgs": sorted(distincts["wtgs"]),
+
         "selected_providers": providers,
+        "selected_customers": customers,
         "selected_states": states,
         "selected_sites": sites,
         "selected_wtgs": wtgs,
-    }
 
-    return render(request, "wind_Grid_Availability_and_Machine.html", context)
+        "date_from": date_from,
+        "date_to": date_to,
+
+        "no_data": False,
+    })
+
+from collections import defaultdict
+from datetime import datetime, date
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import json
 
 
 def _pick(col_map, *candidates):
@@ -1585,436 +1515,619 @@ def safe_float(v):
 
 @login_required
 def wind_drill_down(request):
-    """
-    Turbine-Level Detail View (Drill Down)
-    Implements Priority Visual #12:
-    - Single-turbine selection from full fleet
-    - Turbine lifetime & period KPIs (Generation, MA %, PLF %, Operating Hours, Downtime Hours)
-    - Time-series generation trend for selected turbine
-    - Operational loss breakdown (Machine vs Grid vs Lull vs Service)
-    - Detailed historical breakdown log for the turbine
-    """
     user = request.user.username.lower()
-    is_admin = request.user.is_superuser or user == 'admin'
 
-    with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES;")
-        all_tables = [r[0] for r in cursor.fetchall()]
-
-    if is_admin:
-        gen_tables = [t for t in all_tables if t.endswith('_wind') and not t.endswith('_breakdowndata')]
-        bd_tables = [t for t in all_tables if t.endswith('_wind_breakdowndata')]
-    else:
-        gen_tables = [t for t in all_tables if t.startswith(user + '_') and t.endswith('_wind') and not t.endswith('_breakdowndata')]
-        bd_tables = [t for t in all_tables if t.startswith(user + '_') and t.endswith('_wind_breakdowndata')]
-
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
-
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
-
-    all_wtgs = set()
-    wtg_oem_map = {}
-
-    # Discover all WTGs
-    for gt in gen_tables:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{gt}`")
-            cols = [r[0] for r in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
-        wtg_col = _pick(col_norm, "location_no", "turbine_id", "wtg", "wtg_no", "loc_no", "wec", "location")
-        oem_col = _pick(col_norm, "provider", "oem")
-        if wtg_col:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SELECT DISTINCT `{wtg_col}` FROM `{gt}` WHERE `{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''")
-                for r in cursor.fetchall():
-                    w_name = str(r[0]).strip()
-                    if w_name and w_name.lower() not in ("none", "total", "all wtg"):
-                        all_wtgs.add(w_name)
-                        oem = "Senvion" if "senvion" in gt.lower() else ("Regen" if "regen" in gt.lower() else "OEM")
-                        wtg_oem_map[w_name] = oem
-
-    sorted_wtg_list = sorted(list(all_wtgs))
-    selected_wtg = request.GET.get("selected_wtg", "").strip()
-    if not selected_wtg and sorted_wtg_list:
-        selected_wtg = sorted_wtg_list[0]
-
-    # Metrics for selected turbine
-    wtg_total_gen = 0.0
-    wtg_ma_list = []
-    wtg_plf_list = []
-    wtg_oh = 0.0
-    wtg_iga_list = []
-    wtg_ega_list = []
-    gen_time_series = []
-
-    loss_breakdown = {
-        "Machine Fault": 0.0,
-        "Internal Grid": 0.0,
-        "External Grid": 0.0,
-        "Lull / Low Wind": 0.0,
-        "Scheduled Service": 0.0
-    }
-
-    for gt in gen_tables:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{gt}`")
-            cols = [r[0] for r in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
-
-        wtg_col = _pick(col_norm, "location_no", "turbine_id", "wtg", "wtg_no", "loc_no", "wec", "location")
-        gen_col = _pick(col_norm, "wtg_production_kwh", "gen_kwh_day", "gen_kwh", "generation", "kwh")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date")
-        ma_col = _pick(col_norm, "wtg_availability", "machine_availability", "actual_ma", "corrected_ma")
-        plf_col = _pick(col_norm, "plf_wtg_efficiency", "plf", "monthly_plf")
-        oh_col = _pick(col_norm, "production_hours", "gen_hours", "operating_hours")
-        iga_col = _pick(col_norm, "int_grid_availability", "internal_grid_availability")
-        ega_col = _pick(col_norm, "ext_grid_availability", "external_grid_availability")
-
-        lull_col = _pick(col_norm, "lull_hrs", "lull_hours")
-        mf_col = _pick(col_norm, "machine_fault_hrs", "unscheduled_services")
-        igf_col = _pick(col_norm, "internal_grid_down_time", "internal_grid_fault_hrs")
-        egf_col = _pick(col_norm, "external_grid_down_time", "external_grid_fault_sd_hrs")
-        serv_col = _pick(col_norm, "scheduled_services", "machine_shutdown_hrs")
-
-        if not wtg_col or not selected_wtg:
-            continue
-
-        with connection.cursor() as cursor:
-            cursor.execute(f"""
-                SELECT SUM(CAST(`{gen_col}` AS DECIMAL(15,2))) as s_gen,
-                       AVG(CAST(`{ma_col}` AS DECIMAL(10,2))) as avg_ma,
-                       AVG(CAST(`{plf_col}` AS DECIMAL(10,2))) as avg_plf
-                       {f", SUM(CAST(`{oh_col}` AS DECIMAL(15,2)))" if oh_col else ", 0"}
-                       {f", AVG(CAST(`{iga_col}` AS DECIMAL(10,2)))" if iga_col else ", 0"}
-                       {f", AVG(CAST(`{ega_col}` AS DECIMAL(10,2)))" if ega_col else ", 0"}
-                       {f", SUM(CAST(`{lull_col}` AS DECIMAL(15,2)))" if lull_col else ", 0"}
-                       {f", SUM(CAST(`{mf_col}` AS DECIMAL(15,2)))" if mf_col else ", 0"}
-                       {f", SUM(CAST(`{igf_col}` AS DECIMAL(15,2)))" if igf_col else ", 0"}
-                       {f", SUM(CAST(`{egf_col}` AS DECIMAL(15,2)))" if egf_col else ", 0"}
-                       {f", SUM(CAST(`{serv_col}` AS DECIMAL(15,2)))" if serv_col else ", 0"}
-                FROM `{gt}`
-                WHERE REPLACE(LOWER(`{wtg_col}`), ' ', '') = REPLACE(LOWER(%s), ' ', '')
-            """, [selected_wtg])
-            row = cursor.fetchone()
-            if row and row[0] is not None:
-                wtg_total_gen += float(row[0] or 0)
-                if row[1] is not None: wtg_ma_list.append(float(row[1]))
-                if row[2] is not None: wtg_plf_list.append(float(row[2]))
-                if row[3] is not None: wtg_oh += float(row[3] or 0)
-                if row[4] is not None: wtg_iga_list.append(float(row[4]))
-                if row[5] is not None: wtg_ega_list.append(float(row[5]))
-                loss_breakdown["Lull / Low Wind"] += float(row[6] or 0)
-                loss_breakdown["Machine Fault"] += float(row[7] or 0)
-                loss_breakdown["Internal Grid"] += float(row[8] or 0)
-                loss_breakdown["External Grid"] += float(row[9] or 0)
-                loss_breakdown["Scheduled Service"] += float(row[10] or 0)
-
-        # Monthly trajectory for this turbine
-        if date_col and gen_col:
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT SUBSTRING(`{date_col}`, 1, 7) as ym, SUM(CAST(`{gen_col}` AS DECIMAL(15,2)))
-                    FROM `{gt}`
-                    WHERE REPLACE(LOWER(`{wtg_col}`), ' ', '') = REPLACE(LOWER(%s), ' ', '')
-                      AND `{date_col}` IS NOT NULL AND `{date_col}` != ''
-                    GROUP BY ym
-                    ORDER BY ym ASC
-                """, [selected_wtg])
-                for ym, g in cursor.fetchall():
-                    if ym and len(ym) == 7:
-                        gen_time_series.append({"x": str(ym), "y": round(float(g or 0), 2)})
-
-    # Query breakdown events for this turbine
-    turbine_breakdowns = []
-    total_turbine_downtime = 0.0
-
-    for bdt in bd_tables:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{bdt}`")
-            cols = [r[0] for r in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
-
-        loc_col = _pick(col_norm, "location", "loc_no", "location_no", "wtg", "wtg_no")
-        err_col = _pick(col_norm, "error_description", "error_details", "error_code", "cause")
-        dur_col = _pick(col_norm, "total_duration", "duration", "hours")
-        date_col = _pick(col_norm, "date", "gen_date")
-        act_col = _pick(col_norm, "action_taken_remark", "action_taken", "remark")
-
-        if loc_col and err_col and dur_col:
-            with connection.cursor() as cursor:
-                act_sel = f", `{act_col}`" if act_col else ", ''"
-                cursor.execute(f"""
-                    SELECT `{date_col}`, TRIM(`{err_col}`), CAST(`{dur_col}` AS DECIMAL(15,2)) {act_sel}
-                    FROM `{bdt}`
-                    WHERE REPLACE(LOWER(`{loc_col}`), ' ', '') = REPLACE(LOWER(%s), ' ', '')
-                    ORDER BY CAST(`{dur_col}` AS DECIMAL(15,2)) DESC
-                    LIMIT 100
-                """, [selected_wtg])
-                for r in cursor.fetchall():
-                    d_val = float(r[2] or 0)
-                    total_turbine_downtime += d_val
-                    turbine_breakdowns.append({
-                        "date": str(r[0])[:10] if r[0] else "-",
-                        "cause": ' '.join(str(r[1]).split()) if r[1] else "Trip",
-                        "duration": d_val,
-                        "action": r[3] if len(r) > 3 and r[3] else "Restored to normal operation."
-                    })
-
-    avg_ma = (sum(wtg_ma_list) / len(wtg_ma_list)) if wtg_ma_list else 0.0
-    avg_plf = (sum(wtg_plf_list) / len(wtg_plf_list)) if wtg_plf_list else 0.0
-    avg_iga = (sum(wtg_iga_list) / len(wtg_iga_list)) if wtg_iga_list else 0.0
-    avg_ega = (sum(wtg_ega_list) / len(wtg_ega_list)) if wtg_ega_list else 0.0
-
-    if sum(loss_breakdown.values()) == 0 and total_turbine_downtime > 0:
-        loss_breakdown["Machine Fault"] = round(total_turbine_downtime * 0.45, 1)
-        loss_breakdown["Internal Grid"] = round(total_turbine_downtime * 0.20, 1)
-        loss_breakdown["External Grid"] = round(total_turbine_downtime * 0.25, 1)
-        loss_breakdown["Scheduled Service"] = round(total_turbine_downtime * 0.10, 1)
-
-    return render(request, "wind_drill_down.html", {
-        "selected_wtg": selected_wtg,
-        "selected_oem": wtg_oem_map.get(selected_wtg, "OEM"),
-        "wtg_list": sorted_wtg_list,
-        "total_gen": round(wtg_total_gen, 2),
-        "avg_ma": round(avg_ma, 2),
-        "avg_plf": round(avg_plf, 2),
-        "operating_hours": round(wtg_oh, 1),
-        "total_downtime": round(total_turbine_downtime, 1),
-        "avg_iga": round(avg_iga, 2),
-        "avg_ega": round(avg_ega, 2),
-        "generation_series_json": json.dumps(gen_time_series),
-        "loss_categories_json": json.dumps(list(loss_breakdown.keys())),
-        "loss_values_json": json.dumps([round(v, 1) for v in loss_breakdown.values()]),
-        "breakdown_events": turbine_breakdowns
-    })
-
-
-@login_required
-def wind_Avg_Machine_Availability(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == "admin"
-
-    # Clear filters
+    # ---------------------------------------------------
+    # CLEAR FILTERS
+    # ---------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
+    # ---------------------------------------------------
+    # RESTORE GLOBAL FILTERS
+    # ---------------------------------------------------
     saved = request.session.get("wind_filters", {})
+
     def get_or_saved_list(key):
         vals = request.GET.getlist(key)
         return vals if vals else saved.get(key, [])
 
     date_from = request.GET.get("date_from") or saved.get("date_from")
     date_to   = request.GET.get("date_to")   or saved.get("date_to")
+
+    selected_providers = get_or_saved_list("provider")
+    selected_customers = get_or_saved_list("customer")
+    selected_states    = get_or_saved_list("state")
+    selected_sites     = get_or_saved_list("site")
+    selected_wtgs      = get_or_saved_list("wtg")
+
+    # ---------------------------------------------------
+    # AUTO DATE RANGE: LAST 1 YEAR
+    # ---------------------------------------------------
+    from datetime import date, timedelta
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=365)
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to   = today.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------
+    # SAVE FILTERS BACK TO SESSION
+    # ---------------------------------------------------
+    request.session["wind_filters"] = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "provider": selected_providers,
+        "customer": selected_customers,
+        "state": selected_states,
+        "site": selected_sites,
+        "wtg": selected_wtgs,
+    }
+    request.session.modified = True
+
+    # ---------------------------------------------------
+    # FIND ALL USER TABLES
+    # ---------------------------------------------------
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW TABLES;")
+        tables = [row[0] for row in cursor.fetchall()]
+
+    table_names = [
+        t for t in tables
+        if t.startswith(user + "_") and t.endswith("_wind")
+    ]
+
+    if not table_names:
+        return render(request, "wind_drill_down.html", {
+            "site_gen_data": "[]",
+            "ma_data": "[]",
+            "ga_data": "[]",
+            "oh_data": "[]",
+            "providers": [], "customers": [], "states": [],
+            "sites": [], "wtgs": [],
+            "selected_providers": selected_providers,
+            "selected_customers": selected_customers,
+            "selected_states": selected_states,
+            "selected_sites": selected_sites,
+            "selected_wtgs": selected_wtgs,
+            "date_from": date_from, 
+            "date_to": date_to,
+            "no_data": True,
+            "no_data_msg": "No wind tables found for your account."
+        })
+
+    # ---------------------------------------------------
+    # ACCUMULATORS
+    # ---------------------------------------------------
+    site_gen = defaultdict(float)
+    ma_by_wec = defaultdict(list)
+    ga_by_wec = defaultdict(list)
+    oh_by_wec = defaultdict(float)
+
+    providers_set = set()
+    customers_set = set()
+    states_set = set()
+    sites_set = set()
+    wtgs_set = set()
+
+    # ---------------------------------------------------
+    # PROCESS EVERY WIND TABLE
+    # ---------------------------------------------------
+    for table in table_names:
+
+        # Load schema
+        with connection.cursor() as cursor:
+            cursor.execute(f"SHOW COLUMNS FROM `{table}`")
+            cols = [row[0] for row in cursor.fetchall()]
+        col_map = {normalize(c): c for c in cols}
+
+        # Flexible dynamic mapping
+        date_col = _pick(col_map, "date", "gen_date", "reading_date", "day_date")
+        site_col = _pick(col_map, "site", "location", "plant", "park", "windfarmname")
+        wec_col  = _pick(col_map, "wec", "wtg", "loc_no", "locno", "wtgno")
+
+        gen_col = _pick(col_map, "generation", "gen", "genkwh", "gen_kwh_day", "gen(kwh)")
+        ma_col  = _pick(col_map, "ma", "machineavailability")
+        ga_col  = _pick(col_map, "ga", "gridavailability", "gia")
+
+        oh_col = _pick(col_map, "ohrs", "ophrs", "operatinghours")
+
+        provider_col = _pick(col_map, "provider", "oem")
+        customer_col = _pick(col_map, "customer", "customername", "client")
+        state_col    = _pick(col_map, "state")
+
+        if not date_col:
+            continue
+
+        # ---------------------------------------------------
+        # BUILD WHERE CLAUSE
+        # ---------------------------------------------------
+        conditions, params = [], []
+
+        if date_from:
+            conditions.append(f"`{date_col}` >= %s")
+            params.append(date_from)
+
+        if date_to:
+            conditions.append(f"`{date_col}` <= %s")
+            params.append(date_to)
+
+        def add_filter(col, values):
+            if col and values:
+                q = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({q})")
+                params.extend(values)
+
+        add_filter(provider_col, selected_providers)
+        add_filter(customer_col, selected_customers)
+        add_filter(state_col, selected_states)
+        add_filter(site_col, selected_sites)
+        add_filter(wec_col, selected_wtgs)
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        # ---------------------------------------------------
+        # SELECT ONLY REQUIRED COLUMNS
+        # ---------------------------------------------------
+        select_cols = [
+            c for c in 
+            [date_col, site_col, wec_col, gen_col, ma_col, ga_col, oh_col,
+             provider_col, customer_col, state_col]
+            if c
+        ]
+        select_clause = ", ".join(f"`{c}`" for c in select_cols)
+
+        query = f"SELECT {select_clause} FROM `{table}` {where_clause}"
+
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+        idx = {col: i for i, col in enumerate(select_cols)}
+
+        def val(row, column):
+            return row[idx[column]] if column in idx else None
+
+        # ---------------------------------------------------
+        # ROW PROCESSING
+        # ---------------------------------------------------
+        for row in rows:
+
+            d = parse_date_like(val(row, date_col))
+            if not d:
+                continue
+
+            site_val = val(row, site_col) or "Unknown"
+            wec_val  = val(row, wec_col) or "Unknown"
+
+            # Distinct sets
+            if provider_col and val(row, provider_col): providers_set.add(str(val(row, provider_col)))
+            if customer_col and val(row, customer_col): customers_set.add(str(val(row, customer_col)))
+            if state_col and val(row, state_col): states_set.add(str(val(row, state_col)))
+            if site_col and val(row, site_col): sites_set.add(str(val(row, site_col)))
+            if wec_col and val(row, wec_col): wtgs_set.add(str(val(row, wec_col)))
+
+            # Generation
+            try:
+                site_gen[site_val] += float(val(row, gen_col) or 0)
+            except:
+                pass
+
+            # Machine Availability
+            if ma_col and val(row, ma_col) not in (None, ""):
+                ma_by_wec[wec_val].append(safe_float(val(row, ma_col)))
+
+            # Grid Availability
+            if ga_col and val(row, ga_col) not in (None, ""):
+                ga_by_wec[wec_val].append(safe_float(val(row, ga_col)))
+
+            # Operating Hours
+            if oh_col and val(row, oh_col) not in (None, ""):
+                oh_by_wec[wec_val] += safe_float(val(row, oh_col))
+
+    # ---------------------------------------------------
+    # FINAL OUTPUT DATA
+    # ---------------------------------------------------
+    site_gen_data = [{"site": k, "generation": v} for k, v in site_gen.items()]
+    ma_data = [{"wec": k, "ma": sum(v)/len(v)} for k, v in ma_by_wec.items()]
+    ga_data = [{"wec": k, "ga": sum(v)/len(v)} for k, v in ga_by_wec.items()]
+    oh_data = [{"wec": k, "hours": v} for k, v in oh_by_wec.items()]
+
+    # ---------------------------------------------------
+    # CONTEXT TO TEMPLATE
+    # ---------------------------------------------------
+    return render(request, "wind_drill_down.html", {
+        "site_gen_data": json.dumps(site_gen_data),
+        "ma_data": json.dumps(ma_data),
+        "ga_data": json.dumps(ga_data),
+        "oh_data": json.dumps(oh_data),
+
+        "providers": sorted(providers_set),
+        "customers": sorted(customers_set),
+        "states": sorted(states_set),
+        "sites": sorted(sites_set),
+        "wtgs": sorted(wtgs_set),
+
+        "selected_providers": selected_providers,
+        "selected_customers": selected_customers,
+        "selected_states": selected_states,
+        "selected_sites": selected_sites,
+        "selected_wtgs": selected_wtgs,
+
+        "date_from": date_from,
+        "date_to": date_to,
+        "no_data": False,
+    })
+
+
+from collections import defaultdict
+from datetime import datetime, date
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import json
+
+
+def _pick(col_map, *candidates):
+    """Return the actual column name if it matches any of the candidates"""
+    for c in candidates:
+        lc = c.lower()
+        if lc in col_map:
+            return col_map[lc]
+    return None
+
+
+def parse_date_like(v):
+    """Parse various date formats to datetime.date"""
+    if isinstance(v, datetime): 
+        return v.date()
+    if isinstance(v, date): 
+        return v
+    if v is None: 
+        return None
+    s = str(v).strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d.%m.%Y", "%d-%b-%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except:
+            continue
+    return None
+
+from collections import defaultdict
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.shortcuts import render
+import json
+
+@login_required
+def wind_Avg_Machine_Availability(request):
+    user = request.user.username.lower()
+
+    # ---------------------------------------------------
+    # CLEAR FILTERS
+    # ---------------------------------------------------
+    if request.GET.get("clear_filters"):
+        request.session.pop("wind_filters", None)
+
+    # ---------------------------------------------------
+    # RESTORE SESSION FILTERS
+    # ---------------------------------------------------
+    saved = request.session.get("wind_filters", {})
+
+    def get_or_saved_list(key):
+        vals = request.GET.getlist(key)
+        return vals if vals else saved.get(key, [])
+
+    date_from = request.GET.get("date_from") or saved.get("date_from")
+    date_to   = request.GET.get("date_to")   or saved.get("date_to")
+
     providers = get_or_saved_list("provider")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ---------------------------------------------------
+    # AUTO DATE RANGE = LAST 1 YEAR
+    # ---------------------------------------------------
+    from datetime import date, timedelta
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=365)
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to   = today.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------
+    # SAVE FILTERS BACK TO SESSION
+    # ---------------------------------------------------
     request.session["wind_filters"] = {
-        "date_from": date_from, "date_to": date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
+        "date_from": date_from,
+        "date_to": date_to,
+        "provider": providers,
+        "customer": customers,
+        "state": states,
+        "site": sites,
+        "wtg": wtgs,
     }
     request.session.modified = True
 
+    # ---------------------------------------------------
+    # FIND ALL USER WIND TABLES
+    # ---------------------------------------------------
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
+        cursor.execute("SHOW TABLES;")
         db_tables = [row[0] for row in cursor.fetchall()]
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith("_wind") and not t.endswith("_breakdowndata")]
-    else:
-        table_names = [t for t in db_tables if t.startswith(username + "_") and t.endswith("_wind") and not t.endswith("_breakdowndata")]
+    table_names = [
+        t for t in db_tables
+        if t.startswith(user + "_") and t.endswith("_wind")
+    ]
 
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
+    if not table_names:
+        return render(request, "wind_Avg_Machine_Availability.html", {
+            "chart_data": "[]",
+            "table_data": [],
 
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
+            "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
+            "selected_providers": providers,
+            "selected_customers": customers,
+            "selected_states": states,
+            "selected_sites": sites,
+            "selected_wtgs": wtgs,
 
-    if not date_from or not date_to:
-        min_dates, max_dates = [], []
-        for t in table_names:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cursor.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-                if dcol:
-                    cursor.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cursor.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            date_from = date_from or min(min_dates)
-            date_to = date_to or max(max_dates)
+            "date_from": date_from,
+            "date_to": date_to,
 
-    wtg_ma_list = defaultdict(list)
-    wtg_meta = {}
-    monthly_ma = defaultdict(list)
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
+            "no_data": True,
+            "no_data_msg": "No wind tables found for your account.",
+            "overall_avg_ma": 0,
+            "paginator": None,
+            "table_page": None
+        })
 
-    for t in table_names:
+    # ---------------------------------------------------
+    # ACCUMULATORS
+    # ---------------------------------------------------
+    wtg_ma = defaultdict(list)
+    distincts = {
+        "providers": set(), "customers": set(), "states": set(),
+        "sites": set(), "wtgs": set()
+    }
+
+    # ---------------------------------------------------
+    # PROCESS EACH WIND TABLE
+    # ---------------------------------------------------
+    for table_name in table_names:
+
         with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
+            cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+            cols = [r[0] for r in cursor.fetchall()]
+        col_map = {normalize(c): c for c in cols}
 
-        wtg_col = _pick(col_norm, "location_no", "turbine_id", "loc_no", "wec", "wtg", "wtg_no", "locno", "turbine")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-        ma_col = _pick(col_norm, "wtg_availability", "machine_availability", "actual_ma", "corrected_ma", "ma")
-        oem_col = _pick(col_norm, "provider", "oem", "oemprovider", "oem_name")
-        site_col = _pick(col_norm, "site", "sitename", "location", "plant", "park")
-        state_col = _pick(col_norm, "state", "statename", "st")
-        month_col = _pick(col_norm, "month", "mon")
+        # Dynamic column mapping
+        date_col = _pick(col_map, "date", "gen_date", "reading_date", "day_date")
+        wtg_col = _pick(col_map, "wec", "wtg", "loc_no", "locno", "turbine")
+        ohrs_col = _pick(col_map, "ohrs", "operatinghours", "o_hours")
+        loss_col = _pick(col_map, "lhrs", "losshrs", "loss_hours")
+        ma_col = _pick(col_map, "ma", "machineavailability", "m/c avail.%", "mc_avail")
 
-        if not wtg_col or not ma_col:
+        provider_col = _pick(col_map, "provider","oem")
+        customer_col = _pick(col_map, "customer","consumer","client")
+        state_col    = _pick(col_map, "state","statename")
+        site_col     = _pick(col_map, "site","sitename","plant")
+
+        if not date_col or not wtg_col:
             continue
 
-        select_cols = [f"`{wtg_col}`", f"`{ma_col}`"]
-        if date_col: select_cols.append(f"`{date_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
-        if site_col: select_cols.append(f"`{site_col}`")
-        if state_col: select_cols.append(f"`{state_col}`")
-        if month_col: select_cols.append(f"`{month_col}`")
+        # ---------------------------------------------------
+        # BUILD WHERE CLAUSE
+        # ---------------------------------------------------
+        conditions, params = [], []
 
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and date_from and date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
+        if date_from and date_to:
+            conditions.append(f"`{date_col}` BETWEEN %s AND %s")
             params.extend([date_from, date_to])
+        elif date_from:
+            conditions.append(f"`{date_col}` >= %s")
+            params.append(date_from)
+        elif date_to:
+            conditions.append(f"`{date_col}` <= %s")
+            params.append(date_to)
 
-        def add_in(col, vals):
-            if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
-                params.extend(vals)
+        def add_in(col, values):
+            if col and values:
+                q = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({q})")
+                params.extend(values)
 
-        add_in(oem_col, providers)
+        add_in(provider_col, providers)
+        add_in(customer_col, customers)
         add_in(state_col, states)
         add_in(site_col, sites)
         add_in(wtg_col, wtgs)
 
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause}"
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        # ---------------------------------------------------
+        # MACHINE AVAILABILITY EXPRESSION
+        # ---------------------------------------------------
+        if ma_col:
+            expr = f"`{ma_col}`"
+        elif ohrs_col and loss_col:
+            expr = f"(CASE WHEN `{ohrs_col}` > 0 THEN ((`{ohrs_col}`-`{loss_col}`)/`{ohrs_col}`)*100 ELSE 0 END)"
+        else:
+            continue
+
+        # ---------------------------------------------------
+        # QUERY
+        # ---------------------------------------------------
+        query = f"""
+            SELECT `{wtg_col}`, AVG({expr}) AS avg_ma
+            FROM `{table_name}`
+            {where_clause}
+            GROUP BY `{wtg_col}`
+        """
 
         with connection.cursor() as cursor:
-            cursor.execute(sql, params)
+            cursor.execute(query, params)
             rows = cursor.fetchall()
 
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
-
-        for r in rows:
-            wtg_val = str(r[idx[wtg_col]]).strip()
-            if not wtg_val or wtg_val.lower() in ("none", "total", "all wtg"):
+        for wtg_val, ma in rows:
+            if not wtg_val:
                 continue
+            wtg_ma[str(wtg_val)].append(float(ma or 0))
 
-            val = None
-            if r[idx[ma_col]] not in (None, ""):
-                try: val = float(r[idx[ma_col]])
-                except: pass
+        # ---------------------------------------------------
+        # DISTINCT VALUES FOR FILTERS
+        # ---------------------------------------------------
+        def distinct_list(col):
+            if not col:
+                return []
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table_name}` ORDER BY `{col}`")
+                return [str(r[0]) for r in cursor.fetchall() if r[0]]
 
-            if val is not None and val > 0:
-                wtg_ma_list[wtg_val].append(val)
+        distincts["providers"].update(distinct_list(provider_col))
+        distincts["customers"].update(distinct_list(customer_col))
+        distincts["states"].update(distinct_list(state_col))
+        distincts["sites"].update(distinct_list(site_col))
+        distincts["wtgs"].update(distinct_list(wtg_col))
 
-            if wtg_val not in wtg_meta:
-                wtg_meta[wtg_val] = {
-                    "oem": str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind")),
-                    "site": str(r[idx[site_col]]).strip() if site_col and r[idx[site_col]] else "Site-1",
-                    "state": str(r[idx[state_col]]).strip() if state_col and r[idx[state_col]] else "Default"
-                }
+    # ---------------------------------------------------
+    # FINAL DATA PREPARATION
+    # ---------------------------------------------------
+    chart_data = [
+        {"x": wtg, "y": round(sum(vals) / len(vals), 2)}
+        for wtg, vals in wtg_ma.items()
+    ]
 
-            m_key = None
-            if date_col and r[idx[date_col]]:
-                m_key = str(r[idx[date_col]])[:7]
-            elif month_col and r[idx[month_col]]:
-                m_key = str(r[idx[month_col]]).strip()
+    table_data = [
+        {"wtg_no": wtg, "avg_ma": round(sum(vals) / len(vals), 2)}
+        for wtg, vals in wtg_ma.items()
+    ]
 
-            if m_key and val is not None and val > 0:
-                monthly_ma[m_key].append(val)
+    # ---------------------------------------------------
+    # PAGINATION
+    # ---------------------------------------------------
+    from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+    page = request.GET.get("page", 1)
+    paginator = Paginator(table_data, 10)
+    try:
+        table_page = paginator.page(page)
+    except PageNotAnInteger:
+        table_page = paginator.page(1)
+    except EmptyPage:
+        table_page = paginator.page(paginator.num_pages)
 
-        def add_distinct(col, key):
-            if not col: return
-            with connection.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT `{col}` FROM `{t}` WHERE `{col}` IS NOT NULL AND `{col}` != ''")
-                for r_ in cur.fetchall():
-                    distincts[key].add(str(r_[0]).strip())
+    # ---------------------------------------------------
+    # OVERALL AVERAGE MACHINE AVAILABILITY
+    # ---------------------------------------------------
+    all_vals = [v for arr in wtg_ma.values() for v in arr]
+    overall_avg_ma = round(sum(all_vals)/len(all_vals), 2) if all_vals else 0
 
-        add_distinct(oem_col, "providers")
-        add_distinct(state_col, "states")
-        add_distinct(site_col, "sites")
-        add_distinct(wtg_col, "wtgs")
+    # ---------------------------------------------------
+    # SEND TO TEMPLATE
+    # ---------------------------------------------------
+    return render(request, "wind_Avg_Machine_Availability.html", {
+        "chart_data": json.dumps(chart_data),
+        "table_data": table_data,
+        "table_page": table_page,
+        "paginator": paginator,
 
-    wtg_data = []
-    for w, vals in wtg_ma_list.items():
-        avg_ma = round(sum(vals) / len(vals), 2)
-        meta = wtg_meta.get(w, {"oem": "Wind", "site": "-", "state": "-"})
-        delta_target = round(avg_ma - 95.0, 2)
-        wtg_data.append({
-            "wtg": w,
-            "ma": avg_ma,
-            "delta_target": delta_target,
-            "oem": meta["oem"],
-            "site": meta["site"],
-            "state": meta["state"],
-            "status": "Target Met" if avg_ma >= 95.0 else "Below Target"
-        })
-
-    wtg_data.sort(key=lambda x: x["ma"], reverse=True)
-    for rank, item in enumerate(wtg_data, 1):
-        item["rank"] = rank
-
-    fleet_ma = round(sum(d["ma"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    best_wtg = wtg_data[0] if wtg_data else {"wtg": "-", "ma": 0}
-    worst_wtg = wtg_data[-1] if wtg_data else {"wtg": "-", "ma": 0}
-    compliance_cnt = sum(1 for d in wtg_data if d["ma"] >= 95.0)
-    compliance_pct = round((compliance_cnt / len(wtg_data) * 100), 1) if wtg_data else 0.0
-
-    sorted_months = sorted(monthly_ma.keys())[-12:]
-    month_series = [round(sum(monthly_ma[m]) / len(monthly_ma[m]), 2) for m in sorted_months]
-
-    context = {
-        "kpi_fleet_ma": fleet_ma,
-        "kpi_best_wtg": best_wtg["wtg"],
-        "kpi_best_val": best_wtg["ma"],
-        "kpi_worst_wtg": worst_wtg["wtg"],
-        "kpi_worst_val": worst_wtg["ma"],
-        "kpi_compliance_cnt": compliance_cnt,
-        "kpi_compliance_pct": compliance_pct,
-        "kpi_total_wtgs": len(wtg_data),
-
-        "table_data": wtg_data,
-        "all_wtgs_json": json.dumps(wtg_data),
-
-        "monthly_cats_json": json.dumps(sorted_months),
-        "monthly_ma_json": json.dumps(month_series),
-
-        # Filters
-        "date_from": date_from,
-        "date_to": date_to,
         "providers": sorted(distincts["providers"]),
+        "customers": sorted(distincts["customers"]),
         "states": sorted(distincts["states"]),
         "sites": sorted(distincts["sites"]),
         "wtgs": sorted(distincts["wtgs"]),
+
         "selected_providers": providers,
+        "selected_customers": customers,
         "selected_states": states,
         "selected_sites": sites,
         "selected_wtgs": wtgs,
-    }
 
-    return render(request, "wind_Avg_Machine_Availability.html", context)
+        "date_from": date_from,
+        "date_to": date_to,
+
+        "overall_avg_ma": overall_avg_ma,
+
+        "no_data": len(chart_data) == 0,
+        "no_data_msg": "No Machine Availability data found for selected filters."
+    })
+
+
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.files.storage import FileSystemStorage
+from django.db import connection
+from django.contrib.auth.models import User
+from django.utils.timezone import now
+
+import os
+import re
+import traceback
+import pandas as pd
+import numpy as np
+
+import os, re, traceback
+import pandas as pd
+import numpy as np
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.files.storage import FileSystemStorage
+from django.db import connection
+from django.contrib.auth.models import User
+from django.utils.timezone import now
+
+
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.files.storage import FileSystemStorage
+from django.db import connection
+from django.contrib.auth.models import User
+from django.utils.timezone import now
+
+import os
+import re
+import traceback
+import pandas as pd
+import numpy as np
+
+import os, re, traceback
+import pandas as pd
+import numpy as np
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.files.storage import FileSystemStorage
+from django.db import connection
+from django.contrib.auth.models import User
+from django.utils.timezone import now
+
+import os, re, traceback
+import pandas as pd
+import numpy as np
+from datetime import datetime, date
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.files.storage import FileSystemStorage
+from django.db import connection
+from django.utils.timezone import now
+from accounts.models import Provider, EnergyType
+from accounts.models import ProviderColumnMapping
+from accounts.breakdown_mapping import canonicalize_breakdown_dataframe
+from accounts.breakdown_ingestion import (
+    ensure_breakdown_deduplication,
+    insert_canonical_breakdown_rows,
+)
+from core.models import UploadMetadata
 
 
 def clean_col(col: str) -> str:
@@ -2235,6 +2348,13 @@ def customer_upload(request):
                 for col in df.columns:
                     col_l = col.lower().strip()
 
+                    if (
+                        (("start" in col_l or "end" in col_l) and "time" in col_l)
+                        or col_l.endswith("_datetime")
+                    ):
+                        df[col] = pd.to_datetime(df[col], errors="coerce")
+                        continue
+
                     if any(k in col_l for k in ["date", "gen_date", "generation_date", "dt"]):
                         df[col] = df[col].apply(normalize_date)
                         df[col] = df[col].apply(
@@ -2270,7 +2390,11 @@ def customer_upload(request):
                 # =====================================================
                 sname = sheet_name.lower()
                 if "breakdown" in sname:
-                    target_table = f"{table_name}_breakdowndata"
+                    target_table = (
+                        table_name
+                        if table_name.lower().endswith("_breakdowndata")
+                        else f"{table_name}_breakdowndata"
+                    )
                 elif "month" in sname or "monthly" in sname:
                     target_table = f"{table_name}_monthly"
                 else:
@@ -2279,25 +2403,71 @@ def customer_upload(request):
                 if target_table not in db_tables:
                     continue
 
+                has_canonical_mapping = False
+                mapping_owner = None
+                if "breakdowndata" in target_table.lower():
+                    configured_mappings = list(
+                        ProviderColumnMapping.objects.filter(
+                            table_name=target_table
+                        ).order_by("id")
+                    )
+                    if configured_mappings:
+                        has_canonical_mapping = True
+                        mapping_owner = configured_mappings[0]
+                        try:
+                            df, _ = canonicalize_breakdown_dataframe(
+                                df, configured_mappings
+                            )
+                        except ValueError as error:
+                            messages.error(
+                                request,
+                                f"Breakdown sheet '{sheet_name}': {error}",
+                            )
+                            continue
+                    else:
+                        legacy_aliases = {
+                            "loaction": "location",
+                            "loc": "location",
+                            "location ": "location",
+                        }
+                        df.rename(
+                            columns=lambda column: legacy_aliases.get(
+                                column.lower(), column.lower()
+                            ),
+                            inplace=True,
+                        )
+                else:
+                    alias_map = {
+                        "loaction": "location",
+                        "loc": "location",
+                        "location ": "location",
+                    }
+                    df.rename(columns=lambda c: alias_map.get(c.lower(), c.lower()), inplace=True)
+
                 # =====================================================
                 # GET TABLE COLUMNS
                 # =====================================================
+                if has_canonical_mapping:
+                    ensure_breakdown_deduplication(target_table)
                 with connection.cursor() as cursor:
                     cursor.execute(f"SHOW COLUMNS FROM `{target_table}`")
                     table_columns = [c[0].lower() for c in cursor.fetchall()]
-
-                alias_map = {
-                    "loaction": "location",
-                    "loc": "location",
-                    "location ": "location",
-                }
-                df.rename(columns=lambda c: alias_map.get(c.lower(), c.lower()), inplace=True)
 
                 # =====================================================
                 # FILTER VALID COLUMNS
                 # =====================================================
                 valid_cols = [c for c in df.columns if c in table_columns]
                 df = df[valid_cols]
+                if has_canonical_mapping:
+                    required_fields = ["gen_date", "loc_no", "breakdown_remarks"]
+                    df = df.dropna(subset=required_fields)
+                    if df.empty:
+                        messages.error(
+                            request,
+                            f"Breakdown sheet '{sheet_name}' has no rows with a date, "
+                            "machine ID, and remarks.",
+                        )
+                        continue
 
                 # =====================================================
                 # ADD METADATA
@@ -2308,6 +2478,25 @@ def customer_upload(request):
                     df["provider"] = provider_name
                 if "energy_type" in table_columns:
                     df["energy_type"] = energy_type_name
+                if mapping_owner and "user_id" in table_columns:
+                    df["user_id"] = mapping_owner.user_id
+                if mapping_owner and "provider_id" in table_columns:
+                    df["provider_id"] = mapping_owner.provider_id
+
+                if has_canonical_mapping:
+                    inserted, duplicates = insert_canonical_breakdown_rows(
+                        target_table, df
+                    )
+                    if inserted:
+                        UploadMetadata.objects.update_or_create(
+                            table_name=target_table,
+                            defaults={"last_modified": now()},
+                        )
+                    uploaded_sheets.append(
+                        f"{sheet_name} → {inserted} new rows queued for classification; "
+                        f"{duplicates} duplicates discarded"
+                    )
+                    continue
 
                 # =====================================================
                 # 🔥 SOLAR SAFETY: DROP NULLS + DEDUPE
@@ -2393,11 +2582,74 @@ def customer_upload(request):
         "energy_types": energy_types,
     })
 
+
+@login_required
+def breakdown_classification_results(request):
+    from django.http import Http404
+
+    if not request.user.is_staff:
+        raise Http404("Breakdown classification results not found.")
+
+    table_name = request.GET.get("table", "").strip()
+    if not re.fullmatch(r"[a-zA-Z0-9_]+_breakdowndata", table_name, re.IGNORECASE):
+        raise Http404("Breakdown table not found.")
+
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW TABLES")
+        existing_tables = {row[0].lower() for row in cursor.fetchall()}
+        if table_name.lower() not in existing_tables:
+            raise Http404("Breakdown table not found.")
+
+        cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        columns = {row[0].lower() for row in cursor.fetchall()}
+        required_columns = {
+            "rds_code",
+            "system_name",
+            "standard_component",
+            "classification_status",
+        }
+        if required_columns - columns:
+            return render(request, "breakdown_classification_results.html", {
+                "table_name": table_name,
+                "setup_missing": True,
+                "base_template": "base.html",
+            })
+
+        cursor.execute(
+            "SELECT COALESCE(`rds_code`, 'UNCATEGORIZED'), "
+            "COALESCE(`system_name`, 'Unclassified'), "
+            "COALESCE(`standard_component`, 'Unmapped'), COUNT(*) "
+            f"FROM `{table_name}` "
+            "WHERE `classification_status` IN ('CLASSIFIED', 'LOW_CONFIDENCE') "
+            "GROUP BY `rds_code`, `system_name`, `standard_component` "
+            "ORDER BY COUNT(*) DESC, `rds_code`, `system_name`, `standard_component`"
+        )
+        mapping_summary = [
+            {
+                "rds_code": row[0],
+                "system_name": row[1],
+                "standard_component": row[2],
+                "record_count": row[3],
+            }
+            for row in cursor.fetchall()
+        ]
+    total_records = sum(item["record_count"] for item in mapping_summary)
+    max_count = max((item["record_count"] for item in mapping_summary), default=0)
+    for item in mapping_summary:
+        item["bar_width"] = round(item["record_count"] * 100 / max_count) if max_count else 0
+
+    return render(request, "breakdown_classification_results.html", {
+        "table_name": table_name,
+        "mapping_summary": mapping_summary,
+        "total_records": total_records,
+        "base_template": "base.html",
+    })
+
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import connection
-from datetime import datetime
+from datetime import datetime, timedelta, time as datetime_time
 
 from django.shortcuts import render, redirect
 from django.contrib import messages
@@ -2415,20 +2667,17 @@ from datetime import datetime
 
 @login_required
 def wind_wtg_plf(request):
-    """
-    Availability & Efficiency Analysis (PLF)
-    Implements 12 Priority Visuals:
-    - Visual #4: Turbine Availability Heatmap (Month vs WTG)
-    - Visual #6: Machine Availability vs PLF Scatter Plot (Outlier Detection)
-    - Visual #7: Internal vs External Grid Availability Chart
-    - Summary KPI cards & Full Data Table
-    """
-    user = request.user.username.lower()
-    is_admin = request.user.is_superuser or user == 'admin'
+    username = request.user.username.lower()
 
+    # ---------------------------------------------------
+    # CLEAR FILTERS
+    # ---------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
+    # ---------------------------------------------------
+    # RESTORE SESSION FILTERS
+    # ---------------------------------------------------
     saved = request.session.get("wind_filters", {})
 
     def get_or_saved_list(key):
@@ -2444,6 +2693,19 @@ def wind_wtg_plf(request):
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ---------------------------------------------------
+    # AUTO DATE RANGE = LAST 1 YEAR
+    # ---------------------------------------------------
+    from datetime import date, timedelta
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=365)
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to   = today.strftime("%Y-%m-%d")
+
+    # ---------------------------------------------------
+    # SAVE FILTERS BACK INTO SESSION
+    # ---------------------------------------------------
     request.session["wind_filters"] = {
         "date_from": date_from,
         "date_to": date_to,
@@ -2455,206 +2717,152 @@ def wind_wtg_plf(request):
     }
     request.session.modified = True
 
+    # ---------------------------------------------------
+    # FIND ALL WIND TABLES
+    # ---------------------------------------------------
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES;")
-        all_tables = [r[0] for r in cursor.fetchall()]
+        cursor.execute("SHOW TABLES")
+        db_tables = [row[0] for row in cursor.fetchall()]
 
-    if is_admin:
-        gen_tables = [t for t in all_tables if t.endswith('_wind') and 'breakdown' not in t]
-    else:
-        gen_tables = [t for t in all_tables if t.startswith(user + '_') and t.endswith('_wind')]
+    table_names = [
+        t for t in db_tables
+        if t.startswith(username + "_") and t.endswith("_wind")
+    ]
 
-    scatter_points = []
-    heatmap_matrix = defaultdict(lambda: defaultdict(float))
-    all_months = set()
-    int_grid_vals = []
-    ext_grid_vals = []
-    table_rows = []
-    distincts = {k: set() for k in ["providers", "customers", "states", "sites", "wtgs"]}
+    # ---------------------------------------------------
+    # ACCUMULATORS
+    # ---------------------------------------------------
+    plf_data = defaultdict(list)
+    provider_plf_data = defaultdict(list)
 
-    earliest_date = None
-    latest_date = None
+    distincts = {
+        "providers": set(),
+        "customers": set(),
+        "states": set(),
+        "sites": set(),
+        "wtgs": set(),
+    }
 
-    for gt in gen_tables:
+    # ---------------------------------------------------
+    # PROCESS EACH TABLE
+    # ---------------------------------------------------
+    for table in table_names:
+
         with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{gt}`")
-            cols = [r[0] for r in cursor.fetchall()]
+            cursor.execute(f"SHOW COLUMNS FROM `{table}`")
+            cols = [c[0] for c in cursor.fetchall()]
         col_map = {normalize(c): c for c in cols}
 
-        wtg_col = _pick(col_map, "location_no", "turbine_id", "wtg", "wtg_no", "loc_no", "wec", "location")
-        gen_col = _pick(col_map, "wtg_production_kwh", "gen_kwh_day", "gen_kwh", "generation", "kwh")
-        date_col = _pick(col_map, "date", "gen_date")
-        ma_col = _pick(col_map, "wtg_availability", "machine_availability", "actual_ma", "corrected_ma")
-        plf_col = _pick(col_map, "plf_wtg_efficiency", "plf", "monthly_plf")
-        iga_col = _pick(col_map, "int_grid_availability", "internal_grid_availability")
-        ega_col = _pick(col_map, "ext_grid_availability", "external_grid_availability")
-        provider_col = _pick(col_map, "provider", "oem")
-        customer_col = _pick(col_map, "customer", "customer_name")
-        state_col = _pick(col_map, "state")
-        site_col = _pick(col_map, "site", "wind_farm_name")
+        # column mapping
+        wtg_col      = _pick(col_map, "wec", "loc_no", "wtg", "wtg_no", "turbine", "turbineno", "locno")
+        plf_col      = _pick(col_map, "cf", "plf", "plf_day", "%plf_day", "capacityfactor")
+        date_col     = _pick(col_map, "date", "gen_date", "reading_date", "day_date")
+        customer_col = _pick(col_map, "customername", "customer", "consumer", "client")
+        state_col    = _pick(col_map, "state", "statename", "st")
+        site_col     = _pick(col_map, "site", "sitename", "location", "plant", "park")
+        provider_col = _pick(col_map, "provider", "oem", "oemprovider", "oem_name")
 
-        oem_name = "Unknown OEM"
-        gt_lower = gt.lower()
-        if "senvion" in gt_lower: oem_name = "Senvion"
-        elif "regen" in gt_lower: oem_name = "Regen"
-        elif "gamesa" in gt_lower: oem_name = "Gamesa"
-        elif "inox" in gt_lower: oem_name = "Inox"
-        elif "suzlon" in gt_lower: oem_name = "Suzlon"
-        elif "windworld" in gt_lower: oem_name = "Windworld"
-
-        if not wtg_col or not plf_col:
+        if not (wtg_col and plf_col):
             continue
 
-        if date_col and (not date_from or not date_to):
-            with connection.cursor() as cursor:
-                cursor.execute(f"SELECT MIN(`{date_col}`), MAX(`{date_col}`) FROM `{gt}` WHERE `{date_col}` IS NOT NULL AND `{date_col}` != ''")
-                d_min, d_max = cursor.fetchone()
-                if d_min and (not earliest_date or str(d_min) < str(earliest_date)):
-                    earliest_date = str(d_min)[:10]
-                if d_max and (not latest_date or str(d_max) > str(latest_date)):
-                    latest_date = str(d_max)[:10]
+        # ---------------------------------------------------
+        # WHERE CLAUSE
+        # ---------------------------------------------------
+        conditions, params = [], []
 
-        base_conditions, base_params = [], []
-        if date_from and date_to and date_col:
-            base_conditions.append(f"`{date_col}` BETWEEN %s AND %s")
-            base_params.extend([date_from, date_to])
+        if date_col:
+            if date_from and date_to:
+                conditions.append(f"`{date_col}` BETWEEN %s AND %s")
+                params.extend([date_from, date_to])
+            elif date_from:
+                conditions.append(f"`{date_col}` >= %s")
+                params.append(date_from)
+            elif date_to:
+                conditions.append(f"`{date_col}` <= %s")
+                params.append(date_to)
 
-        def add_in_filter(col, values, conds, parms):
+        def add_in(col, values):
             if col and values:
-                placeholders = ",".join(["%s"] * len(values))
-                conds.append(f"`{col}` IN ({placeholders})")
-                parms.extend(values)
+                q = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({q})")
+                params.extend(values)
 
-        add_in_filter(provider_col, providers, base_conditions, base_params)
-        add_in_filter(customer_col, customers, base_conditions, base_params)
-        add_in_filter(state_col, states, base_conditions, base_params)
-        add_in_filter(site_col, sites, base_conditions, base_params)
-        add_in_filter(wtg_col, wtgs, base_conditions, base_params)
+        add_in(provider_col, providers)
+        add_in(customer_col, customers)
+        add_in(state_col, states)
+        add_in(site_col, sites)
+        add_in(wtg_col, wtgs)
 
-        cond_wtg = list(base_conditions)
-        parms_wtg = list(base_params)
-        cond_wtg.append(f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''")
-        where_wtg = f"WHERE {' AND '.join(cond_wtg)}"
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-        iga_select = f", AVG(CAST(`{iga_col}` AS DECIMAL(10,2)))" if iga_col else ", 0"
-        ega_select = f", AVG(CAST(`{ega_col}` AS DECIMAL(10,2)))" if ega_col else ", 0"
-        gen_select = f", SUM(CAST(`{gen_col}` AS DECIMAL(15,2)))" if gen_col else ", 0"
-
+        # ---------------------------------------------------
+        # WTG-WISE PLF
+        # ---------------------------------------------------
+        query_wtg = f"""
+            SELECT `{wtg_col}`, AVG(`{plf_col}`)
+            FROM `{table}`
+            {where_clause}
+            GROUP BY `{wtg_col}`
+        """
         with connection.cursor() as cursor:
-            cursor.execute(f"""
-                SELECT `{wtg_col}`, 
-                       AVG(CAST(`{plf_col}` AS DECIMAL(10,2))) as avg_plf,
-                       AVG(CAST(`{ma_col}` AS DECIMAL(10,2))) as avg_ma
-                       {iga_select}
-                       {ega_select}
-                       {gen_select}
-                FROM `{gt}`
-                {where_wtg}
-                GROUP BY `{wtg_col}`
-            """, parms_wtg)
-            for w, plf, ma, iga, ega, gen in cursor.fetchall():
-                wtg_key = str(w).strip()
-                p_val = round(float(plf or 0), 2)
-                m_val = round(float(ma or 0), 2)
-                i_val = round(float(iga or 0), 2)
-                e_val = round(float(ega or 0), 2)
-                g_val = round(float(gen or 0), 2)
+            cursor.execute(query_wtg, params)
+            rows = cursor.fetchall()
 
-                scatter_points.append({
-                    "wtg": wtg_key,
-                    "x": m_val,
-                    "y": p_val,
-                    "oem": oem_name
-                })
-                table_rows.append({
-                    "wtg_no": wtg_key,
-                    "oem": oem_name,
-                    "plf": p_val,
-                    "ma": m_val,
-                    "iga": i_val,
-                    "ega": e_val,
-                    "generation": g_val
-                })
-                if iga: int_grid_vals.append(i_val)
-                if ega: ext_grid_vals.append(e_val)
+        for wtg, avg_plf in rows:
+            if wtg and avg_plf is not None:
+                plf_data[str(wtg)].append(float(avg_plf))
 
-        if date_col and ma_col:
-            cond_hm = list(base_conditions)
-            parms_hm = list(base_params)
-            cond_hm.append(f"`{date_col}` IS NOT NULL AND `{date_col}` != ''")
-            where_hm = f"WHERE {' AND '.join(cond_hm)}"
-
+        # ---------------------------------------------------
+        # PROVIDER-WISE PLF
+        # ---------------------------------------------------
+        if provider_col:
+            query_provider = f"""
+                SELECT `{provider_col}`, AVG(`{plf_col}`)
+                FROM `{table}`
+                {where_clause}
+                GROUP BY `{provider_col}`
+            """
             with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT `{wtg_col}`, SUBSTRING(`{date_col}`, 1, 7) as ym, AVG(CAST(`{ma_col}` AS DECIMAL(10,2)))
-                    FROM `{gt}`
-                    {where_hm}
-                    GROUP BY `{wtg_col}`, ym
-                """, parms_hm)
-                for w, ym, ma in cursor.fetchall():
-                    if ym and len(ym) == 7 and ma is not None:
-                        heatmap_matrix[str(w).strip()][ym] = round(float(ma), 1)
-                        all_months.add(ym)
+                cursor.execute(query_provider, params)
+                prov_rows = cursor.fetchall()
 
-        def dist(col):
-            if not col: return []
+            for prov, avg_plf in prov_rows:
+                if prov and avg_plf is not None:
+                    provider_plf_data[str(prov)].append(float(avg_plf))
+
+        # ---------------------------------------------------
+        # DISTINCT VALUES
+        # ---------------------------------------------------
+        def distinct_list(col):
+            if not col:
+                return []
             with connection.cursor() as cursor:
-                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{gt}` WHERE `{col}` IS NOT NULL AND `{col}` != '' ORDER BY `{col}`")
-                return [str(r[0]) for r in cursor.fetchall()]
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table}` ORDER BY `{col}`")
+                return [str(r[0]).strip() for r in cursor.fetchall() if r[0]]
 
-        distincts["providers"].update(dist(provider_col))
-        distincts["customers"].update(dist(customer_col))
-        distincts["states"].update(dist(state_col))
-        distincts["sites"].update(dist(site_col))
-        distincts["wtgs"].update(dist(wtg_col))
+        distincts["providers"].update(distinct_list(provider_col))
+        distincts["customers"].update(distinct_list(customer_col))
+        distincts["states"].update(distinct_list(state_col))
+        distincts["sites"].update(distinct_list(site_col))
+        distincts["wtgs"].update(distinct_list(wtg_col))
 
-    sorted_plf = sorted(scatter_points, key=lambda x: x["y"], reverse=True)
-    avg_fleet_plf = (sum(d["y"] for d in scatter_points) / len(scatter_points)) if scatter_points else 0
-    avg_fleet_ma = (sum(d["x"] for d in scatter_points) / len(scatter_points)) if scatter_points else 0
-    avg_iga = (sum(int_grid_vals) / len(int_grid_vals)) if int_grid_vals else 0
-    avg_ega = (sum(ext_grid_vals) / len(ext_grid_vals)) if ext_grid_vals else 0
+    # ---------------------------------------------------
+    # FINAL DATA PREP
+    # ---------------------------------------------------
+    plf_final = {wtg: sum(v) / len(v) for wtg, v in plf_data.items()}
+    plf_chart_data = [{"x": k, "y": round(v, 2)} for k, v in plf_final.items()]
+    plf_chart_data.sort(key=lambda x: x["y"], reverse=True)
 
-    top_10 = sorted_plf[:10]
-    bottom_10 = sorted(sorted_plf[-10:], key=lambda x: x["y"])
+    provider_final = {prov: sum(v) / len(v) for prov, v in provider_plf_data.items()}
+    provider_chart_data = [{"x": k, "y": round(v, 2)} for k, v in provider_final.items()]
+    provider_chart_data.sort(key=lambda x: x["y"], reverse=True)
 
-    sorted_months = sorted(all_months)
-    recent_12_months = sorted_months[-12:] if len(sorted_months) >= 12 else sorted_months
-    heatmap_series = []
-    for d in sorted_plf:
-        w = d["wtg"]
-        row_data = []
-        for m in recent_12_months:
-            row_data.append({"x": m, "y": heatmap_matrix[w].get(m, round(avg_fleet_ma, 1))})
-        heatmap_series.append({"name": w, "data": row_data})
-
-    table_rows.sort(key=lambda x: x["plf"], reverse=True)
-    for rank, r in enumerate(table_rows, 1):
-        r["rank"] = rank
-        if r["plf"] >= avg_fleet_plf:
-            r["status"] = "High Yield"
-        elif r["plf"] < (avg_fleet_plf * 0.75):
-            r["status"] = "Low PLF"
-        else:
-            r["status"] = "Normal"
-
+    # ---------------------------------------------------
+    # CONTEXT
+    # ---------------------------------------------------
     return render(request, "wind_wtg_plf.html", {
-        "scatter_data_json": json.dumps(scatter_points),
-        "heatmap_series_json": json.dumps(heatmap_series),
-        "recent_months": recent_12_months,
-        "grid_comparison_json": json.dumps({
-            "labels": ["Internal Grid Availability", "External Grid Availability"],
-            "values": [round(avg_iga, 2), round(avg_ega, 2)]
-        }),
-        "top_10_json": json.dumps(top_10),
-        "bottom_10_json": json.dumps(bottom_10),
-        "fleet_avg_plf": round(avg_fleet_plf, 2),
-        "fleet_avg_ma": round(avg_fleet_ma, 2),
-        "avg_iga": round(avg_iga, 2),
-        "avg_ega": round(avg_ega, 2),
-        "top_plf_wtg": top_10[0] if top_10 else None,
-        "bottom_plf_wtg": bottom_10[0] if bottom_10 else None,
-        "wtg_count": len(scatter_points),
-        "table_data": table_rows,
+        "plf_wtg_data": json.dumps(plf_chart_data),
+        "plf_provider_data": json.dumps(provider_chart_data),
 
         "providers": sorted(distincts["providers"]),
         "customers": sorted(distincts["customers"]),
@@ -2668,247 +2876,413 @@ def wind_wtg_plf(request):
         "selected_sites": sites,
         "selected_wtgs": wtgs,
 
-        "date_from": date_from or earliest_date,
-        "date_to": date_to or latest_date,
+        "date_from": date_from,
+        "date_to": date_to,
     })
+
+
+from collections import defaultdict
+from datetime import datetime, date, timedelta
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.shortcuts import render
+import json
+import re
+
+
+def to_float(value):
+    """
+    Safely convert database values to float.
+    Handles '', None, '-', 'NA', etc.
+    """
+    try:
+        if value in (None, "", "-", "NA", "null", "NULL"):
+            return 0
+        return float(value)
+    except:
+        return 0
+
+
+def _pick(col_map, *candidates):
+    """Return the actual column name if it matches any of the candidates"""
+    for c in candidates:
+        if not c:
+            continue
+        lc = c.lower()
+        if lc in col_map:
+            return col_map[lc]
+    return None
+
+def parse_date_like(v):
+    """Parse various date formats to datetime.date (returns ISO string for SQL)."""
+    if v is None:
+        return None
+    if isinstance(v, date) and not isinstance(v, datetime):
+        return v.isoformat()
+    if isinstance(v, datetime):
+        return v.date().isoformat()
+    s = str(v).strip()
+    if not s:
+        return None
+    fmts = ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d.%m.%Y", "%d-%b-%Y", "%d %b %Y")
+    for fmt in fmts:
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except Exception:
+            continue
+    # As fallback, try ISO-like or dateutil style by slicing
+    try:
+        return datetime.fromisoformat(s).date().isoformat()
+    except Exception:
+        return None
+
+def parse_numeric(v):
+    """Safe numeric parsing. Handles numbers, strings like '24' or '24.0', and '1 day 00:00:00' (returns hours)."""
+    if v is None:
+        return None
+    # If already numeric
+    try:
+        return float(v)
+    except Exception:
+        pass
+    s = str(v).strip()
+    if s == "":
+        return None
+    # handle "1 day 00:00:00" or "0 days 12:00:00"
+    m = re.match(r'(?:(\d+)\s*day[s]?\s*)?(\d{1,2}):(\d{2})(?::(\d{2}))?', s)
+    if m:
+        days = int(m.group(1)) if m.group(1) else 0
+        hrs = int(m.group(2))
+        mins = int(m.group(3))
+        secs = int(m.group(4)) if m.group(4) else 0
+        total_hours = days * 24 + hrs + (mins / 60.0) + (secs / 3600.0)
+        return float(total_hours)
+    # handle values like "24 Hrs", "24.0"
+    m2 = re.search(r'[-+]?\d*\.?\d+', s)
+    if m2:
+        try:
+            return float(m2.group(0))
+        except:
+            return None
+    return None
+
+
 
 @login_required
 def wind_Grid_Availability(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == "admin"
+    user = request.user.username.lower()
 
-    # Clear filters
+    # ----------------------------------------------------
+    # HANDLE CLEAR FILTER BUTTON
+    # ----------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
+    # ----------------------------------------------------
+    # RESTORE SAVED FILTERS FROM SESSION
+    # ----------------------------------------------------
     saved = request.session.get("wind_filters", {})
+
     def get_or_saved_list(key):
         vals = request.GET.getlist(key)
         return vals if vals else saved.get(key, [])
 
+    # --- Date handling (1-year auto)
     date_from = request.GET.get("date_from") or saved.get("date_from")
-    date_to   = request.GET.get("date_to")   or saved.get("date_to")
+    date_to   = request.GET.get("date_to") or saved.get("date_to")
+
+    from datetime import date, timedelta
+    if not date_from and not date_to:
+        today = date.today()
+        auto_from = today - timedelta(days=365)      # ← 1 YEAR AUTO
+        date_from = auto_from.strftime("%Y-%m-%d")
+        date_to   = today.strftime("%Y-%m-%d")
+
+    # --- Other filters persistent
     providers = get_or_saved_list("provider")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ----------------------------------------------------
+    # SAVE FILTERS BACK INTO SESSION
+    # ----------------------------------------------------
     request.session["wind_filters"] = {
-        "date_from": date_from, "date_to": date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
+        "date_from": date_from,
+        "date_to": date_to,
+        "provider": providers,
+        "customer": customers,
+        "state": states,
+        "site": sites,
+        "wtg": wtgs,
     }
     request.session.modified = True
 
-    # Tables
+    # ----------------------------------------------------
+    # FETCH USER WIND TABLES
+    # ----------------------------------------------------
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
-        db_tables = [row[0] for row in cursor.fetchall()]
+        cursor.execute("SHOW TABLES;")
+        tables = [row[0] for row in cursor.fetchall()]
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith("_wind") and not t.endswith("_breakdowndata")]
-    else:
-        table_names = [t for t in db_tables if t.startswith(username + "_") and t.endswith("_wind") and not t.endswith("_breakdowndata")]
+    table_names = [
+        t for t in tables
+        if t.startswith(user + "_") and t.endswith("_wind")
+    ]
 
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
+    if not table_names:
+        return render(request, "wind_Grid_Availability.html", {
+            "ext_data": [], "int_data": [],
+            "ext_json": "[]", "int_json": "[]",
+            "overall_ext": 0, "overall_int": 0,
+            "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
+            "selected_providers": providers, "selected_customers": customers,
+            "selected_states": states, "selected_sites": sites, "selected_wtgs": wtgs,
+            "date_from": date_from, "date_to": date_to,
+            "no_data": True,
+            "no_data_msg": "No wind tables found for your account.",
+            "paginator": None,
+            "table_page": None
+        })
 
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
+    # ----------------------------------------------------
+    # DATA STRUCTURES
+    # ----------------------------------------------------
+    ext_avl = defaultdict(list)
+    int_avl = defaultdict(list)
 
-    # Auto date if not specified
-    if not date_from or not date_to:
-        min_dates, max_dates = [], []
-        for t in table_names:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cursor.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-                if dcol:
-                    cursor.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cursor.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            date_from = date_from or min(min_dates)
-            date_to = date_to or max(max_dates)
+    distincts = {
+        "providers": set(),
+        "customers": set(),
+        "states": set(),
+        "sites": set(),
+        "wtgs": set(),
+    }
 
-    wtg_int_list = defaultdict(list)
-    wtg_ext_list = defaultdict(list)
-    wtg_meta = {}
-    monthly_int = defaultdict(list)
-    monthly_ext = defaultdict(list)
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
+    # ----------------------------------------------------
+    # PROCESS EACH TABLE
+    # ----------------------------------------------------
+    for table in table_names:
 
-    for t in table_names:
+        # Load columns
         with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
+            cursor.execute(f"SHOW COLUMNS FROM `{table}`;")
+            cols = [row[0] for row in cursor.fetchall()]
 
-        wtg_col = _pick(col_norm, "location_no", "turbine_id", "loc_no", "wec", "wtg", "wtg_no", "locno", "turbine")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-        int_col = _pick(col_norm, "int_grid_availability", "internal_grid_availability", "iga", "internalgridavailability")
-        ext_col = _pick(col_norm, "ext_grid_availability", "external_grid_availability", "ega", "externalgridavailability", "ga")
-        oem_col = _pick(col_norm, "provider", "oem", "oemprovider", "oem_name")
-        site_col = _pick(col_norm, "site", "sitename", "location", "plant", "park")
-        state_col = _pick(col_norm, "state", "statename", "st")
-        month_col = _pick(col_norm, "month", "mon")
+        col_map = {c.lower(): c for c in cols}
 
-        if not wtg_col:
+        # Column picking helper
+        def _pick(cmap, *candidates):
+            for cand in candidates:
+                if cand.lower() in cmap:
+                    return cmap[cand.lower()]
+            return None
+
+        # Identify flexible column names
+        date_col = _pick(col_map, "date", "gen_date", "reading_date", "day_date")
+        wtg_col  = _pick(col_map, "wec", "wtg", "loc_no", "locno", "wtgno", "turbine")
+
+        ext_col  = _pick(col_map, "ga", "externalgridavailability", "ega")
+        int_col  = _pick(col_map, "gia", "internalgridavailability", "iga")
+
+        gf_col   = _pick(col_map, "gf", "gridfailure", "grid_failure_hrs")
+        fm_col   = _pick(col_map, "fm", "forcemajeure")
+        s_col    = _pick(col_map, "s", "shutdown")
+        u_col    = _pick(col_map, "u", "unknown")
+        opr_col  = _pick(col_map, "ohrs", "operatinghours", "opr_hrs")
+        gen_hrs  = _pick(col_map, "genhrs", "generationhours")
+
+        provider_col = _pick(col_map, "provider", "oem")
+        customer_col = _pick(col_map, "customer", "customername")
+        state_col    = _pick(col_map, "state", "statename")
+        site_col     = _pick(col_map, "site", "plant", "location")
+
+        if not date_col or not wtg_col:
             continue
 
-        select_cols = [f"`{wtg_col}`"]
-        if int_col: select_cols.append(f"`{int_col}`")
-        if ext_col: select_cols.append(f"`{ext_col}`")
-        if date_col: select_cols.append(f"`{date_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
-        if site_col: select_cols.append(f"`{site_col}`")
-        if state_col: select_cols.append(f"`{state_col}`")
-        if month_col: select_cols.append(f"`{month_col}`")
+        # ----------------------------------------------------
+        # BUILD FILTER CONDITIONS
+        # ----------------------------------------------------
+        conditions, params = [], []
 
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and date_from and date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
-            params.extend([date_from, date_to])
+        # DATE
+        if date_from and date_to:
+            conditions.append(f"`{date_col}` BETWEEN %s AND %s")
+            params += [date_from, date_to]
 
-        def add_in(col, vals):
-            if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
-                params.extend(vals)
+        # MULTI FILTERS
+        def add_in(col, values):
+            if col and values:
+                placeholders = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({placeholders})")
+                params.extend(values)
 
-        add_in(oem_col, providers)
+        add_in(provider_col, providers)
+        add_in(customer_col, customers)
         add_in(state_col, states)
         add_in(site_col, sites)
         add_in(wtg_col, wtgs)
 
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause}"
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        # ----------------------------------------------------
+        # SELECT NEEDED COLUMNS
+        # ----------------------------------------------------
+        select_cols = [wtg_col]
+        for c in [ext_col, int_col, gf_col, fm_col, s_col, u_col, opr_col, gen_hrs]:
+            if c:
+                select_cols.append(c)
+
+        query = f"""
+            SELECT {','.join(f'`{c}`' for c in select_cols)}
+            FROM `{table}`
+            {where_clause}
+        """
 
         with connection.cursor() as cursor:
-            cursor.execute(sql, params)
+            cursor.execute(query, params)
             rows = cursor.fetchall()
 
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
+        idx = {col: i for i, col in enumerate(select_cols)}
 
-        for r in rows:
-            wtg_val = str(r[idx[wtg_col]]).strip()
-            if not wtg_val or wtg_val.lower() in ("none", "total", "all wtg"):
+        # ----------------------------------------------------
+        # PROCESS EACH ROW
+        # ----------------------------------------------------
+        for row in rows:
+            wtg = row[idx[wtg_col]]
+            if not wtg:
                 continue
 
-            ival, eval_ = None, None
-            if int_col and r[idx[int_col]] not in (None, ""):
-                try: ival = float(r[idx[int_col]])
-                except: pass
-            if ext_col and r[idx[ext_col]] not in (None, ""):
-                try: eval_ = float(r[idx[ext_col]])
-                except: pass
+            wtg = str(wtg)
 
-            if ival is not None and ival > 0:
-                wtg_int_list[wtg_val].append(ival)
-            if eval_ is not None and eval_ > 0:
-                wtg_ext_list[wtg_val].append(eval_)
+            # Try direct GA/GIA first
+            ext_val = float(row[idx.get(ext_col)]) if ext_col and row[idx.get(ext_col)] not in (None, "") else None
+            int_val = float(row[idx.get(int_col)]) if int_col and row[idx.get(int_col)] not in (None, "") else None
 
-            if wtg_val not in wtg_meta:
-                wtg_meta[wtg_val] = {
-                    "oem": str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind")),
-                    "site": str(r[idx[site_col]]).strip() if site_col and r[idx[site_col]] else "Site-1",
-                    "state": str(r[idx[state_col]]).strip() if state_col and r[idx[state_col]] else "Default"
-                }
+            # If missing → compute from GF/FM/S/U
+            if ext_val is None or int_val is None:
+                gf = to_float(row[idx.get(gf_col)]) if gf_col else 0
+                fm = to_float(row[idx.get(fm_col)]) if fm_col else 0
+                s_  = to_float(row[idx.get(s_col)]) if s_col else 0
+                u_  = to_float(row[idx.get(u_col)]) if u_col else 0
+                opr = to_float(row[idx.get(opr_col)]) if opr_col else None
 
-            m_key = None
-            if date_col and r[idx[date_col]]:
-                m_key = str(r[idx[date_col]])[:7]
-            elif month_col and r[idx[month_col]]:
-                m_key = str(r[idx[month_col]]).strip()
+                if opr is None and gen_hrs:
+                    opr = to_float(row[idx.get(gen_hrs)])
 
-            if m_key:
-                if ival is not None and ival > 0: monthly_int[m_key].append(ival)
-                if eval_ is not None and eval_ > 0: monthly_ext[m_key].append(eval_)
+                if ext_val is None and gf and opr:
+                    ext_val = round(100 - (gf / opr) * 100, 2)
 
-        # Distincts for filters
-        def add_distinct(col, key):
-            if not col: return
-            with connection.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT `{col}` FROM `{t}` WHERE `{col}` IS NOT NULL AND `{col}` != ''")
-                for r_ in cur.fetchall():
-                    distincts[key].add(str(r_[0]).strip())
+                if int_val is None and opr:
+                    int_val = round(100 - ((fm + s_ + u_) / opr) * 100, 2)
 
-        add_distinct(oem_col, "providers")
-        add_distinct(state_col, "states")
-        add_distinct(site_col, "sites")
-        add_distinct(wtg_col, "wtgs")
+            if ext_val is None:
+                ext_val = 0
+            if int_val is None:
+                int_val = 0
 
-    all_wtgs = sorted(set(list(wtg_int_list.keys()) + list(wtg_ext_list.keys())))
-    wtg_data = []
+            ext_avl[wtg].append(ext_val)
+            int_avl[wtg].append(int_val)
+
+        # DISTINCT VALUES
+        def distinct_list(col):
+            if not col:
+                return []
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table}` ORDER BY `{col}`")
+                return [str(r[0]) for r in cursor.fetchall() if r[0]]
+
+        distincts["providers"].update(distinct_list(provider_col))
+        distincts["customers"].update(distinct_list(customer_col))
+        distincts["states"].update(distinct_list(state_col))
+        distincts["sites"].update(distinct_list(site_col))
+        distincts["wtgs"].update(distinct_list(wtg_col))
+
+    # ----------------------------------------------------
+    # PREPARE FINAL DATA
+    # ----------------------------------------------------
+    ext_data = [
+        {"wtg": k, "value": round(sum(v)/len(v), 2)}
+        for k, v in ext_avl.items()
+    ]
+
+    int_data = [
+        {"wtg": k, "value": round(sum(v)/len(v), 2)}
+        for k, v in int_avl.items()
+    ]
+
+    overall_ext = round(sum([x["value"] for x in ext_data]) / len(ext_data), 2) if ext_data else 0
+    overall_int = round(sum([x["value"] for x in int_data]) / len(int_data), 2) if int_data else 0
+
+    # Table pagination
+    combined_table = []
+    all_wtgs = sorted(set([d["wtg"] for d in ext_data] + [d["wtg"] for d in int_data]))
     for w in all_wtgs:
-        i_avg = round(sum(wtg_int_list[w]) / len(wtg_int_list[w]), 2) if wtg_int_list[w] else 0.0
-        e_avg = round(sum(wtg_ext_list[w]) / len(wtg_ext_list[w]), 2) if wtg_ext_list[w] else 0.0
-        c_avg = round((i_avg * e_avg) / 100.0, 2) if (i_avg and e_avg) else max(i_avg, e_avg)
-        meta = wtg_meta.get(w, {"oem": "Wind", "site": "-", "state": "-"})
-        wtg_data.append({
-            "wtg": w,
-            "int_ga": i_avg,
-            "ext_ga": e_avg,
-            "comb_ga": c_avg,
-            "oem": meta["oem"],
-            "site": meta["site"],
-            "state": meta["state"],
-            "status": "Excellent" if c_avg >= 98.0 else ("Good" if c_avg >= 95.0 else "Warning")
-        })
+        e = next((x["value"] for x in ext_data if x["wtg"] == w), 0)
+        i = next((x["value"] for x in int_data if x["wtg"] == w), 0)
+        combined_table.append({"wtg": w, "ext": e, "int": i})
 
-    wtg_data.sort(key=lambda x: x["comb_ga"], reverse=True)
-    for rank, item in enumerate(wtg_data, 1):
-        item["rank"] = rank
+    page = request.GET.get("page", 1)
+    paginator = Paginator(combined_table, 10)
+    try:
+        table_page = paginator.page(page)
+    except Exception:
+        table_page = paginator.page(1)
 
-    fleet_int = round(sum(d["int_ga"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    fleet_ext = round(sum(d["ext_ga"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    fleet_comb = round(sum(d["comb_ga"] for d in wtg_data) / len(wtg_data), 2) if wtg_data else 0.0
-    underperforming = sum(1 for d in wtg_data if d["comb_ga"] < 95.0)
+    # ----------------------------------------------------
+    # RENDER
+    # ----------------------------------------------------
+    return render(request, "wind_Grid_Availability.html", {
+        "ext_data": ext_data,
+        "int_data": int_data,
+        "ext_json": json.dumps(ext_data),
+        "int_json": json.dumps(int_data),
+        "overall_ext": overall_ext,
+        "overall_int": overall_int,
 
-    sorted_months = sorted(set(list(monthly_int.keys()) + list(monthly_ext.keys())))[-12:]
-    month_int_series = [round(sum(monthly_int[m]) / len(monthly_int[m]), 2) if monthly_int[m] else 0.0 for m in sorted_months]
-    month_ext_series = [round(sum(monthly_ext[m]) / len(monthly_ext[m]), 2) if monthly_ext[m] else 0.0 for m in sorted_months]
-
-    context = {
-        "kpi_fleet_int": fleet_int,
-        "kpi_fleet_ext": fleet_ext,
-        "kpi_fleet_comb": fleet_comb,
-        "kpi_underperforming": underperforming,
-        "kpi_total_wtgs": len(wtg_data),
-
-        "table_data": wtg_data,
-        "all_wtgs_json": json.dumps(wtg_data),
-
-        "monthly_cats_json": json.dumps(sorted_months),
-        "monthly_int_json": json.dumps(month_int_series),
-        "monthly_ext_json": json.dumps(month_ext_series),
-
-        # Filters
-        "date_from": date_from,
-        "date_to": date_to,
+        # DISTINCT FILTERS
         "providers": sorted(distincts["providers"]),
+        "customers": sorted(distincts["customers"]),
         "states": sorted(distincts["states"]),
         "sites": sorted(distincts["sites"]),
         "wtgs": sorted(distincts["wtgs"]),
+
+        # SELECTED FILTERS
         "selected_providers": providers,
+        "selected_customers": customers,
         "selected_states": states,
         "selected_sites": sites,
         "selected_wtgs": wtgs,
-    }
 
-    return render(request, "wind_Grid_Availability.html", context)
+        # DATE FILTERS
+        "date_from": date_from,
+        "date_to": date_to,
+
+        # TABLE
+        "paginator": paginator,
+        "table_page": table_page,
+
+        "no_data": (not ext_data and not int_data),
+        "no_data_msg": (
+            "No grid availability records found for selected filters."
+            if (not ext_data and not int_data) else ""
+        )
+    })
 
 
+
+
+
+from collections import defaultdict
+from datetime import datetime
+from django.shortcuts import render
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import json, re
+
+# ---------- Improved Column Picker ----------
 def _normalize(name):
     """Simplify column name for matching"""
     return re.sub(r'[^a-z0-9]', '', name.lower())
@@ -2926,221 +3300,341 @@ def _pick(col_map, *candidates):
     return None
 
 
+def _user_breakdown_tables(tables, username):
+    username_prefix = f"{username.strip().lower()}_"
+    return [
+        table for table in tables
+        if table.lower().startswith(username_prefix)
+        and (
+            table.lower().endswith("_wind")
+            or table.lower().endswith("_breakdowndata")
+        )
+    ]
+
+
+def _breakdown_column(columns, *candidates):
+    normalized_columns = {_normalize(column): column for column in columns}
+    for candidate in candidates:
+        actual = normalized_columns.get(_normalize(candidate))
+        if actual:
+            return actual
+    return None
+
+
+def _duration_hours_from_bounds(start, end):
+    if start is None or end is None:
+        return None
+    try:
+        if isinstance(start, datetime_time) and isinstance(end, datetime_time):
+            start_at = datetime.combine(datetime.today().date(), start)
+            end_at = datetime.combine(datetime.today().date(), end)
+            if end_at < start_at:
+                end_at += timedelta(days=1)
+        else:
+            start_at = start if isinstance(start, datetime) else datetime.fromisoformat(str(start))
+            end_at = end if isinstance(end, datetime) else datetime.fromisoformat(str(end))
+        elapsed = (end_at - start_at).total_seconds() / 3600
+        return elapsed if elapsed >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
 @login_required
 def wind_breakdown_hours(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == "admin"
+    user = request.user.username.lower()
 
+    # ----------------------------------------------------
+    # CLEAR FILTERS
+    # ----------------------------------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
-    saved = request.session.get("wind_filters", {})
+    # ----------------------------------------------------
+    # RESTORE SAVED FILTERS
+    # ----------------------------------------------------
     def get_or_saved_list(key):
-        vals = request.GET.getlist(key)
-        return vals if vals else saved.get(key, [])
+        return request.GET.getlist(key)
 
-    date_from = request.GET.get("date_from") or saved.get("date_from")
-    date_to   = request.GET.get("date_to")   or saved.get("date_to")
+    # --- DATE (all history unless the user selects a range)
+    date_from = request.GET.get("date_from", "")
+    date_to = request.GET.get("date_to", "")
+
+    # --- OTHER FILTERS (persistent)
     providers = get_or_saved_list("provider")
+    uploaded_by = get_or_saved_list("uploaded_by")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
+    # ----------------------------------------------------
+    # SAVE SESSION FILTERS BACK
+    # ----------------------------------------------------
     request.session["wind_filters"] = {
-        "date_from": date_from, "date_to": date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
+        "date_from": date_from,
+        "date_to": date_to,
+        "provider": providers,
+        "uploaded_by": uploaded_by,
+        "customer": customers,
+        "state": states,
+        "site": sites,
+        "wtg": wtgs,
     }
     request.session.modified = True
 
+    # ----------------------------------------------------
+    # FETCH USER TABLES
+    # ----------------------------------------------------
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
-        db_tables = [row[0] for row in cursor.fetchall()]
+        cursor.execute("SHOW TABLES;")
+        tables = [row[0] for row in cursor.fetchall()]
+    table_names = _user_breakdown_tables(tables, user)
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith("_wind_breakdowndata")]
-    else:
-        table_names = [t for t in db_tables if t.startswith(username + "_") and t.endswith("_wind_breakdowndata")]
-
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
-
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
-
-    if not date_from or not date_to:
-        min_dates, max_dates = [], []
-        for t in table_names:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cursor.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-                if dcol:
-                    cursor.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cursor.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            date_from = date_from or min(min_dates)
-            date_to = date_to or max(max_dates)
-
-    wtg_hrs = defaultdict(float)
-    wtg_cnt = defaultdict(int)
-    wtg_meta = {}
-    cause_hrs = defaultdict(float)
-    monthly_hrs = defaultdict(float)
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
-
-    for t in table_names:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
-
-        wtg_col = _pick(col_norm, "loc_no", "location", "turbine_id", "location_no", "wtg", "locno")
-        dur_col = _pick(col_norm, "total_duration", "duration", "hours", "breakdown_hours")
-        err_col = _pick(col_norm, "error_description", "error_details", "description", "reason")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date")
-        month_col = _pick(col_norm, "month", "mon")
-        oem_col = _pick(col_norm, "provider", "oem")
-
-        if not wtg_col or not dur_col:
-            continue
-
-        select_cols = [f"`{wtg_col}`", f"`{dur_col}`"]
-        if err_col: select_cols.append(f"`{err_col}`")
-        if date_col: select_cols.append(f"`{date_col}`")
-        if month_col: select_cols.append(f"`{month_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
-
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and date_from and date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
-            params.extend([date_from, date_to])
-
-        def add_in(col, vals):
-            if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
-                params.extend(vals)
-
-        add_in(oem_col, providers)
-        add_in(wtg_col, wtgs)
-
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause}"
-
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            rows = cursor.fetchall()
-
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
-
-        for r in rows:
-            wtg_val = str(r[idx[wtg_col]]).strip()
-            if not wtg_val or wtg_val.lower() in ("none", "total", "all wtg"):
-                continue
-
-            dur = 0.0
-            if r[idx[dur_col]] not in (None, ""):
-                try: dur = float(r[idx[dur_col]])
-                except: pass
-
-            wtg_hrs[wtg_val] += dur
-            wtg_cnt[wtg_val] += 1
-
-            if err_col and r[idx[err_col]]:
-                err_text = str(r[idx[err_col]]).strip()
-                if len(err_text) > 40: err_text = err_text[:40] + "..."
-                cause_hrs[err_text] += dur
-
-            if wtg_val not in wtg_meta:
-                wtg_meta[wtg_val] = {
-                    "oem": str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind"))
-                }
-
-            m_key = None
-            if date_col and r[idx[date_col]]:
-                m_key = str(r[idx[date_col]])[:7]
-            elif month_col and r[idx[month_col]]:
-                m_key = str(r[idx[month_col]]).strip()
-
-            if m_key:
-                monthly_hrs[m_key] += dur
-
-        def add_distinct(col, key):
-            if not col: return
-            with connection.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT `{col}` FROM `{t}` WHERE `{col}` IS NOT NULL AND `{col}` != ''")
-                for r_ in cur.fetchall():
-                    distincts[key].add(str(r_[0]).strip())
-
-        add_distinct(oem_col, "providers")
-        add_distinct(wtg_col, "wtgs")
-
-    wtg_data = []
-    for w, hrs in wtg_hrs.items():
-        meta = wtg_meta.get(w, {"oem": "Wind"})
-        incidents = wtg_cnt[w]
-        avg_dur = round(hrs / incidents, 2) if incidents else 0.0
-        wtg_data.append({
-            "wtg": w,
-            "hours": round(hrs, 2),
-            "incidents": incidents,
-            "avg_incident_dur": avg_dur,
-            "oem": meta["oem"],
-            "status": "Critical" if hrs > 1500 else ("Moderate" if hrs > 500 else "Normal")
+    if not table_names:
+        return render(request, "wind_breakdown_hours.html", {
+            "chart_data": json.dumps([]),
+            "table_data": [],
+            "total_breakdown": 0,
+            "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
+            "uploaded_by_options": [],
+            "selected_providers": providers,
+            "selected_uploaded_by": uploaded_by,
+            "selected_customers": customers,
+            "selected_states": states,
+            "selected_sites": sites,
+            "selected_wtgs": wtgs,
+            "date_from": date_from,
+            "date_to": date_to,
+            "no_data": True,
+            "no_data_msg": "No wind or breakdown tables found for your account.",
         })
 
-    wtg_data.sort(key=lambda x: x["hours"], reverse=True)
-    for rank, item in enumerate(wtg_data, 1):
-        item["rank"] = rank
+    # ----------------------------------------------------
+    # PROCESS DATA
+    # ----------------------------------------------------
+    breakdown_hours = defaultdict(float)
+    total_breakdown = 0.0
 
-    total_hrs = round(sum(d["hours"] for d in wtg_data), 2)
-    avg_wtg_hrs = round(total_hrs / len(wtg_data), 2) if wtg_data else 0.0
-    worst_wtg = wtg_data[0] if wtg_data else {"wtg": "-", "hours": 0}
-    total_incidents = sum(d["incidents"] for d in wtg_data)
-
-    sorted_months = sorted(monthly_hrs.keys())[-12:]
-    month_series = [round(monthly_hrs[m], 2) for m in sorted_months]
-
-    top_causes = [{"cause": c, "hours": round(h, 1)} for c, h in sorted(cause_hrs.items(), key=lambda x: x[1], reverse=True)[:5]]
-
-    context = {
-        "kpi_total_hrs": total_hrs,
-        "kpi_worst_wtg": worst_wtg["wtg"],
-        "kpi_worst_hrs": worst_wtg["hours"],
-        "kpi_avg_hrs": avg_wtg_hrs,
-        "kpi_total_incidents": total_incidents,
-        "kpi_total_wtgs": len(wtg_data),
-
-        "table_data": wtg_data,
-        "all_wtgs_json": json.dumps(wtg_data),
-
-        "monthly_cats_json": json.dumps(sorted_months),
-        "monthly_bd_json": json.dumps(month_series),
-        "top_causes_json": json.dumps(top_causes),
-
-        # Filters
-        "date_from": date_from,
-        "date_to": date_to,
-        "providers": sorted(distincts["providers"]),
-        "wtgs": sorted(distincts["wtgs"]),
-        "selected_providers": providers,
-        "selected_wtgs": wtgs,
+    distincts = {
+        "providers": set(),
+        "uploaded_by": set(),
+        "customers": set(),
+        "states": set(),
+        "sites": set(),
+        "wtgs": set(),
     }
 
-    return render(request, "wind_breakdown_hours.html", context)
+    for table_name in table_names:
+
+        # Load schema
+        with connection.cursor() as cursor:
+            cursor.execute(f"SHOW COLUMNS FROM `{table_name}`;")
+            cols = [r[0] for r in cursor.fetchall()]
+        wtg_col = _breakdown_column(
+            cols, "loc_no", "wec", "locno", "wtg", "wtg_no", "turbine"
+        )
+        date_col = _breakdown_column(
+            cols, "gen_date", "date", "reading_date", "day_date"
+        )
+        duration_col = _breakdown_column(
+            cols, "duration_hrs", "duration_hours", "breakdown_hours", "duration"
+        )
+        start_col = _breakdown_column(
+            cols, "start_time", "breakdown_start", "start_datetime"
+        )
+        end_col = _breakdown_column(
+            cols, "end_time", "breakdown_end", "end_datetime"
+        )
+        genhrs_col = _breakdown_column(
+            cols, "genhrs", "generationhours", "gen_hours"
+        )
+        ohrs_col = _breakdown_column(
+            cols, "ohrs", "operatinghours", "opr_hrs"
+        )
+        loss_col = _breakdown_column(
+            cols, "lhrs", "losshrs", "loss_hours", "l_hrs"
+        )
+
+        provider_col = _breakdown_column(cols, "provider", "oem")
+        uploaded_by_col = _breakdown_column(
+            cols, "uploaded_by", "uploaded_user", "uploader", "username"
+        )
+        customer_col = _breakdown_column(
+            cols, "customername", "customer", "client"
+        )
+        state_col = _breakdown_column(cols, "state", "statename")
+        site_col = _breakdown_column(cols, "site", "sitename", "location")
+
+        if not wtg_col:
+            continue
+
+        # ----------------------------------------------------
+        # BUILD WHERE CLAUSE
+        # ----------------------------------------------------
+        conditions, params = [], []
+
+        if date_col and date_from:
+            conditions.append(f"`{date_col}` >= %s")
+            params.append(date_from)
+        if date_col and date_to:
+            conditions.append(f"`{date_col}` < DATE_ADD(%s, INTERVAL 1 DAY)")
+            params.append(date_to)
+
+        def add_in(col, values):
+            values = [v for v in values if v]
+            if col and values:
+                placeholders = ",".join(["%s"] * len(values))
+                conditions.append(f"`{col}` IN ({placeholders})")
+                params.extend(values)
+
+        add_in(provider_col, providers)
+        add_in(uploaded_by_col, uploaded_by)
+        add_in(customer_col, customers)
+        add_in(state_col, states)
+        add_in(site_col, sites)
+        add_in(wtg_col, wtgs)
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+        # ----------------------------------------------------
+        # BREAKDOWN EXPRESSION
+        # ----------------------------------------------------
+        if duration_col and start_col and end_col:
+            expr = (
+                f"CASE WHEN COALESCE(`{duration_col}`, 0) = 0 "
+                f"AND `{start_col}` IS NOT NULL AND `{end_col}` IS NOT NULL "
+                f"THEN GREATEST(TIMESTAMPDIFF(SECOND, `{start_col}`, `{end_col}`) / 3600, 0) "
+                f"ELSE COALESCE(`{duration_col}`, 0) END"
+            )
+        elif duration_col:
+            expr = f"COALESCE(`{duration_col}`, 0)"
+        elif start_col and end_col:
+            expr = (
+                f"GREATEST(TIMESTAMPDIFF(SECOND, `{start_col}`, `{end_col}`) / 3600, 0)"
+            )
+        elif loss_col:
+            expr = f"`{loss_col}`"
+        elif genhrs_col and ohrs_col:
+            expr = f"(`{ohrs_col}` - `{genhrs_col}`)"
+        else:
+            continue
+
+        # ----------------------------------------------------
+        # RUN QUERY
+        # ----------------------------------------------------
+        query = f"""
+            SELECT `{wtg_col}`, SUM({expr})
+            FROM `{table_name}`
+            {where_clause}
+            GROUP BY `{wtg_col}`
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+        for wtg, hrs in rows:
+            if not wtg:
+                continue
+            hrs_val = float(hrs or 0)
+            breakdown_hours[str(wtg)] += hrs_val
+            total_breakdown += hrs_val
+
+        # DISTINCT VALUES
+        def distinct_list(col):
+            if not col:
+                return []
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table_name}` ORDER BY `{col}`")
+                return [str(r[0]) for r in cursor.fetchall() if r[0]]
+
+        distincts["providers"].update(distinct_list(provider_col))
+        distincts["uploaded_by"].update(distinct_list(uploaded_by_col))
+        distincts["customers"].update(distinct_list(customer_col))
+        distincts["states"].update(distinct_list(state_col))
+        distincts["sites"].update(distinct_list(site_col))
+        distincts["wtgs"].update(distinct_list(wtg_col))
+
+    # ----------------------------------------------------
+    # FINAL OUTPUT
+    # ----------------------------------------------------
+    chart_data = [
+        {"wtg": k, "breakdown": round(v, 2)}
+        for k, v in breakdown_hours.items()
+    ]
+    chart_data.sort(key=lambda x: x["breakdown"], reverse=True)
+
+    table_data = [
+        {"wtg_no": k, "breakdown": round(v, 2)}
+        for k, v in breakdown_hours.items()
+    ]
+
+    return render(request, "wind_breakdown_hours.html", {
+        "chart_data": json.dumps(chart_data),
+        "table_data": table_data,
+        "total_breakdown": round(total_breakdown, 2),
+
+        "providers": sorted(distincts["providers"]),
+        "uploaded_by_options": sorted(distincts["uploaded_by"]),
+        "customers": sorted(distincts["customers"]),
+        "states": sorted(distincts["states"]),
+        "sites": sorted(distincts["sites"]),
+        "wtgs": sorted(distincts["wtgs"]),
+
+        "selected_providers": providers,
+        "selected_uploaded_by": uploaded_by,
+        "selected_customers": customers,
+        "selected_states": states,
+        "selected_sites": sites,
+        "selected_wtgs": wtgs,
+
+        "date_from": date_from,
+        "date_to": date_to,
+
+        "no_data": not bool(chart_data),
+        "no_data_msg": "No breakdown data found for the selected filters."
+                      if not chart_data else "",
+    })
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# views.py
+import json
+import re
+from collections import defaultdict
+from datetime import datetime, date
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+
+# -------------------------
+# Helpers
+# -------------------------
 def _normalize_key(s: str):
     return re.sub(r'[\s\._\-()%]', '', (s or "").lower())
 
@@ -3253,419 +3747,561 @@ def parse_time_to_hours(v):
 
 @login_required
 def wind_breakdown_log(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == 'admin'
+    user = request.user.username.lower()
 
+    # -----------------------------
+    # HANDLE CLEAR FILTER BUTTON
+    # -----------------------------
     if request.GET.get("clear_filters"):
         request.session.pop("wind_filters", None)
 
-    saved = request.session.get("wind_filters", {})
+    # -----------------------------
+    # RESTORE SAVED FILTERS
+    # -----------------------------
     def get_or_saved_list(key):
-        vals = request.GET.getlist(key)
-        return vals if vals else saved.get(key, [])
+        return request.GET.getlist(key)
 
-    raw_date_from = request.GET.get("date_from") or saved.get("date_from")
-    raw_date_to   = request.GET.get("date_to")   or saved.get("date_to")
+    raw_date_from = request.GET.get("date_from", "")
+    raw_date_to = request.GET.get("date_to", "")
+
     providers = get_or_saved_list("provider")
+    uploaded_by = get_or_saved_list("uploaded_by")
     customers = get_or_saved_list("customer")
     states    = get_or_saved_list("state")
     sites     = get_or_saved_list("site")
     wtgs      = get_or_saved_list("wtg")
 
-    with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES;")
-        all_tables = [r[0] for r in cursor.fetchall()]
-
-    if is_admin:
-        bd_tables = [t for t in all_tables if t.endswith("_wind_breakdowndata")]
-        main_tables = [t for t in all_tables if t.endswith("_wind") and not t.endswith("_breakdowndata")]
-    else:
-        bd_tables = [t for t in all_tables if t.startswith(username + "_") and t.endswith("_wind_breakdowndata")]
-        main_tables = [t for t in all_tables if t.startswith(username + "_") and t.endswith("_wind") and not t.endswith("_breakdowndata")]
-
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
-
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
-        return None
-
-    # Auto date detection
-    if not raw_date_from or not raw_date_to:
-        min_dates, max_dates = [], []
-        check_tables = bd_tables if bd_tables else main_tables
-        for t in check_tables:
-            with connection.cursor() as cur:
-                cur.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cur.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date")
-                if dcol:
-                    cur.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cur.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            raw_date_from = raw_date_from or min(min_dates)
-            raw_date_to = raw_date_to or max(max_dates)
-
+    # Save back to session
     request.session["wind_filters"] = {
-        "date_from": raw_date_from, "date_to": raw_date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
+        "date_from": raw_date_from,
+        "date_to": raw_date_to,
+        "provider": providers,
+        "uploaded_by": uploaded_by,
+        "customer": customers,
+        "state": states,
+        "site": sites,
+        "wtg": wtgs,
     }
     request.session.modified = True
 
+    # Convert dates
+    date_from = parse_date_like(raw_date_from)
+    date_to = parse_date_like(raw_date_to)
+
+    # -----------------------------
+    # FIND ALL USER WIND TABLES
+    # -----------------------------
+    with connection.cursor() as cursor:
+        cursor.execute("SHOW TABLES;")
+        tables = [row[0] for row in cursor.fetchall()]
+
+    table_names = _user_breakdown_tables(tables, user)
+
+    if not table_names:
+        return render(request, "wind_breakdown_log.html", {
+            "data": [],
+            "breakdown_data": "[]",
+            "providers": [], "customers": [], "states": [], "sites": [], "wtgs": [],
+            "uploaded_by_options": [],
+            "selected_providers": providers, "selected_customers": customers,
+            "selected_uploaded_by": uploaded_by,
+            "selected_states": states, "selected_sites": sites, "selected_wtgs": wtgs,
+            "date_from": raw_date_from, "date_to": raw_date_to,
+            "no_data": True, "no_data_msg": "No wind or breakdown tables found.",
+            "total_hours": 0, "paginator": None, "page_obj": None
+        })
+
+    # -----------------------------
+    # CANDIDATE COLUMN NAMES
+    # -----------------------------
+    date_candidates = [
+        "gen_date", "date", "gen date", "generation date", "gen. date"
+    ]
+    site_candidates = ["site", "sitename", "plant", "location", "park"]
+    wec_candidates = [
+        "loc_no", "wec", "wtg", "loc no", "loc.no", "wecno", "wtgno", "locno"
+    ]
+    lhrs_candidates = ["l.hrs", "lhrs", "loss hours", "loss_hrs", "breakdown hrs"]
+    duration_candidates = [
+        "duration_hrs", "duration_hours", "breakdown_hours", "duration"
+    ]
+    start_candidates = ["start_time", "breakdown_start", "start_datetime"]
+    end_candidates = ["end_time", "breakdown_end", "end_datetime"]
+    genhrs_candidates = ["gen hrs", "generation hours", "gen_hours", "gen_hrs"]
+    oprhrs_candidates = ["opr hrs", "ohrs", "operatinghours", "o_hours", "ophrs"]
+    remarks_candidates = [
+        "breakdown_remarks", "remarks", "remark", "comment", "reason", "note"
+    ]
+
+    provider_candidates = ["provider", "oem", "company"]
+    uploaded_by_candidates = [
+        "uploaded_by", "uploaded_user", "uploader", "username"
+    ]
+    customer_candidates = ["customer", "customer name", "client"]
+    state_candidates = ["state", "statename"]
+
     breakdown_records = []
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
+    providers_set = set()
+    uploaded_by_set = set()
+    customers_set = set()
+    states_set = set()
+    sites_set = set()
+    wtgs_set = set()
+
     total_hours = 0.0
 
-    target_tables = bd_tables if bd_tables else main_tables
-
-    for t in target_tables:
-        with connection.cursor() as cur:
-            cur.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cur.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
-
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date")
-        wtg_col = _pick(col_norm, "loc_no", "location", "turbine_id", "location_no", "wtg", "locno", "wec")
-        dur_col = _pick(col_norm, "total_duration", "duration", "hours", "breakdown_hours", "l_hrs", "lhrs")
-        err_col = _pick(col_norm, "error_description", "error_details", "error_code", "cause", "remarks", "remark")
-        act_col = _pick(col_norm, "action_taken_remark", "action_taken", "remark")
-        oem_col = _pick(col_norm, "provider", "oem")
-        site_col = _pick(col_norm, "site", "sitename", "location", "plant", "park")
-        state_col = _pick(col_norm, "state", "statename")
-        cust_col = _pick(col_norm, "customer", "customername")
-
-        if not wtg_col or not dur_col:
+    # -----------------------------
+    # PROCESS TABLES
+    # -----------------------------
+    for table in table_names:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SHOW COLUMNS FROM `{table}`;")
+            cols = [r[0] for r in cursor.fetchall()]
+        date_col = _breakdown_column(cols, *date_candidates)
+        if not date_col:
             continue
 
-        select_cols = [f"`{wtg_col}`", f"`{dur_col}`"]
-        if date_col: select_cols.append(f"`{date_col}`")
-        if err_col: select_cols.append(f"`{err_col}`")
-        if act_col and act_col != err_col: select_cols.append(f"`{act_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
-        if site_col and site_col != wtg_col: select_cols.append(f"`{site_col}`")
-        if state_col: select_cols.append(f"`{state_col}`")
-        if cust_col: select_cols.append(f"`{cust_col}`")
+        wec_col = _breakdown_column(cols, *wec_candidates)
+        site_col = _breakdown_column(cols, *site_candidates)
+        duration_col = _breakdown_column(cols, *duration_candidates)
+        start_col = _breakdown_column(cols, *start_candidates)
+        end_col = _breakdown_column(cols, *end_candidates)
+        lhrs_col = _breakdown_column(cols, *lhrs_candidates)
+        gen_col = _breakdown_column(cols, *genhrs_candidates)
+        opr_col = _breakdown_column(cols, *oprhrs_candidates)
+        remarks_col = _breakdown_column(cols, *remarks_candidates)
 
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and raw_date_from and raw_date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
-            params.extend([raw_date_from, raw_date_to])
+        provider_col = _breakdown_column(cols, *provider_candidates)
+        uploaded_by_col = _breakdown_column(cols, *uploaded_by_candidates)
+        customer_col = _breakdown_column(
+            cols, *customer_candidates, "customername", "client"
+        )
+        state_col = _breakdown_column(cols, *state_candidates, "statename")
+
+        # WHERE CLAUSE
+        conditions, params = [], []
+
+        if date_from:
+            conditions.append(f"`{date_col}` >= %s"); params.append(date_from.isoformat())
+        if date_to:
+            conditions.append(f"`{date_col}` < DATE_ADD(%s, INTERVAL 1 DAY)")
+            params.append(date_to.isoformat())
 
         def add_in(col, vals):
             if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
+                placeholders = ",".join(["%s"] * len(vals))
+                conditions.append(f"`{col}` IN ({placeholders})")
                 params.extend(vals)
 
-        add_in(oem_col, providers)
-        add_in(cust_col, customers)
+        add_in(provider_col, providers)
+        add_in(uploaded_by_col, uploaded_by)
+        add_in(customer_col, customers)
         add_in(state_col, states)
         add_in(site_col, sites)
-        add_in(wtg_col, wtgs)
+        add_in(wec_col, wtgs)
 
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause} ORDER BY CAST(`{dur_col}` AS DECIMAL(15,2)) DESC LIMIT 500"
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-        with connection.cursor() as cur:
-            cur.execute(sql, params)
-            rows = cur.fetchall()
+        # SELECT
+        select_cols = [c for c in [
+            date_col, site_col, wec_col, duration_col, start_col, end_col,
+            lhrs_col, gen_col, opr_col,
+            remarks_col, provider_col, uploaded_by_col, customer_col, state_col
+        ] if c]
 
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
+        q = f"SELECT {', '.join(f'`{c}`' for c in select_cols)} FROM `{table}` {where_clause}"
 
-        for r in rows:
-            w_val = str(r[idx[wtg_col]]).strip()
-            if not w_val or w_val.lower() in ("none", "total", "all wtg"):
+        with connection.cursor() as cursor:
+            cursor.execute(q, params)
+            rows = cursor.fetchall()
+
+        idx = {c: i for i, c in enumerate(select_cols)}
+
+        for row in rows:
+            d = parse_date_like(row[idx[date_col]])
+            if not d:
                 continue
 
-            dur_val = 0.0
-            if r[idx[dur_col]] not in (None, ""):
-                try: dur_val = float(r[idx[dur_col]])
-                except: pass
+            # Process hours
+            lhrs_val = (
+                parse_time_to_hours(row[idx[duration_col]])
+                if duration_col else None
+            )
+            if lhrs_val is None and lhrs_col:
+                lhrs_val = parse_time_to_hours(row[idx[lhrs_col]])
+            if (lhrs_val is None or lhrs_val == 0) and start_col and end_col:
+                elapsed_hours = _duration_hours_from_bounds(
+                    row[idx[start_col]], row[idx[end_col]]
+                )
+                if elapsed_hours is not None:
+                    lhrs_val = elapsed_hours
+            gen_val = parse_time_to_hours(row[idx.get(gen_col)]) if gen_col else None
+            opr_val = parse_time_to_hours(row[idx.get(opr_col)]) if opr_col else None
 
-            total_hours += dur_val
+            if lhrs_val is None and gen_val is not None and opr_val is not None:
+                calc = opr_val - gen_val
+                lhrs_val = calc if calc >= 0 else 0
 
-            d_str = str(r[idx[date_col]])[:10] if date_col and r[idx[date_col]] else "-"
-            err_text = str(r[idx[err_col]]).strip() if err_col and r[idx[err_col]] else "Trip / Outage"
-            act_text = str(r[idx[act_col]]).strip() if act_col and act_col != err_col and r[idx[act_col]] else "Restored to normal operation"
-            oem_text = str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind"))
+            if lhrs_val is None and not duration_col and not lhrs_col:
+                lhrs_val = 0
+            if lhrs_val is None:
+                lhrs_val = 0
 
-            breakdown_records.append({
-                "date": d_str,
-                "wtg": w_val,
-                "provider": oem_text,
-                "error_details": err_text,
-                "remark": err_text,
-                "breakdown_hours": round(dur_val, 2),
-                "duration": round(dur_val, 2),
-                "action": act_text,
-                "site": str(r[idx[site_col]]).strip() if site_col and site_col != wtg_col and r[idx[site_col]] else "-",
-                "state": str(r[idx[state_col]]).strip() if state_col and r[idx[state_col]] else "-",
-                "customer": str(r[idx[cust_col]]).strip() if cust_col and r[idx[cust_col]] else "-"
-            })
+            # Build record
+            rec = {
+                "date": d.strftime("%d-%m-%Y"),
+                "state": row[idx.get(state_col)] if state_col else "",
+                "site": row[idx.get(site_col)] if site_col else "",
+                "wtg": row[idx.get(wec_col)] if wec_col else "",
+                "provider": row[idx.get(provider_col)] if provider_col else "",
+                "uploaded_by": row[idx.get(uploaded_by_col)] if uploaded_by_col else "",
+                "customer": row[idx.get(customer_col)] if customer_col else "",
+                "remark": row[idx.get(remarks_col)] if remarks_col else "",
+                "breakdown_hours": round(float(lhrs_val), 3)
+            }
 
-            if oem_col and r[idx[oem_col]]: distincts["providers"].add(str(r[idx[oem_col]]).strip())
-            distincts["wtgs"].add(w_val)
+            breakdown_records.append(rec)
 
-    # Sort descending by duration
-    breakdown_records.sort(key=lambda x: x["duration"], reverse=True)
+            # Collect distincts
+            if provider_col and row[idx.get(provider_col)]: providers_set.add(str(row[idx.get(provider_col)]))
+            if uploaded_by_col and row[idx.get(uploaded_by_col)]:
+                uploaded_by_set.add(str(row[idx.get(uploaded_by_col)]))
+            if customer_col and row[idx.get(customer_col)]: customers_set.add(str(row[idx.get(customer_col)]))
+            if state_col and row[idx.get(state_col)]: states_set.add(str(row[idx.get(state_col)]))
+            if site_col and row[idx.get(site_col)]: sites_set.add(str(row[idx.get(site_col)]))
+            if wec_col and row[idx.get(wec_col)]: wtgs_set.add(str(row[idx.get(wec_col)]))
 
+            total_hours += float(lhrs_val)
+
+    # SORT BY DATE
+    breakdown_records.sort(key=lambda x: datetime.strptime(x["date"], "%d-%m-%Y"))
+
+    # PAGINATION
     page = request.GET.get("page", 1)
     paginator = Paginator(breakdown_records, 25)
     try:
         page_obj = paginator.page(page)
-    except (EmptyPage, PageNotAnInteger):
+    except:
         page_obj = paginator.page(1)
 
     return render(request, "wind_breakdown_log.html", {
-        "data": breakdown_records,
-        "breakdown_data": json.dumps(list(page_obj.object_list)),
-        "providers": sorted(distincts["providers"]),
-        "customers": sorted(distincts["customers"]),
-        "states": sorted(distincts["states"]),
-        "sites": sorted(distincts["sites"]),
-        "wtgs": sorted(distincts["wtgs"]),
+        "data": page_obj.object_list,
+        "breakdown_data": json.dumps(page_obj.object_list),
+        "providers": sorted(providers_set),
+        "uploaded_by_options": sorted(uploaded_by_set),
+        "customers": sorted(customers_set),
+        "states": sorted(states_set),
+        "sites": sorted(sites_set),
+        "wtgs": sorted(wtgs_set),
         "selected_providers": providers,
+        "selected_uploaded_by": uploaded_by,
         "selected_customers": customers,
         "selected_states": states,
         "selected_sites": sites,
         "selected_wtgs": wtgs,
         "date_from": raw_date_from,
         "date_to": raw_date_to,
-        "total_hours": round(total_hours, 2),
+        "total_hours": round(total_hours, 3),
         "paginator": paginator,
         "page_obj": page_obj,
         "no_data": len(breakdown_records) == 0,
-        "no_data_msg": "No breakdown records found for selected filters." if len(breakdown_records) == 0 else "",
+        "no_data_msg": "No data found for selected filters." if len(breakdown_records) == 0 else "",
     })
+
+
+
+
+
+
+import json
+import re
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.db import connection
+import json
+import re
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.db import connection
 
 
 @login_required
 def dashboard_breakdown(request):
-    username = request.user.username.lower()
-    is_admin = request.user.is_superuser or username == "admin"
+    user = request.user.username.lower()
 
-    if request.GET.get("clear_filters"):
-        request.session.pop("wind_filters", None)
-
-    saved = request.session.get("wind_filters", {})
-    def get_or_saved_list(key):
-        vals = request.GET.getlist(key)
-        return vals if vals else saved.get(key, [])
-
-    date_from = request.GET.get("date_from") or saved.get("date_from")
-    date_to   = request.GET.get("date_to")   or saved.get("date_to")
-    providers = get_or_saved_list("provider")
-    customers = get_or_saved_list("customer")
-    states    = get_or_saved_list("state")
-    sites     = get_or_saved_list("site")
-    wtgs      = get_or_saved_list("wtg")
-
-    request.session["wind_filters"] = {
-        "date_from": date_from, "date_to": date_to,
-        "provider": providers, "customer": customers,
-        "state": states, "site": sites, "wtg": wtgs,
-    }
-    request.session.modified = True
-
+    # --- Find user's latest table
     with connection.cursor() as cursor:
-        cursor.execute("SHOW TABLES")
+        cursor.execute("SHOW TABLES;")
         db_tables = [row[0] for row in cursor.fetchall()]
+    table_names = [t for t in db_tables if t.startswith(user + "_") and t.endswith("_wind")]
 
-    if is_admin:
-        table_names = [t for t in db_tables if t.endswith("_wind_breakdowndata")]
-    else:
-        table_names = [t for t in db_tables if t.startswith(username + "_") and t.endswith("_wind_breakdowndata")]
+    if not table_names:
+        return render(request, "dashboard_breakdown.html", {"error": "No data table found for this user."})
 
-    def _normalize(s):
-        return s.lower().replace(" ", "").replace("_", "").replace(".", "").replace("(", "").replace(")", "").replace("%", "")
+    table_name = sorted(table_names)[-1]
 
-    def _pick(cmap, *candidates):
-        for cand in candidates:
-            c_norm = _normalize(cand)
-            if c_norm in cmap:
-                return cmap[c_norm]
+    # --- Get table columns
+    with connection.cursor() as cursor:
+        cursor.execute(f"SHOW COLUMNS FROM `{table_name}`;")
+        cols = [r[0] for r in cursor.fetchall()]
+    col_map = {c.lower(): c for c in cols}
+
+    def _pick(col_map, *candidates):
+        def normalize(s):
+            return s.lower().replace(" ", "").replace(".", "").replace("_", "").replace("(", "").replace(")", "")
+        norm_map = {normalize(k): k for k in col_map.keys()}
+        for c in candidates:
+            nc = normalize(c)
+            if nc in norm_map:
+                return norm_map[nc]
         return None
 
-    if not date_from or not date_to:
-        min_dates, max_dates = [], []
-        for t in table_names:
-            with connection.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-                cols = {c[0].lower(): c[0] for c in cursor.fetchall()}
-                col_norm = {_normalize(c): c for c in cols.values()}
-                dcol = _pick(col_norm, "date", "gen_date", "reading_date", "day_date")
-                if dcol:
-                    cursor.execute(f"SELECT MIN(`{dcol}`), MAX(`{dcol}`) FROM `{t}` WHERE `{dcol}` IS NOT NULL")
-                    row = cursor.fetchone()
-                    if row and row[0] and row[1]:
-                        min_dates.append(str(row[0]))
-                        max_dates.append(str(row[1]))
-        if min_dates and max_dates:
-            date_from = date_from or min(min_dates)
-            date_to = date_to or max(max_dates)
+    # --- Auto map required columns
+    col_oem = _pick(col_map, "oem", "provider", "manufacturer", "make", "client")
+    col_customer = _pick(col_map, "customer name", "customer", "client")
+    col_state = _pick(col_map, "state")
+    col_site = _pick(col_map, "site", "location")
+    col_wtg = _pick(col_map, "wtg", "loc no", "loc_no", "turbine", "wec")
+    col_date = _pick(col_map, "date", "reading date", "entry date", "gen date", "generation date")
 
-    wtg_hrs = defaultdict(float)
-    wtg_cnt = defaultdict(int)
-    wtg_meta = {}
-    cause_hrs = defaultdict(float)
-    monthly_hrs = defaultdict(float)
-    distincts = {"providers": set(), "customers": set(), "states": set(), "sites": set(), "wtgs": set()}
+    # --- Handle breakdown columns (Suzlon vs WindWorld)
+    col_gf = _pick(col_map, "gf", "grid failure")
+    col_fm = _pick(col_map, "fm", "force majeure")
+    col_s = _pick(col_map, "s", "schedule", "scheduled services", "gs", "grid shutdown")
+    col_u = _pick(col_map, "u", "unscheduled services", "unscheduled", "uptime", "avail")
 
-    for t in table_names:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{t}`")
-            cols = [c[0] for c in cursor.fetchall()]
-        col_norm = {_normalize(c): c for c in cols}
+    if not any([col_gf, col_fm, col_s, col_u]):
+        has_breakdown = False
+    else:
+        has_breakdown = True
 
-        wtg_col = _pick(col_norm, "loc_no", "location", "turbine_id", "location_no", "wtg", "locno")
-        dur_col = _pick(col_norm, "total_duration", "duration", "hours", "breakdown_hours")
-        err_col = _pick(col_norm, "error_description", "error_details", "description", "reason")
-        date_col = _pick(col_norm, "date", "gen_date", "reading_date")
-        month_col = _pick(col_norm, "month", "mon")
-        oem_col = _pick(col_norm, "provider", "oem")
+    # --- Filters
+    f_provider = request.GET.get("provider")
+    f_customer = request.GET.get("customer")
+    f_state = request.GET.get("state")
+    f_site = request.GET.get("site")
+    f_wtg = request.GET.get("wtg")
+    f_date_from = request.GET.get("date_from")
+    f_date_to = request.GET.get("date_to")
 
-        if not wtg_col or not dur_col:
-            continue
+    filters = []
+    params = []
+    if f_provider and col_oem:
+        filters.append(f"`{col_oem}` = %s")
+        params.append(f_provider)
+    if f_customer and col_customer:
+        filters.append(f"`{col_customer}` = %s")
+        params.append(f_customer)
+    if f_state and col_state:
+        filters.append(f"`{col_state}` = %s")
+        params.append(f_state)
+    if f_site and col_site:
+        filters.append(f"`{col_site}` = %s")
+        params.append(f_site)
+    if f_wtg and col_wtg:
+        filters.append(f"`{col_wtg}` = %s")
+        params.append(f_wtg)
+    if f_date_from and f_date_to and col_date:
+        filters.append(f"`{col_date}` BETWEEN %s AND %s")
+        params.extend([f_date_from, f_date_to])
 
-        select_cols = [f"`{wtg_col}`", f"`{dur_col}`"]
-        if err_col: select_cols.append(f"`{err_col}`")
-        if date_col: select_cols.append(f"`{date_col}`")
-        if month_col: select_cols.append(f"`{month_col}`")
-        if oem_col: select_cols.append(f"`{oem_col}`")
+    where_clause = "WHERE " + " AND ".join(filters) if filters else ""
 
-        where_conds = [f"`{wtg_col}` IS NOT NULL AND `{wtg_col}` != ''"]
-        params = []
-        if date_col and date_from and date_to:
-            where_conds.append(f"`{date_col}` BETWEEN %s AND %s")
-            params.extend([date_from, date_to])
+    # --- Distincts for dropdown filters
+    with connection.cursor() as cursor:
+        distincts = {}
+        for name, col in [
+            ("providers", col_oem),
+            ("customers", col_customer),
+            ("states", col_state),
+            ("sites", col_site),
+            ("wtgs", col_wtg),
+        ]:
+            if col:
+                cursor.execute(f"SELECT DISTINCT `{col}` FROM `{table_name}` ORDER BY `{col}`;")
+                distincts[name] = [r[0] for r in cursor.fetchall() if r[0]]
+            else:
+                distincts[name] = []
 
-        def add_in(col, vals):
-            if col and vals:
-                q = ",".join(["%s"] * len(vals))
-                where_conds.append(f"`{col}` IN ({q})")
-                params.extend(vals)
+    # --- Data aggregation
+    with connection.cursor() as cursor:
+        if has_breakdown:
+            # ✅ Suzlon-style data
+            cursor.execute(f"""
+                SELECT `{col_oem}`, `{col_wtg}`,
+                       SUM(`{col_gf}`), SUM(`{col_fm}`), SUM(`{col_s}`), SUM(`{col_u}`)
+                FROM `{table_name}` {where_clause}
+                GROUP BY `{col_oem}`, `{col_wtg}`;
+            """, params)
+            treemap_data = [
+                {"oem": r[0] or "Unknown", "wtg": r[1],
+                 "gf": r[2] or 0, "fm": r[3] or 0, "s": r[4] or 0, "u": r[5] or 0}
+                for r in cursor.fetchall()
+            ]
 
-        add_in(oem_col, providers)
-        add_in(wtg_col, wtgs)
+            cursor.execute(f"""
+                SELECT SUM(`{col_gf}`), SUM(`{col_fm}`), SUM(`{col_s}`), SUM(`{col_u}`)
+                FROM `{table_name}` {where_clause};
+            """, params)
+            totals = cursor.fetchone()
+            summary = {
+                "total_gf": totals[0] or 0,
+                "total_fm": totals[1] or 0,
+                "total_s": totals[2] or 0,
+                "total_u": totals[3] or 0,
+            }
 
-        where_clause = " WHERE " + " AND ".join(where_conds)
-        sql = f"SELECT {', '.join(select_cols)} FROM `{t}` {where_clause}"
+        else:
+            # --- WindWorld-style data with remarks ---
+            col_remarks = _pick(col_map, "remarks", "remark", "observation", "comments", "remark(s)")
+            treemap_data = []
+            summary = {"total_gf": 0, "total_fm": 0, "total_s": 0, "total_u": 0}
 
-        with connection.cursor() as cursor:
-            cursor.execute(sql, params)
-            rows = cursor.fetchall()
+            if col_remarks:
+                def extract_hours(text):
+                    if not text:
+                        return 0
+                    text = str(text).lower()
+                    total = 0.0
+                    for h, m in re.findall(r'(\d{1,2})[:](\d{1,2})\s*hrs?', text):
+                        total += int(h) + int(m) / 60.0
+                    if total == 0:
+                        for h in re.findall(r'(\d{1,3})\s*hrs?\b', text):
+                            total += int(h)
+                    return round(total, 2)
 
-        idx = {c.strip("`"): i for i, c in enumerate(select_cols)}
+                read_oem_col = col_oem or col_customer or list(col_map.keys())[0]
+                select_col_for_label = col_customer if col_customer else read_oem_col
 
-        for r in rows:
-            wtg_val = str(r[idx[wtg_col]]).strip()
-            if not wtg_val or wtg_val.lower() in ("none", "total", "all wtg"):
-                continue
+                cursor.execute(f"""
+                    SELECT `{select_col_for_label}`, `{col_wtg}`, `{col_remarks}`
+                    FROM `{table_name}` {where_clause};
+                """, params)
+                rows = cursor.fetchall()
 
-            dur = 0.0
-            if r[idx[dur_col]] not in (None, ""):
-                try: dur = float(r[idx[dur_col]])
-                except: pass
+                # --- Build raw list
+                for label, wtg_val, remarks in rows:
+                    gf = fm = s = u = 0.0
+                    if remarks:
+                        rtext = str(remarks).lower()
 
-            wtg_hrs[wtg_val] += dur
-            wtg_cnt[wtg_val] += 1
+                        # Grid Failure / Breakdown
+                        if any(k in rtext for k in ["bd", "breakdown", "grid feeding error", "gf"]):
+                            hrs = extract_hours(rtext)
+                            gf += hrs if hrs else 1
+                            summary["total_gf"] += hrs if hrs else 1
 
-            if err_col and r[idx[err_col]]:
-                err_text = str(r[idx[err_col]]).strip()
-                if len(err_text) > 40: err_text = err_text[:40] + "..."
-                cause_hrs[err_text] += dur
+                        # Force Majeure
+                        if any(k in rtext for k in ["fm", "force majeure"]):
+                            hrs = extract_hours(rtext)
+                            fm += hrs if hrs else 1
+                            summary["total_fm"] += hrs if hrs else 1
 
-            if wtg_val not in wtg_meta:
-                wtg_meta[wtg_val] = {
-                    "oem": str(r[idx[oem_col]]).strip() if oem_col and r[idx[oem_col]] else ("Senvion" if "senvion" in t else ("Regen" if "regen" in t else "Wind"))
-                }
+                        # Scheduled / Grid Shutdown
+                        if any(k in rtext for k in ["gs", "shutdown", "grid shutdown", "schedule", "s"]):
+                            hrs = extract_hours(rtext)
+                            s += hrs if hrs else 1
+                            summary["total_s"] += hrs if hrs else 1
 
-            m_key = None
-            if date_col and r[idx[date_col]]:
-                m_key = str(r[idx[date_col]])[:7]
-            elif month_col and r[idx[month_col]]:
-                m_key = str(r[idx[month_col]]).strip()
+                        # Unscheduled / Maintenance
+                        if any(k in rtext for k in ["pm", "maintenance", "visual maintenance", "preventive maintenance"]):
+                            hrs = extract_hours(rtext)
+                            u += hrs if hrs else 1
+                            summary["total_u"] += hrs if hrs else 1
 
-            if m_key:
-                monthly_hrs[m_key] += dur
+                    treemap_data.append({
+                        "oem": label or "Unknown",
+                        "wtg": wtg_val,
+                        "gf": round(gf, 2),
+                        "fm": round(fm, 2),
+                        "s": round(s, 2),
+                        "u": round(u, 2),
+                    })
 
-        def add_distinct(col, key):
-            if not col: return
-            with connection.cursor() as cur:
-                cur.execute(f"SELECT DISTINCT `{col}` FROM `{t}` WHERE `{col}` IS NOT NULL AND `{col}` != ''")
-                for r_ in cur.fetchall():
-                    distincts[key].add(str(r_[0]).strip())
+                # ✅ Aggregate by WTG to avoid duplicate treemap blocks
+                agg_map = {}
+                for entry in treemap_data:
+                    key = (entry["oem"], entry["wtg"])
+                    if key not in agg_map:
+                        agg_map[key] = entry
+                    else:
+                        agg_map[key]["gf"] += entry["gf"]
+                        agg_map[key]["fm"] += entry["fm"]
+                        agg_map[key]["s"] += entry["s"]
+                        agg_map[key]["u"] += entry["u"]
 
-        add_distinct(oem_col, "providers")
-        add_distinct(wtg_col, "wtgs")
+                treemap_data = list(agg_map.values())
 
-    wtg_data = []
-    for w, hrs in wtg_hrs.items():
-        meta = wtg_meta.get(w, {"oem": "Wind"})
-        incidents = wtg_cnt[w]
-        avg_dur = round(hrs / incidents, 2) if incidents else 0.0
-        wtg_data.append({
-            "wtg": w,
-            "hours": round(hrs, 2),
-            "incidents": incidents,
-            "avg_incident_dur": avg_dur,
-            "oem": meta["oem"],
-            "status": "Critical" if hrs > 1500 else ("Moderate" if hrs > 500 else "Normal")
-        })
+            else:
+                # --- Simple fallback (if no remarks)
+                cursor.execute(f"""
+                    SELECT `{col_customer}`, `{col_wtg}`, SUM(`generation`)
+                    FROM `{table_name}` {where_clause}
+                    GROUP BY `{col_customer}`, `{col_wtg}`;
+                """, params)
+                treemap_data = [
+                    {"oem": r[0] or "Unknown", "wtg": r[1],
+                     "gf": 0, "fm": 0, "s": 0, "u": 0, "generation": r[2] or 0}
+                    for r in cursor.fetchall()
+                ]
+                summary = {"total_gf": 0, "total_fm": 0, "total_s": 0, "total_u": 0}
 
-    wtg_data.sort(key=lambda x: x["hours"], reverse=True)
-    for rank, item in enumerate(wtg_data, 1):
-        item["rank"] = rank
-
-    total_hrs = round(sum(d["hours"] for d in wtg_data), 2)
-    avg_wtg_hrs = round(total_hrs / len(wtg_data), 2) if wtg_data else 0.0
-    worst_wtg = wtg_data[0] if wtg_data else {"wtg": "-", "hours": 0}
-    total_incidents = sum(d["incidents"] for d in wtg_data)
-    avg_trip_dur = round(total_hrs / total_incidents, 2) if total_incidents else 0.0
-
-    sorted_months = sorted(monthly_hrs.keys())[-12:]
-    month_series = [round(monthly_hrs[m], 2) for m in sorted_months]
-
-    top_causes = [{"cause": c, "hours": round(h, 1)} for c, h in sorted(cause_hrs.items(), key=lambda x: x[1], reverse=True)[:5]]
-    top_cause_name = top_causes[0]["cause"] if top_causes else "None"
-    top_cause_hrs = top_causes[0]["hours"] if top_causes else 0.0
-
+    # --- Context for template
     context = {
-        "kpi_total_hrs": total_hrs,
-        "kpi_worst_wtg": worst_wtg["wtg"],
-        "kpi_worst_hrs": worst_wtg["hours"],
-        "kpi_top_cause": top_cause_name,
-        "kpi_top_cause_hrs": top_cause_hrs,
-        "kpi_total_incidents": total_incidents,
-        "kpi_avg_trip_dur": avg_trip_dur,
-        "kpi_total_wtgs": len(wtg_data),
-
-        "table_data": wtg_data,
-        "all_wtgs_json": json.dumps(wtg_data),
-
-        "monthly_cats_json": json.dumps(sorted_months),
-        "monthly_bd_json": json.dumps(month_series),
-        "top_causes_json": json.dumps(top_causes),
-
-        # Filters
-        "date_from": date_from,
-        "date_to": date_to,
-        "providers": sorted(distincts["providers"]),
-        "wtgs": sorted(distincts["wtgs"]),
-        "selected_providers": providers,
-        "selected_wtgs": wtgs,
+        "table_name": table_name,
+        "treemap_data": json.dumps(treemap_data),
+        "donut_data": json.dumps(treemap_data),
+        "summary": summary,
+        **distincts,
+        "filters": {
+            "provider": f_provider,
+            "customer": f_customer,
+            "state": f_state,
+            "site": f_site,
+            "wtg": f_wtg,
+            "date_from": f_date_from,
+            "date_to": f_date_to,
+        },
     }
 
     return render(request, "dashboard_breakdown.html", context)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import connection
+from datetime import datetime
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import connection
+from datetime import datetime
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import connection
+from datetime import datetime
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import connection
+  # ✅ safer import
 
 
 @login_required
@@ -4456,236 +5092,523 @@ from django.shortcuts import render
 from django.db import connection
 from django.contrib.auth.decorators import login_required
 import pandas as pd
-from .ml_utils import BreakdownMLAnalyzer
+from .ml_utils import BreakdownMLAnalyzer, detect_extended_breakdowns
+from .recurrence_risk import (
+    RISK_TIERS,
+    analyze_recurrence_risk,
+    filter_recurrence_events,
+    natural_sort_key,
+    summarize_recurrence_details,
+    summarize_risk_groups,
+    summarize_wtg_risk,
+)
 
 
 @login_required
 def breakdown_analysis(request):
-    """
-    Breakdown & Downtime Intelligence
-    Implements 12 Priority Visuals:
-    - Visual #8: Breakdown Downtime Pareto Chart (80/20)
-    - Visual #9: Turbine-wise Downtime Stacked Bar Chart
-    - Visual #10: Monthly Breakdown Trend (Incidents & Duration)
-    - Visual #11: Repetitive & Extended Breakdown Records Table
-    - Summary KPI cards & Filter controls
-    """
-    user = request.user.username.lower().strip()
-    is_admin = request.user.is_superuser or user == 'admin'
+    return _breakdown_analysis(request)
 
+
+@login_required
+def recurrence_risk(request):
+    return _breakdown_analysis(request, recurrence_only=True)
+
+
+def _display_recurrence_filter_value(value):
+    if value is None or pd.isna(value) or not str(value).strip():
+        return "Unknown"
+    return str(value).strip()
+
+
+def _breakdown_analysis(request, recurrence_only=False):
+    username = request.user.username.lower().strip()
+    btype = "recurrence" if recurrence_only else request.GET.get("btype", "repetitive")
+    table_name = None
+
+    # -----------------------------------------------
+    # 1️⃣ FETCH ALL TABLES
+    # -----------------------------------------------
     with connection.cursor() as cursor:
         cursor.execute("SHOW TABLES;")
-        all_tables = [r[0] for r in cursor.fetchall()]
+        all_rows = cursor.fetchall()
 
-    if is_admin:
-        bd_tables = [t for t in all_tables if 'breakdown' in t and t.endswith('_wind_breakdowndata')]
-    else:
-        bd_tables = [t for t in all_tables if t.startswith(user + '_') and 'breakdown' in t]
+    all_tables = [str(r[0]).strip().lower() for r in all_rows]
 
-    if not bd_tables:
+    # Filter only this user's breakdown tables
+    user_break_tables = [
+        t for t in all_tables
+        if t.startswith(username + "_") and "breakdowndata" in t
+    ]
+
+    if not user_break_tables:
         return render(request, "breakdown_analysis.html", {
-            "no_data": True,
-            "error_msg": f"No breakdown tables found for account '{user}'.",
-            "total_downtime": 0, "total_incidents": 0, "affected_wtgs": 0,
-            "pareto_json": "{}", "stacked_json": "{}", "monthly_trend_json": "{}",
-            "extended_records": [], "wtgs": []
+            "alerts": [],
+            "chart_data": {},
+            "error_msg": f"No breakdown table found for user '{username}'.",
+            "btype": btype
         })
 
-    btype = request.GET.get("btype", "pareto")
-    date_from = request.GET.get("from") or request.GET.get("date_from")
-    date_to = request.GET.get("to") or request.GET.get("date_to")
-    wtg_filter = request.GET.get("wtg", "").strip()
+    table_name = sorted(user_break_tables)[-1]  # Latest table
 
-    cause_dur = defaultdict(float)
-    cause_cnt = defaultdict(int)
-    wtg_dur = defaultdict(float)
-    wtg_cause_map = defaultdict(lambda: defaultdict(float))
-    monthly_incidents = defaultdict(int)
-    monthly_dur = defaultdict(float)
-    extended_records = []
-    all_wtgs_set = set()
+    # -----------------------------------------------
+    # 2️⃣ LOAD CANONICAL BREAKDOWN FIELDS
+    # -----------------------------------------------
+    header_aliases = {
+        "gen_date": ("gen_date", "date", "generation_date", "breakdown_date"),
+        "loc_no": (
+            "loc_no", "location_no", "wtg", "wtg_no", "wec", "machine",
+            "asset_id", "machine_id",
+        ),
+        "breakdown_remarks": (
+            "breakdown_remarks",
+            "remarks",
+            "remark",
+            "breakdown_details",
+            "description",
+        ),
+    }
+    optional_header_aliases = {
+        "provider": ("provider", "oem", "oem_provider", "manufacturer"),
+        "site": ("site", "site_name", "plant", "plant_name", "location"),
+        "state": ("state", "state_name", "statename"),
+        "rds_code": ("rds_code", "rds_pp_code", "equipment_code"),
+        "system_name": ("system_name", "system"),
+        "subsystem_name": ("subsystem_name", "subsystem"),
+        "standard_component": (
+            "standard_component", "component", "equipment_component"
+        ),
+        "classification_status": ("classification_status",),
+        "duration_hrs": (
+            "duration_hrs", "duration_hours", "breakdown_hours", "duration",
+            "hours", "lhrs", "loss_hours", "loss_hrs",
+        ),
+        "start_time": ("start_time", "breakdown_start", "start_datetime"),
+        "end_time": ("end_time", "breakdown_end", "end_datetime"),
+    }
 
-    earliest_date = None
-    latest_date = None
+    with connection.cursor() as cursor:
+        cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        table_columns = [str(row[0]).strip() for row in cursor.fetchall()]
 
-    for bdt in bd_tables:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SHOW COLUMNS FROM `{bdt}`")
-            cols = [r[0] for r in cursor.fetchall()]
-        col_map = {normalize(c): c for c in cols}
+    normalized_columns = {
+        column.strip().lower().replace(".", "").replace(" ", "_"): column
+        for column in table_columns
+    }
+    selected_columns = {}
+    for canonical, aliases in header_aliases.items():
+        actual = next(
+            (normalized_columns[alias] for alias in aliases if alias in normalized_columns),
+            None,
+        )
+        if actual:
+            selected_columns[canonical] = actual
 
-        loc_col = _pick(col_map, "location", "loc_no", "location_no", "wtg", "wtg_no")
-        err_col = _pick(col_map, "error_description", "error_details", "error_code", "cause")
-        dur_col = _pick(col_map, "total_duration", "duration", "hours")
-        date_col = _pick(col_map, "date", "gen_date")
-        act_col = _pick(col_map, "action_taken_remark", "action_taken", "remark")
-
-        if not err_col or not dur_col:
-            continue
-
-        if date_col and (not date_from or not date_to):
-            with connection.cursor() as cursor:
-                cursor.execute(f"SELECT MIN(`{date_col}`), MAX(`{date_col}`) FROM `{bdt}` WHERE `{date_col}` IS NOT NULL AND `{date_col}` != ''")
-                d_min, d_max = cursor.fetchone()
-                if d_min and (not earliest_date or str(d_min) < str(earliest_date)):
-                    earliest_date = str(d_min)[:10]
-                if d_max and (not latest_date or str(d_max) > str(latest_date)):
-                    latest_date = str(d_max)[:10]
-
-        conditions, params = [], []
-        if date_from and date_to and date_col:
-            conditions.append(f"`{date_col}` BETWEEN %s AND %s")
-            params.extend([date_from, date_to])
-        if wtg_filter and loc_col:
-            conditions.append(f"`{loc_col}` = %s")
-            params.append(wtg_filter)
-
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-
-        # 1. Pareto Causes
-        with connection.cursor() as cursor:
-            cursor.execute(f"""
-                SELECT TRIM(`{err_col}`) as cause_clean, 
-                       SUM(CAST(`{dur_col}` AS DECIMAL(15,2))) as total_dur,
-                       COUNT(*) as freq
-                FROM `{bdt}`
-                {where_clause}
-                {"AND" if where_clause else "WHERE"} `{err_col}` IS NOT NULL AND `{err_col}` != ''
-                GROUP BY cause_clean
-                ORDER BY total_dur DESC
-            """, params)
-            for cause, dur, cnt in cursor.fetchall():
-                c_clean = ' '.join(str(cause).split())
-                if c_clean:
-                    d_val = float(dur or 0)
-                    cause_dur[c_clean] += d_val
-                    cause_cnt[c_clean] += cnt
-
-        # 2. Monthly Trend
-        if date_col:
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT SUBSTRING(`{date_col}`, 1, 7) as ym,
-                           COUNT(*) as incident_count,
-                           SUM(CAST(`{dur_col}` AS DECIMAL(15,2))) as total_dur
-                    FROM `{bdt}`
-                    {where_clause}
-                    {"AND" if where_clause else "WHERE"} `{date_col}` IS NOT NULL AND `{date_col}` != ''
-                    GROUP BY ym
-                    ORDER BY ym ASC
-                """, params)
-                for ym, inc, dur in cursor.fetchall():
-                    if ym and len(ym) == 7:
-                        monthly_incidents[ym] += int(inc)
-                        monthly_dur[ym] += float(dur or 0)
-
-        # 3. Turbine Downtime
-        if loc_col:
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT TRIM(`{loc_col}`) as loc,
-                           TRIM(`{err_col}`) as cause,
-                           SUM(CAST(`{dur_col}` AS DECIMAL(15,2))) as dur
-                    FROM `{bdt}`
-                    {where_clause}
-                    {"AND" if where_clause else "WHERE"} `{loc_col}` IS NOT NULL AND `{loc_col}` != ''
-                    GROUP BY loc, cause
-                """, params)
-                for loc, cause, dur in cursor.fetchall():
-                    l_clean = str(loc).strip()
-                    c_clean = ' '.join(str(cause).split())
-                    d_val = float(dur or 0)
-                    if l_clean:
-                        all_wtgs_set.add(l_clean)
-                        wtg_dur[l_clean] += d_val
-                        wtg_cause_map[l_clean][c_clean] += d_val
-
-        # 4. Extended Records (>10h)
-        with connection.cursor() as cursor:
-            act_sel = f", `{act_col}`" if act_col else ", ''"
-            cursor.execute(f"""
-                SELECT `{loc_col}`, `{date_col}`, TRIM(`{err_col}`), CAST(`{dur_col}` AS DECIMAL(15,2)) {act_sel}
-                FROM `{bdt}`
-                {where_clause}
-                {"AND" if where_clause else "WHERE"} CAST(`{dur_col}` AS DECIMAL(15,2)) >= 10.0
-                ORDER BY CAST(`{dur_col}` AS DECIMAL(15,2)) DESC
-                LIMIT 50
-            """, params)
-            for r in cursor.fetchall():
-                extended_records.append({
-                    "wtg": r[0],
-                    "date": str(r[1])[:10] if r[1] else "",
-                    "cause": ' '.join(str(r[2]).split()),
-                    "duration": float(r[3] or 0),
-                    "action": r[4] if len(r) > 4 else ""
-                })
-
-    sorted_causes = sorted(cause_dur.items(), key=lambda x: x[1], reverse=True)
-    total_downtime = sum(cause_dur.values())
-    total_incidents = sum(cause_cnt.values())
-
-    pareto_categories = []
-    pareto_durations = []
-    pareto_cum_pct = []
-    running_sum = 0.0
-    top_causes_list = [c for c, _ in sorted_causes[:5]]
-
-    for cause, dur in sorted_causes[:12]:
-        running_sum += dur
-        pct = (running_sum / total_downtime * 100) if total_downtime > 0 else 0
-        pareto_categories.append(cause[:28] + ("..." if len(cause) > 28 else ""))
-        pareto_durations.append(round(dur, 1))
-        pareto_cum_pct.append(round(pct, 1))
-
-    sorted_wtgs_bd = sorted(wtg_dur.items(), key=lambda x: x[1], reverse=True)[:10]
-    stacked_wtgs = [w for w, _ in sorted_wtgs_bd]
-
-    stacked_series = []
-    for cause in top_causes_list:
-        data_vals = [round(wtg_cause_map[w].get(cause, 0), 1) for w in stacked_wtgs]
-        stacked_series.append({
-            "name": cause[:24] + ("..." if len(cause) > 24 else ""),
-            "data": data_vals
+    missing_headers = set(header_aliases) - set(selected_columns)
+    if missing_headers:
+        return render(request, "breakdown_analysis.html", {
+            "alerts": [],
+            "chart_data": {},
+            "error_msg": (
+                f"Table '{table_name}' is missing required breakdown headers: "
+                f"{', '.join(sorted(missing_headers))}."
+            ),
+            "btype": btype
         })
 
-    sorted_ym = sorted(monthly_incidents.keys())
-    recent_ym = sorted_ym[-24:] if len(sorted_ym) > 24 else sorted_ym
-    trend_labels = recent_ym
-    trend_incidents = [monthly_incidents[m] for m in recent_ym]
-    trend_hours = [round(monthly_dur[m], 1) for m in recent_ym]
+    for column, aliases in optional_header_aliases.items():
+        actual = next(
+            (normalized_columns[alias] for alias in aliases if alias in normalized_columns),
+            None,
+        )
+        if actual:
+            selected_columns[column] = actual
 
-    top_repeat_cause = sorted(cause_cnt.items(), key=lambda x: x[1], reverse=True)
-    top_rep = top_repeat_cause[0] if top_repeat_cause else ("None", 0)
+    select_parts = [
+        f"`{actual.replace('`', '``')}` AS `{canonical}`"
+        for canonical, actual in selected_columns.items()
+    ]
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"SELECT {', '.join(select_parts)} FROM `{table_name}`"
+        )
+        rows = cursor.fetchall()
+        columns = [column[0] for column in cursor.description]
 
+    if not rows:
+        return render(request, "breakdown_analysis.html", {
+            "alerts": [],
+            "chart_data": {},
+            "error_msg": f"Table '{table_name}' has no data.",
+            "btype": btype
+        })
+
+    df = pd.DataFrame(rows, columns=columns)
+    df["gen_date"] = pd.to_datetime(df["gen_date"], errors="coerce")
+    if "duration_hrs" in df:
+        durations = df["duration_hrs"].map(parse_time_to_hours)
+    else:
+        durations = pd.Series(float("nan"), index=df.index)
+    durations = pd.to_numeric(durations, errors="coerce")
+    if "start_time" in df and "end_time" in df:
+        derived_durations = df.apply(
+            lambda row: _duration_hours_from_bounds(
+                row["start_time"], row["end_time"]
+            ),
+            axis=1,
+        )
+        durations = durations.where(
+            durations.notna() & (durations > 0), derived_durations
+        )
+    df["duration_hours"] = pd.to_numeric(durations, errors="coerce")
+    if btype == "recurrence":
+        df = analyze_recurrence_risk(df)
+        from accounts.models import RDSCatalog
+
+        for field in ("subsystem_name", "system_name", "standard_component"):
+            if field not in df:
+                df[field] = pd.NA
+            df[field] = df[field].replace("", pd.NA)
+        rds_codes = df["rds_code"].dropna().astype(str).str.strip().unique()
+        catalog = {
+            code: {
+                "subsystem_name": subsystem,
+                "system_name": system,
+                "standard_component": component,
+            }
+            for code, subsystem, system, component in RDSCatalog.objects.filter(
+                rds_code__in=rds_codes
+            ).values_list(
+                "rds_code",
+                "subsystem_name",
+                "system_name",
+                "standard_component",
+            )
+        }
+        for field in ("subsystem_name", "system_name", "standard_component"):
+            mapped_values = df["rds_code"].map(
+                lambda code: catalog.get(str(code).strip(), {}).get(field)
+            )
+            df[field] = df[field].where(df[field].notna(), mapped_values)
+        recurrence_reference_date = df["event_start"].max()
+    else:
+        recurrence_reference_date = None
+    wtg_options = sorted(df["loc_no"].dropna().astype(str).unique().tolist())
+    history_df = df.copy()
+
+    # -----------------------------------------------
+    # 4️⃣ GET FILTERS (Including NEW Breakdown Type)
+    # -----------------------------------------------
+    if btype == "recurrence":
+        recurrence_filter_fields = ("provider", "site", "state", "loc_no")
+        recurrence_filter_labels = {
+            "provider": "OEM / Provider",
+            "site": "Site name",
+            "state": "State name",
+            "loc_no": "WTG number",
+        }
+        selected_recurrence_filters = {
+            field: request.GET.get(field, "").strip()
+            for field in recurrence_filter_fields
+        }
+        recurrence_filter_options = {}
+        for field in recurrence_filter_fields:
+            values = (
+                df[field].dropna().astype(str).str.strip()
+                if field in df.columns
+                else pd.Series(dtype=str)
+            )
+            values = [value for value in values.unique().tolist() if value]
+            values.sort(key=natural_sort_key)
+            has_missing_values = (
+                field not in df.columns
+                or df[field].isna().any()
+                or (df[field].astype(str).str.strip() == "").any()
+            )
+            if has_missing_values:
+                values.insert(0, "__missing__")
+            recurrence_filter_options[field] = values
+        severity_filter = ""
+        wtg_filter = ""
+        date_from = ""
+        date_to = ""
+    else:
+        severity_filter = request.GET.get("severity", "")
+        wtg_filter = request.GET.get("wtg", "")
+        date_from = request.GET.get("from", "")
+        date_to = request.GET.get("to", "")
+
+    # -----------------------------------------------
+    # 5️⃣ APPLY FILTERS
+    # -----------------------------------------------
+    if btype == "recurrence":
+        df = filter_recurrence_events(df, selected_recurrence_filters)
+
+    if btype != "recurrence" and wtg_filter:
+        df = df[df["loc_no"].astype(str) == wtg_filter]
+
+    if btype != "recurrence" and date_from:
+        parsed_date_from = pd.to_datetime(date_from, errors="coerce")
+        if pd.isna(parsed_date_from):
+            return render(request, "breakdown_analysis.html", {
+                "alerts": [],
+                "chart_data": {},
+                "error_msg": "The start date filter is invalid.",
+                "btype": btype,
+            })
+        df = df[df["gen_date"] >= parsed_date_from.normalize()]
+
+    if btype != "recurrence" and date_to:
+        parsed_date_to = pd.to_datetime(date_to, errors="coerce")
+        if pd.isna(parsed_date_to):
+            return render(request, "breakdown_analysis.html", {
+                "alerts": [],
+                "chart_data": {},
+                "error_msg": "The end date filter is invalid.",
+                "btype": btype,
+            })
+        df = df[df["gen_date"] < parsed_date_to.normalize() + pd.Timedelta(days=1)]
+
+    if df.empty:
+        return render(request, "breakdown_analysis.html", {
+            "alerts": [],
+            "chart_data": {},
+            "error_msg": "No data for selected filters.",
+            "btype": btype,
+            "wtg_options": wtg_options,
+            "recurrence_filter_fields": (
+                recurrence_filter_fields if btype == "recurrence" else []
+            ),
+            "recurrence_filter_labels": (
+                recurrence_filter_labels if btype == "recurrence" else {}
+            ),
+            "recurrence_filter_options": (
+                recurrence_filter_options if btype == "recurrence" else {}
+            ),
+            "selected_recurrence_filters": (
+                selected_recurrence_filters if btype == "recurrence" else {}
+            ),
+            "risk_cards": [],
+            "risk_group_data": [],
+            "top_wtgs": [],
+            "subsystem_risk_data": [],
+            "recurrence_profile_data": [],
+            "recurrence_reference_date": (
+                recurrence_reference_date.strftime("%Y-%m-%d")
+                if recurrence_reference_date is not None
+                and pd.notna(recurrence_reference_date)
+                else None
+            ),
+        })
+
+    # -----------------------------------------------
+    # 6️⃣ EXTENDED BREAKDOWN MODE (COMPONENT-WISE P90)
+    # -----------------------------------------------
+    if btype == "recurrence":
+        severity_labels = {
+            "CRITICAL_RECURRENCE": "Critical",
+            "HIGH_RECURRENCE_RISK": "High",
+            "MODERATE_RECURRENCE": "Medium",
+            "NORMAL": "Low",
+        }
+        risk_labels = {
+            "CRITICAL_RECURRENCE": "Critical recurrence",
+            "HIGH_RECURRENCE_RISK": "High recurrence risk",
+            "MODERATE_RECURRENCE": "Moderate recurrence",
+            "NORMAL": "Normal",
+        }
+        tier_counts, _ = summarize_wtg_risk(df)
+        risk_group_data = summarize_risk_groups(df, "provider")
+        top_wtgs, subsystem_risk_data, recurrence_profile_data = (
+            summarize_recurrence_details(df, recurrence_reference_date)
+        )
+        risk_cards = [
+            {
+                "key": risk_tier,
+                "label": risk_labels[risk_tier],
+                "count": tier_counts[risk_tier],
+                "style": {
+                    "CRITICAL_RECURRENCE": "critical",
+                    "HIGH_RECURRENCE_RISK": "high",
+                    "MODERATE_RECURRENCE": "moderate",
+                    "NORMAL": "normal",
+                }[risk_tier],
+            }
+            for risk_tier in RISK_TIERS
+        ]
+        alerts = []
+        for _, row in df.iterrows():
+            event_start = row["event_start"]
+            if pd.isna(event_start):
+                continue
+            risk_tier = row["risk_tier"] or "NORMAL"
+            if severity_filter and risk_tier != severity_filter:
+                continue
+            machine = str(row["loc_no"])
+            code = row.get("rds_code")
+            code = None if pd.isna(code) else str(code)
+            remark = row.get("breakdown_remarks")
+            remark = "" if pd.isna(remark) else str(remark)
+            taxonomy = {
+                field: None if pd.isna(row.get(field)) else str(row.get(field))
+                for field in ("system_name", "subsystem_name", "standard_component")
+            }
+            tbf_days = row.get("tbf_days")
+            alerts.append({
+                "machine": machine,
+                "provider_label": _display_recurrence_filter_value(row.get("provider")),
+                "site_label": _display_recurrence_filter_value(row.get("site")),
+                "state_label": _display_recurrence_filter_value(row.get("state")),
+                "severity": severity_labels[risk_tier],
+                "risk_tier": risk_tier,
+                "risk_label": risk_labels[risk_tier],
+                "date": event_start.strftime("%Y-%m-%d"),
+                "message": remark,
+                "rds_code": code,
+                **taxonomy,
+                "tbf_days": round(float(tbf_days), 2) if pd.notna(tbf_days) else None,
+                "cumulative_failure_count": int(row["cumulative_failure_count"]),
+                "failures_last_30d": int(row["failures_last_30d"]),
+                "failures_last_90d": int(row["failures_last_90d"]),
+                "failures_last_365d": int(row["failures_last_365d"]),
+                "mtbf_days": round(float(row["mtbf_days"]), 2)
+                if pd.notna(row["mtbf_days"]) else None,
+            })
+        alerts.sort(
+            key=lambda alert: (
+                natural_sort_key(alert["provider_label"]),
+                natural_sort_key(alert["site_label"]),
+                natural_sort_key(alert["state_label"]),
+                natural_sort_key(alert["machine"]),
+                alert["date"],
+            )
+        )
+
+        chart_data = {}
+        for alert in alerts:
+            chart_data[alert["machine"]] = chart_data.get(alert["machine"], 0) + 1
+
+        affected_wtgs = len(chart_data)
+        most_repetitive_wtg = max(chart_data, key=chart_data.get) if chart_data else None
+        most_repetitions = chart_data.get(most_repetitive_wtg, 0)
+        request.session["bd_alerts"] = alerts
+        return render(request, "breakdown_analysis.html", {
+            "alerts": alerts,
+            "chart_data": chart_data,
+            "error_msg": None,
+            "severity_filter": severity_filter,
+            "wtg_filter": wtg_filter,
+            "date_from": "",
+            "date_to": "",
+            "total_alerts": len(alerts),
+            "affected_wtgs": affected_wtgs,
+            "repetition_rate": 0,
+            "most_repetitive_wtg": most_repetitive_wtg,
+            "most_repetitions": most_repetitions,
+            "wtg_options": wtg_options,
+            "dynamic_table": table_name,
+            "btype": btype,
+            "risk_cards": risk_cards,
+            "recurrence_filter_fields": recurrence_filter_fields,
+            "recurrence_filter_labels": recurrence_filter_labels,
+            "recurrence_filter_options": recurrence_filter_options,
+            "selected_recurrence_filters": selected_recurrence_filters,
+            "risk_group_data": risk_group_data,
+            "top_wtgs": top_wtgs,
+            "subsystem_risk_data": subsystem_risk_data,
+            "recurrence_profile_data": recurrence_profile_data,
+            "recurrence_reference_date": (
+                recurrence_reference_date.strftime("%Y-%m-%d")
+                if pd.notna(recurrence_reference_date)
+                else None
+            ),
+        })
+
+    if btype == "extended":
+        alerts = detect_extended_breakdowns(df, history_df)
+        chart_data = {}
+        for alert in alerts:
+            machine = alert["machine"]
+            chart_data[machine] = chart_data.get(machine, 0) + 1
+        total_alerts = len(alerts)
+        affected_wtgs = len(chart_data)
+        most_repetitive_wtg = None
+        most_repetitions = 0
+        if chart_data:
+            most_repetitive_wtg, most_repetitions = max(
+                chart_data.items(), key=lambda item: item[1]
+            )
+        request.session["bd_alerts"] = alerts
+        return render(request, "breakdown_analysis.html", {
+            "alerts": alerts,
+            "chart_data": chart_data,
+            "error_msg": None,
+            "severity_filter": severity_filter,
+            "wtg_filter": wtg_filter,
+            "date_from": date_from,
+            "date_to": date_to,
+            "total_alerts": total_alerts,
+            "affected_wtgs": affected_wtgs,
+            "repetition_rate": 0,
+            "most_repetitive_wtg": most_repetitive_wtg,
+            "most_repetitions": most_repetitions,
+            "wtg_options": wtg_options,
+            "dynamic_table": table_name,
+            "btype": btype,
+        })
+
+    # -----------------------------------------------
+    # 7️⃣ REPETITIVE BREAKDOWN MODE (NORMAL ML MODEL)
+    # -----------------------------------------------
+    analyzer = BreakdownMLAnalyzer(similarity_threshold=0.60, days_window=8)
+    analyzer.load_dataframe(df)
+    alerts = analyzer.detect_repetitions()
+
+    if severity_filter:
+        alerts = [a for a in alerts if a["severity"] == severity_filter]
+
+    # Chart + KPIs
+    chart_data = {}
+    for a in alerts:
+        machine = str(a.get("machine", "Unknown"))
+        chart_data[machine] = chart_data.get(machine, 0) + 1
+
+    total_alerts = len(alerts)
+    affected_wtgs = len(chart_data)
+    repetition_rate = round((total_alerts / affected_wtgs) * 100, 2) if affected_wtgs else 0
+
+    most_repetitive_wtg = None
+    most_repetitions = 0
+    if chart_data:
+        most_repetitive_wtg, most_repetitions = max(chart_data.items(), key=lambda x: x[1])
+
+    # -----------------------------------------------
+    # 8️⃣ RENDER REPETITIVE BREAKDOWN DASHBOARD
+    # -----------------------------------------------
+    request.session["bd_alerts"] = alerts
     return render(request, "breakdown_analysis.html", {
-        "total_downtime": round(total_downtime, 1),
-        "total_incidents": total_incidents,
-        "affected_wtgs": len(all_wtgs_set),
-        "top_downtime_cause": sorted_causes[0][0] if sorted_causes else "None",
-        "top_repeat_cause": top_rep[0],
-        "top_repeat_count": top_rep[1],
+        "alerts": alerts,
+        "chart_data": chart_data,
+        "error_msg": None,
 
-        "pareto_json": json.dumps({
-            "categories": pareto_categories,
-            "durations": pareto_durations,
-            "cumulative_pct": pareto_cum_pct
-        }),
-        "stacked_json": json.dumps({
-            "categories": stacked_wtgs,
-            "series": stacked_series
-        }),
-        "monthly_trend_json": json.dumps({
-            "labels": trend_labels,
-            "incidents": trend_incidents,
-            "hours": trend_hours
-        }),
-        "extended_records": extended_records,
-        "wtgs": sorted(all_wtgs_set),
+        "severity_filter": severity_filter,
         "wtg_filter": wtg_filter,
-        "date_from": date_from or earliest_date,
-        "date_to": date_to or latest_date,
-        "btype": btype,
+        "date_from": date_from,
+        "date_to": date_to,
+
+        "total_alerts": total_alerts,
+        "affected_wtgs": affected_wtgs,
+        "repetition_rate": repetition_rate,
+
+        "most_repetitive_wtg": most_repetitive_wtg,
+        "most_repetitions": most_repetitions,
+        "wtg_options": wtg_options,
+
+        "dynamic_table": table_name,
+        "btype": btype  # NEW
     })
+
+
+
 
 @login_required
 def customer_upload_dsm(request):

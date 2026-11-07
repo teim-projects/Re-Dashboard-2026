@@ -23,6 +23,7 @@ html5lib==1.1
 idna==3.10
 joblib==1.5.2
 lxml==6.0.1
+matplotlib>=3.8,<4
 multidict==6.6.4
 mysqlclient==2.2.7
 numpy==2.2.6

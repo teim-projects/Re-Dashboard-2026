@@ -1,0 +1,97 @@
+{% extends base_template %}
+
+{% block title %}Breakdown Classification Results{% endblock %}
+
+{% block style_css %}
+<style>
+  .mapping-chart-item { margin-bottom: 1.25rem; }
+  .mapping-chart-label { display: flex; justify-content: space-between; gap: 1rem; }
+  .mapping-chart-track {
+    height: 1.25rem;
+    background: #e9ecef;
+    border-radius: 0.4rem;
+    overflow: hidden;
+  }
+  .mapping-chart-bar {
+    height: 100%;
+    min-width: 2px;
+    background: linear-gradient(90deg, #0c8599, #38a3a5);
+    border-radius: inherit;
+  }
+</style>
+{% endblock style_css %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h2>Breakdown Classification Summary</h2>
+      <p class="text-muted mb-0">{{ table_name }} · {{ total_records|default:0 }} records</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'upload_files' %}">Back to upload</a>
+  </div>
+
+  {% if setup_missing %}
+    <div class="alert alert-info">
+      This table does not have canonical classification fields. Confirm the provider's canonical
+      breakdown mapping and upload a breakdown sheet before viewing the classification summary.
+    </div>
+  {% else %}
+    <div class="alert alert-secondary">
+      This summary includes records successfully mapped by the classifier, grouped by RDS code,
+      system category, and component.
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header fw-semibold">Mapped records by RDS category</div>
+      <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0">
+          <thead>
+            <tr>
+              <th>RDS code</th>
+              <th>System category</th>
+              <th>System component</th>
+              <th>Total records mapped</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in mapping_summary %}
+              <tr>
+                <td>{{ item.rds_code }}</td>
+                <td>{{ item.system_name }}</td>
+                <td>{{ item.standard_component }}</td>
+                <td>{{ item.record_count }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-center text-muted">No classified breakdown records found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header fw-semibold">Record distribution by mapped category</div>
+      <div class="card-body">
+        {% for item in mapping_summary %}
+          <div class="mapping-chart-item">
+            <div class="mapping-chart-label mb-1">
+              <span>
+                <strong>{{ item.rds_code }}</strong> · {{ item.system_name }} ·
+                {{ item.standard_component }}
+              </span>
+              <span class="fw-semibold">{{ item.record_count }}</span>
+            </div>
+            <div class="mapping-chart-track" role="img"
+                 aria-label="{{ item.rds_code }}: {{ item.record_count }} records">
+              <div class="mapping-chart-bar" style="width: {{ item.bar_width }}%"></div>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-muted mb-0">No breakdown records to visualize.</p>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock content %}

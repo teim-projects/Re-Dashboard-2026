@@ -444,7 +444,7 @@ aria-expanded="{% if request.resolver_match.url_name == 'wind_generation_kwh' or
 data-bs-toggle="collapse"
 href="#breakdownMenu"
 role="button"
-aria-expanded="{% if request.resolver_match.url_name == 'wind_breakdown_hours' or request.resolver_match.url_name == 'wind_breakdown_log' or request.resolver_match.url_name == 'dashboard_breakdown' %}true{% else %}false{% endif %}">
+aria-expanded="{% if request.resolver_match.url_name == 'wind_breakdown_hours' or request.resolver_match.url_name == 'wind_breakdown_log' or request.resolver_match.url_name == 'dashboard_breakdown' or request.resolver_match.url_name == 'breakdown_analysis' or request.resolver_match.url_name == 'recurrence_risk' %}true{% else %}false{% endif %}">
 
    <span class="modern-menu-left">
       <i class="fa-solid fa-screwdriver-wrench"></i>
@@ -454,7 +454,7 @@ aria-expanded="{% if request.resolver_match.url_name == 'wind_breakdown_hours' o
 <i class="fa-solid fa-angle-right modern-menu-arrow"></i> </a>
 
 <div id="breakdownMenu"
-     class="collapse {% if request.resolver_match.url_name == 'wind_breakdown_hours' or request.resolver_match.url_name == 'wind_breakdown_log' or request.resolver_match.url_name == 'dashboard_breakdown' %}show{% endif %}">
+     class="collapse {% if request.resolver_match.url_name == 'wind_breakdown_hours' or request.resolver_match.url_name == 'wind_breakdown_log' or request.resolver_match.url_name == 'dashboard_breakdown' or request.resolver_match.url_name == 'breakdown_analysis' or request.resolver_match.url_name == 'recurrence_risk' %}show{% endif %}">
 
    <div class="modern-submenu">
 
@@ -482,7 +482,11 @@ aria-expanded="{% if request.resolver_match.url_name == 'wind_breakdown_hours' o
       Breakdown Analysis
    </a>
 
-
+   <a class="{% if request.resolver_match.url_name == 'recurrence_risk' %}active{% endif %}"
+      href="{% url 'recurrence_risk' %}">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      Recurrence Risk
+   </a>
 
    </div>
 </div>

@@ -43,7 +43,9 @@ from django.core.files.storage import FileSystemStorage
 from django.db import connection
 from django.contrib.auth.models import User
 from django.utils.timezone import now
-from accounts.models import Provider, EnergyType
+from accounts.models import Provider, EnergyType, ProviderColumnMapping
+from accounts.breakdown_mapping import canonicalize_breakdown_dataframe
+from accounts.breakdown_ingestion import insert_canonical_breakdown_rows
 from .models import UploadMetadata
 
 
@@ -215,9 +217,7 @@ def read_excel_multi(file_path, ext):
         """Return the index where data header starts (e.g. contains DATE/WEC)."""
         for i, row in df.iterrows():
             joined = " ".join(str(x).lower() for x in row if pd.notna(x))
-            has_date = any(k in joined for k in ["date", "gen_date", "reading_date"])
-            has_wtg = any(k in joined for k in ["wec", "wtg", "loc", "turbine", "location"])
-            if (has_date and has_wtg) or ("date" in joined and "wec" in joined):
+            if "date" in joined and "wec" in joined:
                 return i
         return 0
 
@@ -306,20 +306,12 @@ def upload_files(request):
         cursor.execute("SHOW TABLES;")
         db_tables = [r[0] for r in cursor.fetchall()]
 
-    expected_tables = []
-    for tbl in db_tables:
-        parts = tbl.split("_")
-        if len(parts) >= 3:
-            username = parts[0]
-            provider_slug = "_".join(parts[1:-1])
-            energy_slug = parts[-1]
-
-            if Provider.objects.filter(name__iexact=provider_slug.replace("_", " ")).exists() and \
-               EnergyType.objects.filter(name__iexact=energy_slug.replace("_", " ")).exists():
-                expected_tables.append({
-                    "name": tbl,
-                    "label": f"{username} - {provider_slug.replace('_',' ').title()} - {energy_slug.title()}"
-                })
+    expected_tables = build_expected_upload_tables(
+        db_tables,
+        User.objects.all(),
+        providers,
+        energy_types,
+    )
 
     if request.method == "POST":
         table_name = request.POST.get("provider", "").strip()
@@ -348,6 +340,13 @@ def upload_files(request):
                 # ----------------- NORMALIZATION -----------------
                 for col in df.columns:
                     col_l = col.lower().strip()
+
+                    if (
+                        (("start" in col_l or "end" in col_l) and "time" in col_l)
+                        or col_l.endswith("_datetime")
+                    ):
+                        df[col] = pd.to_datetime(df[col], errors="coerce")
+                        continue
 
                     # Date column
                     if any(k in col_l for k in ["date", "gen_date", "dt"]):
@@ -390,19 +389,38 @@ def upload_files(request):
                     cursor.execute(f"SHOW COLUMNS FROM `{target_table}`")
                     table_columns = [c[0].lower() for c in cursor.fetchall()]
 
-                # -------- COLUMN FIX (loaction → location) --------
+                # -------- APPLY BREAKDOWN HEADER MAPPING OR STANDARD COLUMN FIX --------
                 alias_map = {
                       "loaction": "location",
                       "loc": "location",
                       "location_": "location",
                       "location ": "location",
                       }
-                    
-                    
-                   
-                
-
-                df.rename(columns=lambda c: alias_map.get(c.lower(), c.lower()), inplace=True)
+                has_canonical_mapping = False
+                mapping_owner = None
+                if "breakdowndata" in target_table.lower():
+                    configured_mappings = list(
+                        ProviderColumnMapping.objects.filter(
+                            table_name=target_table
+                        ).order_by("id")
+                    )
+                    if configured_mappings:
+                        has_canonical_mapping = True
+                        mapping_owner = configured_mappings[0]
+                        try:
+                            df, _ = canonicalize_breakdown_dataframe(
+                                df, configured_mappings
+                            )
+                        except ValueError as error:
+                            messages.error(
+                                request,
+                                f"Breakdown sheet '{sheet_name}': {error}",
+                            )
+                            continue
+                    else:
+                        df.rename(columns=lambda c: c.lower(), inplace=True)
+                else:
+                    df.rename(columns=lambda c: alias_map.get(c.lower(), c.lower()), inplace=True)
 
                 # ---------------------------------------------------------------------
                 # ⭐ FIX: SOLAR MERGED COLUMN SPLIT MUST RUN BEFORE VALID COLUMN FILTER
@@ -428,6 +446,16 @@ def upload_files(request):
                 # ---------------- VALID COLUMN FILTER (run AFTER split) ----------------
                 valid_cols = [c for c in df.columns if c in table_columns]
                 df = df[valid_cols]
+                if has_canonical_mapping:
+                    required_fields = ["gen_date", "loc_no", "breakdown_remarks"]
+                    df = df.dropna(subset=required_fields)
+                    if df.empty:
+                        messages.error(
+                            request,
+                            f"Breakdown sheet '{sheet_name}' has no rows with a date, "
+                            "machine ID, and remarks.",
+                        )
+                        continue
 
                 # Metadata
                 parts = table_name.split("_")
@@ -440,6 +468,25 @@ def upload_files(request):
                     df["provider"] = provider_name
                 if "energy_type" in table_columns:
                     df["energy_type"] = energy_type
+                if mapping_owner and "user_id" in table_columns:
+                    df["user_id"] = mapping_owner.user_id
+                if mapping_owner and "provider_id" in table_columns:
+                    df["provider_id"] = mapping_owner.provider_id
+
+                if has_canonical_mapping:
+                    inserted, duplicates = insert_canonical_breakdown_rows(
+                        target_table, df
+                    )
+                    if inserted:
+                        UploadMetadata.objects.update_or_create(
+                            table_name=target_table,
+                            defaults={"last_modified": now()},
+                        )
+                    uploaded_sheets.append(
+                        f"{sheet_name} → {inserted} new rows queued for classification; "
+                        f"{duplicates} duplicates discarded"
+                    )
+                    continue
 
                 # ---------------- UPSERT FOR SOLAR ----------------
                 is_solar = "solar" in table_name.lower()
@@ -494,6 +541,42 @@ def upload_files(request):
         "energy_types": energy_types,
         "staff_users": User.objects.filter(is_superuser=False),
     })
+
+
+def build_expected_upload_tables(db_tables, users, providers, energy_types):
+    existing_tables = {table.lower() for table in db_tables}
+    expected_tables = []
+    seen_table_names = set()
+
+    for user in users:
+        for provider in providers:
+            for energy_type in energy_types:
+                provider_slug = re.sub(
+                    r"[^a-z0-9_]+",
+                    "_",
+                    provider.name.strip().lower().replace(" ", "_"),
+                ).strip("_")
+                energy_slug = re.sub(
+                    r"[^a-z0-9_]+",
+                    "_",
+                    energy_type.name.strip().lower().replace(" ", "_"),
+                ).strip("_")
+                base_name = f"{user.username.lower()}_{provider_slug}_{energy_slug}"
+                breakdown_name = f"{base_name}_breakdowndata"
+                if not ({base_name, breakdown_name} & existing_tables):
+                    continue
+                if base_name in seen_table_names:
+                    continue
+
+                seen_table_names.add(base_name)
+                expected_tables.append({
+                    "name": base_name,
+                    "label": (
+                        f"{user.username} - {provider.name} - {energy_type.name}"
+                    ),
+                })
+
+    return expected_tables
 
 
 
