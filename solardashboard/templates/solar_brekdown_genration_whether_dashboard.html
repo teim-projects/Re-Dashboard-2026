@@ -1,0 +1,334 @@
+{% extends "basesolar.html" %}
+{% load static %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+.page-wrapper {
+    margin-top: 80px;
+    padding: 0 20px 20px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.header-strip {
+    background: linear-gradient(280deg, #8aff8a, #ffffff);
+    color: #000000;
+    padding: 10px 20px;
+    border-radius: 16px 16px 0 0;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: .5px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.25);
+}
+
+/* 2-column layout for filters + first chart */
+.solar-layout {
+    display: grid;
+    grid-template-columns: 230px 1fr;
+    background: #ffffff;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 10px 20px rgba(0,0,0,.18);
+}
+
+ 
+
+
+/* NEW FILTER CARD STYLE */
+.filter-pane {
+    background: #eef5ff;
+    padding: 15px 10px;
+    border-radius: 0 0 0 16px;
+    border-right: 1px solid #d5e5ff;
+}
+
+.filter-group {
+    margin-bottom: 18px;
+}
+
+.filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5c76;
+    margin-bottom: 6px;
+    margin-left: 4px;
+}
+
+/* UPDATED DROPDOWN STYLE */
+.filter-select {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #d9e5f5;
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 10px;
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+    color: #333;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    background-image: url("data:image/svg+xml,%3Csvg fill='%234b5c76' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 18px;
+}
+
+/* Hover / Focus Effects */
+.filter-select:hover {
+    border-color: #aac8ff;
+}
+
+.filter-select:focus {
+    border-color: #4b8dff;
+    box-shadow: 0 0 6px rgba(91,135,255,0.45);
+}
+
+/* Chart card */
+.charts-pane {
+    padding: 15px;
+}
+.chart-card {
+    background: #f7fbff;
+    border-radius: 10px;
+    padding: 14px 16px 10px;
+    border: 1px solid #c5ddf7;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.07);
+    margin-bottom: 16px;
+}
+.chart-title {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #1f3965;
+}
+.canvas-wrap {
+    height: 260px;
+}
+
+/* Weather chart full-width below layout */
+.full-width-chart {
+    margin-top: 12px;
+    background: #f7fbff;
+    border-radius: 12px;
+    padding: 14px 16px 10px;
+    border: 1px solid #c5ddf7;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.07);
+}
+
+@media (max-width: 900px) {
+    .solar-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.filter-description {
+    font-size: 11px;
+    color: #000000;
+    margin-top: 8px;
+    margin-left: 4px;
+    opacity: 0.8;
+}
+
+</style>
+
+<div class="page-wrapper">
+    <div class="header-strip"> SOLAR ANALYSIS</div>
+
+    <!-- Filters + first chart -->
+    <div class="solar-layout">
+        <!-- Filter Panel -->
+    <div class="filter-pane">
+
+    <div class="filter-group">
+        <div class="filter-label">Year</div>
+        <select id="filter-year" class="filter-select">
+            <option value="">All Years</option>
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <div class="filter-label">Month</div>
+        <select id="filter-month" class="filter-select">
+            <option value="">All Months</option>
+            {% for m in "123456789101112"|make_list %}
+            <option value="{{ forloop.counter }}">{{ forloop.counter }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <div class="filter-label">Day</div>
+        <select id="filter-day" class="filter-select">
+            <option value="">All Days</option>
+            {% for d in "1234567890123456789012345678901"|make_list %}
+            <option value="{{ forloop.counter }}">{{ forloop.counter }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <p class="filter-description"> <i class="fa-solid fa-lightbulb" style="color: rgb(27, 160, 0);"></i>
+This is an<strong>advanced</strong>  filter-based dashboard</p>
+
+</div>
+
+
+        
+        <!-- First chart only -->
+        <div class="charts-pane">
+            <div class="chart-card">
+                <div class="chart-title">Daily Generation & Generation Hours</div>
+                <div class="canvas-wrap">
+                    <canvas id="lineChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full-width Weather Chart BELOW -->
+    <div class="full-width-chart">
+        <div class="chart-title">Daily Generation by Weather Condition</div>
+        <div class="canvas-wrap" style="height:330px;">
+            <canvas id="weatherChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_URL = "{% url 'api_brekdown_genration_whether_dashboard' %}";
+let lineChart = null;
+let weatherChart = null;
+let yearOptionsLoaded = false;
+
+function groupByYear(data) {
+    const map = {};
+    data.forEach(r => {
+        const y = r.date.slice(0, 4);
+        if (!map[y]) map[y] = { gen: 0, gh: 0 };
+        map[y].gen += r.gen || 0;
+        map[y].gh  += r.gh  || 0;
+    });
+
+    const labels = Object.keys(map).sort();
+    return {
+        labels: labels,
+        gen: labels.map(y => map[y].gen),
+        gh:  labels.map(y => map[y].gh)
+    };
+}
+
+async function loadDashboard() {
+    const params = new URLSearchParams();
+    ["filter-year","filter-month","filter-day"].forEach(id => {
+        const v = document.getElementById(id).value;
+        if (v) params.append(id.replace("filter-",""), v);
+    });
+
+    const res = await fetch(API_URL + "?" + params.toString());
+    const data = await res.json();
+
+    if (data.status === "no_data") {
+        if (lineChart) lineChart.destroy();
+        if (weatherChart) weatherChart.destroy();
+        return;
+    }
+
+    if (!yearOptionsLoaded) {
+        const years = [...new Set(data.line.map(r => r.date.slice(0,4)))];
+        const sel = document.getElementById("filter-year");
+        years.forEach(y => sel.innerHTML += `<option value="${y}">${y}</option>`);
+        yearOptionsLoaded = true;
+    }
+
+    updateLineChart(data.line);
+updateWeatherChart(
+    data.weather.filter(w => w.generation > 0)
+);}
+
+function updateLineChart(data) {
+    const ctx = document.getElementById("lineChart");
+    const grouped = groupByYear(data);
+
+    if (lineChart) lineChart.destroy();
+
+    lineChart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: grouped.labels,
+            datasets: [
+                {
+                    label: "Sum of Daily Generation",
+                    data: grouped.gen,
+                    borderColor: "#0054a6",
+                    backgroundColor: "#0054a6",
+                    borderWidth: 3,
+                    tension: 0.35,
+                    yAxisID: "y1"
+                },
+                {
+                    label: "Sum of Generation Hours",
+                    data: grouped.gh,
+                    borderColor: "#29a8ff",
+                    backgroundColor: "#29a8ff",
+                    borderWidth: 3,
+                    borderDash: [6,3],
+                    tension: 0.35,
+                    yAxisID: "y2"
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y1: { position: "left" },
+                y2: { position: "right" }
+            }
+        }
+    });
+}
+
+function getWeatherColor(label) {
+    const colors = {
+        "Good Radiation": "#f4c542",
+        "Cloudy": "#9fa4ad",
+        "Rain": "#3b82f6",
+        "Rainy": "#3b82f6",
+        "Intermittent Radiation": "#ff8c42",
+        "Good Radiation & Rain": "#16a34a",
+    };
+    return colors[label] || "#" + Math.floor(Math.random()*16777215).toString(16);
+}
+
+function updateWeatherChart(data) {
+    const ctx = document.getElementById("weatherChart");
+    if (weatherChart) weatherChart.destroy();
+
+    weatherChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: data.map(d => d.weather),
+            datasets: [{
+                label: "Generation",
+                data: data.map(d => d.generation),
+                backgroundColor: data.map(d => getWeatherColor(d.weather))
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+["filter-year", "filter-month", "filter-day"].forEach(id => {
+    document.getElementById(id).addEventListener("change", loadDashboard);
+});
+
+loadDashboard();
+</script>
+{% endblock %}

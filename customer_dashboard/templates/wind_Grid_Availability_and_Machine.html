@@ -1,0 +1,741 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="container my-4" style="margin-top: 85px !important;">
+
+  <!-- FILTER BUTTONS + APPLIED FILTERS (NEW DESIGN) -->
+<div class="d-flex justify-content-between align-items-start w-100 mb-3  flex-wrap"  >
+
+    <!-- LEFT FILTER BUTTONS -->
+    <div class="d-flex flex-wrap gap-2">
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+            <i class="fa-solid fa-calendar-days text-primary"></i> Date
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#providerModal">
+            <i class="fa-solid fa-industry text-info"></i> OEM
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#customerModal">
+            <i class="fa-solid fa-user text-success"></i> Customer
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#stateModal">
+            <i class="fa-solid fa-map-location-dot text-warning"></i> State
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#siteModal">
+            <i class="fa-solid fa-map-pin text-danger"></i> Site
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#wtgModal">
+            <i class="fa-solid fa-bolt text-purple"></i> WTG
+        </button>
+
+    </div>
+
+    <!-- RIGHT SIDE: SMALL FILTER CHIPS -->
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+    <div class="d-flex flex-wrap gap-1 justify-content-end" style="max-width: 50%;">
+
+        {% if date_from and date_to %}
+        <span class="badge rounded-pill bg-primary-subtle text-primary small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-calendar"></i> {{ date_from }} → {{ date_to }}
+        </span>
+        {% endif %}
+
+        {% for p in selected_providers %}
+        <span class="badge rounded-pill bg-info-subtle text-info small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-industry"></i> {{ p }}
+        </span>
+        {% endfor %}
+
+        {% for c in selected_customers %}
+        <span class="badge rounded-pill bg-success-subtle text-success small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-user"></i> {{ c }}
+        </span>
+        {% endfor %}
+
+        {% for s in selected_states %}
+        <span class="badge rounded-pill bg-warning-subtle text-warning small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-location-dot"></i> {{ s }}
+        </span>
+        {% endfor %}
+
+        {% for s in selected_sites %}
+        <span class="badge rounded-pill bg-danger-subtle text-danger small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-map-pin"></i> {{ s }}
+        </span>
+        {% endfor %}
+
+        {% for w in selected_wtgs %}
+        <span class="badge rounded-pill bg-purple-subtle text-purple small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-bolt"></i> {{ w }}
+        </span>
+        {% endfor %}
+
+     <a href="?clear_filters=1" class="    text-danger small    ">
+    Clear ✕
+</a>
+
+    </div>
+    {% endif %}
+
+</div>
+<style>
+    .text-purple { color: #7b2cbf !important; }
+    .bg-purple-subtle { background: #f3e8ff !important; }
+
+    .badge {
+        font-size: 12px !important;
+    }
+</style>
+
+  <!-- Grid Failure Chart Card -->
+  <div class="card shadow-lg border-0 h-100 chart-card mb-5">
+    <div class="card-header form-heading d-flex justify-content-between align-items-center">
+      <strong>Average Grid Failure by Year</strong>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="gridMenu" data-bs-toggle="dropdown" aria-expanded="false">
+          ☰
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="gridMenu">
+          <li><a class="dropdown-item" href="#" onclick="downloadChart('gridFailureChart','png')">Download PNG</a></li>
+          <li><a class="dropdown-item" href="#" onclick="downloadChart('gridFailureChart','svg')">Download SVG</a></li>
+          <li><a class="dropdown-item" href="#" onclick="downloadCSV(gridData,'Grid_Failure.csv')">Download CSV</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="card-body">
+      <canvas id="gridFailureChart" height="400px"></canvas>
+    </div>
+  </div>
+
+  <!-- Availability Chart Card -->
+  <div class="card shadow-lg border-0 h-100 chart-card mb-5">
+    <div class="card-header form-heading d-flex justify-content-between align-items-center">
+      <strong>Grid Availability and Machine Availability Percent</strong>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="availMenu" data-bs-toggle="dropdown" aria-expanded="false">
+          ☰
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="availMenu">
+          <li><a class="dropdown-item" href="#" onclick="downloadChart('availabilityChart','png')">Download PNG</a></li>
+          <li><a class="dropdown-item" href="#" onclick="downloadChart('availabilityChart','svg')">Download SVG</a></li>
+          <li><a class="dropdown-item" href="#" onclick="downloadCSVAvailability(availabilityData,'Availability.csv')">Download CSV</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label for="yearFilter" class="fw-bold">Select Year:</label>
+        <select id="yearFilter" class="form-select w-auto d-inline-block">
+          <option value="all">All Years</option>
+        </select>
+      </div>
+<div style="height: 400px;">
+  <canvas id="availabilityChart"></canvas>
+</div>
+    </div>
+  </div>
+
+  <!-- PLF Chart Card -->
+  <div class="card shadow-lg border-0 h-100 chart-card mb-5">
+    <div class="card-header form-heading d-flex justify-content-between align-items-center">
+      <strong>Plant Load Factor (PLF)</strong>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="plfMenu" data-bs-toggle="dropdown" aria-expanded="false">
+          ☰
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="plfMenu">
+          <li><a class="dropdown-item" href="#" onclick="downloadChart('plfChart','png')">Download PNG</a></li>
+          <li><a class="dropdown-item" href="#" onclick="downloadChart('plfChart','svg')">Download SVG</a></li>
+          <li><a class="dropdown-item" href="#" onclick="downloadPLFCSV(currentPLFYear)">Download CSV</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label for="plfYearSelect" class="fw-bold">Select Year:</label>
+        <select id="plfYearFilter" class="form-select w-auto d-inline-block">
+  <option value="all">All Years</option>
+</select>
+
+      </div>
+      <div style="height: 400px;">
+  <canvas id="plfChart"></canvas>
+</div>
+
+     </div>
+  </div>
+
+</div>
+
+<!-- ========== Modals ========== --> 
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex gap-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for p in providers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}"
+             {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+          <label class="form-check-label">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label">{{ c }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in states %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in sites %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for w in wtgs %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}"
+              {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label">{{ w }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted">No WTG numbers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .chart-card { border-radius: 15px; }
+  .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px !important;
+    border-top-right-radius: 15px !important;
+    font-size: 18px;
+    font-weight: 500;
+    text-align: center !important;
+  }
+  .dropdown-toggle {
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  @media (max-width: 991px) {
+    .nav-link { width: 110px !important; }
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+const gridData = {{ grid_chart_data|safe }};
+const availabilityData = {{ availability_chart_data|safe }};
+const plfYearly = {{ plf_yearly_data|safe }};
+const plfMonthly = {{ plf_monthly_data|safe }};
+
+// ------------------- Chart Download Helpers -------------------
+function downloadChart(chartId, type) {
+  const chartCanvas = document.getElementById(chartId);
+  if (!chartCanvas) return;
+
+  if (type === "png") {
+    const link = document.createElement("a");
+    link.href = chartCanvas.toDataURL("image/png");
+    link.download = chartId + ".png";
+    link.click();
+  } else if (type === "svg") {
+    const svgData = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${chartCanvas.width}" height="${chartCanvas.height}">
+        <foreignObject width="100%" height="100%">
+          ${new XMLSerializer().serializeToString(chartCanvas)}
+        </foreignObject>
+      </svg>`;
+    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = chartId + ".svg";
+    link.click();
+  }
+}
+
+function downloadCSV(data, filename) {
+  let csv = "Year,Avg Grid Failure (%)\n";
+  data.forEach(row => { csv += `${row.year},${row.avg_failure}\n`; });
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+}
+
+function downloadCSVAvailability(data, filename, mode="month") {
+  let csv = "";
+  if (mode === "year") {
+    csv = "Year,Grid Availability (%),Machine Availability (%)\n";
+    data.forEach(row => { csv += `${row.year},${row.grid},${row.machine}\n`; });
+  } else {
+    csv = "Month,Grid Availability (%),Machine Availability (%)\n";
+    data.forEach(row => { csv += `${row.month},${row.grid_availability},${row.machine_availability}\n`; });
+  }
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+}
+
+// ------------------- Grid Failure Chart -------------------
+const gridLabels = gridData.map(r => r.year);
+const gridValues = gridData.map(r => r.avg_failure);
+const baseColors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853'];
+const colors = gridValues.map((_, i) => baseColors[i % baseColors.length]);
+const ctxGrid = document.getElementById("gridFailureChart").getContext('2d');
+
+const createGradient = (ctx, color) => {
+  const gradient = ctx.createLinearGradient(0,0,0,400);
+  gradient.addColorStop(0,color);
+  gradient.addColorStop(1,'rgba(255,255,255,0)');
+  return gradient;
+};
+const gradientColors = colors.map(c => createGradient(ctxGrid,c));
+
+new Chart(ctxGrid, {
+  type: 'bar',
+  data: {
+    labels: gridLabels,
+    datasets: [
+      {
+        label: "Avg Grid Failure (%)",
+        data: gridValues,
+        backgroundColor: gradientColors,
+        borderColor: colors,
+        borderWidth: 2,
+        borderRadius: 12,
+        borderSkipped: false,
+        hoverBackgroundColor: colors.map(c=>c+'99'),
+        hoverBorderColor: colors.map(c=>c+'FF')
+      },
+      {
+        type: 'line',
+        label: 'Trend Line',
+        data: gridValues,
+        borderColor: '#FF9900',
+        backgroundColor: 'rgba(255,153,0,0.1)',
+        borderWidth: 4,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointBackgroundColor: '#FF9900',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        yAxisID: 'y'
+      }
+    ]
+  },
+  options: {
+    responsive:true,
+    maintainAspectRatio:false,
+    animation: { duration:2000, easing:'easeInOutCubic' },
+    plugins: {
+      legend: { display:true, position:'top', labels:{usePointStyle:true, boxWidth:12, padding:20} },
+      tooltip: {
+        callbacks: {
+          title: ctx => 'Year: '+ctx[0].label,
+          label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+        }
+      },
+      datalabels: {
+        anchor: 'end',
+        align: 'top',
+        formatter: val => val.toFixed(2)+'%',
+        color:'#333',
+        font:{weight:'bold',size:12},
+        backgroundColor:'rgba(255,255,255,0.8)',
+        borderRadius:4,
+        padding:1,
+        display: ctx => ctx.dataset.label!=='Trend Line'
+      }
+    },
+    scales: {
+      y: { beginAtZero:true, title:{display:true,text:'Avg Grid Failure (%)'}, ticks:{callback:v=>v.toFixed(1)+'%'} },
+      x: { title:{display:true,text:'Year'} }
+    }
+  },
+  plugins: [ChartDataLabels]
+});
+
+// ------------------- Availability Chart -------------------
+const ctxA = document.getElementById("availabilityChart").getContext('2d');
+let availabilityChart;
+const yearFilter = document.getElementById("yearFilter");
+
+const monthOrder = ["01","02","03","04","05","06","07","08","09","10","11","12"];
+
+function renderAvailabilityChart(selectedYear="all") {
+  let labelsA=[], gridValues=[], machineValues=[], csvData=[], mode;
+
+  if (selectedYear==="all") {
+    const yearMap = {};
+    availabilityData.forEach(r=>{
+      const y=r.month.split("-")[0];
+      if(!yearMap[y]) yearMap[y]={grid:[],machine:[]};
+      yearMap[y].grid.push(r.grid_availability);
+      yearMap[y].machine.push(r.machine_availability);
+    });
+    labelsA = Object.keys(yearMap).sort();
+    gridValues = labelsA.map(y=>yearMap[y].grid.reduce((a,b)=>a+b,0)/yearMap[y].grid.length);
+    machineValues = labelsA.map(y=>yearMap[y].machine.reduce((a,b)=>a+b,0)/yearMap[y].machine.length);
+    csvData = labelsA.map((y,i)=>({year:y,grid:gridValues[i].toFixed(2),machine:machineValues[i].toFixed(2)}));
+    mode="year";
+  } else {
+    const filtered = availabilityData.filter(r=>r.month.startsWith(selectedYear));
+    filtered.sort((a,b)=>monthOrder.indexOf(a.month.split("-")[1]) - monthOrder.indexOf(b.month.split("-")[1]));
+    labelsA = filtered.map(r=>r.month);
+    gridValues = filtered.map(r=>r.grid_availability);
+    machineValues = filtered.map(r=>r.machine_availability);
+    csvData = filtered;
+    mode="month";
+  }
+
+  if (availabilityChart) availabilityChart.destroy();
+
+  availabilityChart = new Chart(ctxA, {
+    type:'bar',
+    data:{
+      labels:labelsA,
+      datasets:[
+        { label:"Grid Availability (%)", data:gridValues, backgroundColor:'#4285F4', borderColor:'#4285F4', borderWidth:2, borderRadius:6 },
+        { label:"Machine Availability (%)", data:machineValues, backgroundColor:'#34A853', borderColor:'#34A853', borderWidth:2, borderRadius:6 }
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true,position:'top'},
+        tooltip:{
+          callbacks:{
+            title: ctx => selectedYear==="all" ? "Year: "+ctx[0].label : "Month: "+ctx[0].label,
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+          }
+        },
+        datalabels:{
+          anchor:'end',
+          align:'top',
+          formatter: val => val.toFixed(2)+'%',
+          color:'#333',
+          font:{weight:'bold',size:10},
+          display:true
+        }
+      },
+      scales:{
+        y:{beginAtZero:true,max:120,title:{display:true,text:'Availability (%)'}},
+        x:{title:{display:true,text:selectedYear==="all"?"Year":"Month"}}
+      }
+    },
+    plugins:[ChartDataLabels]
+  });
+}
+
+if(yearFilter){
+  const years = [...new Set(availabilityData.map(r=>r.month.split("-")[0]))];
+  yearFilter.innerHTML='<option value="all">All Years</option>';
+  years.forEach(y=>{
+    const opt=document.createElement("option");
+    opt.value=y; opt.textContent=y;
+    yearFilter.appendChild(opt);
+  });
+  yearFilter.addEventListener("change", e => renderAvailabilityChart(e.target.value));
+}
+renderAvailabilityChart("all");
+
+// ------------------- PLF Chart (Attractive) -------------------
+const ctxPlf = document.getElementById("plfChart").getContext('2d');
+let plfChart;
+const plfFilter = document.getElementById("plfYearFilter");
+
+// Gradient helper
+function createBarGradient(ctx) {
+  const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+  gradient.addColorStop(0, "rgba(54,162,235,0.9)");
+  gradient.addColorStop(1, "rgba(54,162,235,0.7)");
+  return gradient;
+}
+
+function renderPlfChart(selectedYear = "all") {
+  let labels = [], values = [], title;
+
+  if (selectedYear === "all") {
+    labels = plfYearly.map(r => r.year);
+    values = plfYearly.map(r => r.avg_plf);
+    title = "PLF by Year";
+  } else {
+    const filtered = plfMonthly[selectedYear] || [];
+    labels = filtered.map(r => r.month);
+    values = filtered.map(r => r.avg_plf);
+    title = `Monthly PLF - ${selectedYear}`;
+  }
+// Soft green gradient for bars
+function createGreenGradient(ctx) {
+  const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+  gradient.addColorStop(0, "rgba(144,238,144,0.3)"); // light green top
+  gradient.addColorStop(1, "rgba(0,128,0,0.3)");     // darker green bottom
+  return gradient;
+}
+
+// Then in your dataset
+  if (plfChart) plfChart.destroy();
+
+  plfChart = new Chart(ctxPlf, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Plant Load Factor (%)",
+          data: values,
+          backgroundColor: createBarGradient(ctxPlf),
+          borderColor: "#36A2EB",
+          borderWidth: 2,
+          borderRadius: 8
+        },
+        {
+          type: "line",
+          label: "Trend Line",
+          data: values,
+          borderColor: "#FF5733",
+backgroundColor: createGreenGradient(ctxPlf),
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 6,
+          pointHoverRadius: 9,
+          pointBackgroundColor: "#FF5733",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+          yAxisID: "y"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 1800,
+        easing: "easeOutQuart"
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: {
+            usePointStyle: true,
+            font: { size: 13, weight: "bold" },
+            padding: 15
+          }
+        },
+        tooltip: {
+          backgroundColor: "rgba(0,0,0,0.8)",
+          titleFont: { size: 14, weight: "bold" },
+          bodyFont: { size: 13 },
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            title: ctx =>
+              selectedYear === "all"
+                ? "Year: " + ctx[0].label
+                : "Month: " + ctx[0].label,
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)}%`
+          }
+        },
+        datalabels: {
+          anchor: "end",
+          align: "top",
+          formatter: v => v.toFixed(1) + "%",
+          color: "#222",
+          font: { weight: "bold", size: 12 },
+          textShadowColor: "rgba(255,255,255,0.8)",
+          textShadowBlur: 4,
+          display: ctx => ctx.dataset.label !== "Trend Line"
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: "PLF (%)", font: { weight: "bold" } },
+          ticks: { callback: v => v + "%" }
+        },
+        x: {
+          title: {
+            display: true,
+            text: selectedYear === "all" ? "Year" : "Month",
+            font: { weight: "bold" }
+          }
+        }
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+}
+
+// Dropdown setup
+if (plfFilter) {
+  const years = [...new Set(plfYearly.map(r => r.year))];
+  plfFilter.innerHTML = '<option value="all">All Years</option>';
+  years.forEach(y => {
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    plfFilter.appendChild(opt);
+  });
+  plfFilter.addEventListener("change", e => renderPlfChart(e.target.value));
+}
+renderPlfChart("all");
+
+ 
+
+</script>
+  {% include 'fotter.html' %}
+
+{% endblock %}

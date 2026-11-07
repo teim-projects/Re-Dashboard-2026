@@ -1,0 +1,195 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% block content %}
+
+<style>
+.upload-card {
+    max-width: 750px;
+    margin: 80px auto;
+    border-radius: 18px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    overflow: hidden;
+    background: #fff;
+}
+.upload-header {
+    background: linear-gradient(135deg, #009688, #0288d1);
+    padding: 30px 20px;
+    text-align: center;
+    color: white;
+    border-radius: 0 0 20px 20px;
+}
+.upload-header i {
+    font-size: 45px;
+    margin-bottom: 10px;
+}
+
+.upload-header h3 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #333;
+}
+
+.upload-btn {
+    width: 180px;
+    font-weight: 600;
+    border-radius: 10px;
+}
+.drop-zone {
+    padding: 30px;
+    border: 2px dashed #0288d1;
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    background: #f7fbff;
+    transition: .3s;
+}
+.drop-zone:hover {
+    background: #e4f3ff;
+    border-color: #01579b;
+}
+</style>
+
+
+
+<div class="upload-card">
+
+    <!-- HEADER -->
+    <div class="upload-header">
+        <i class="bi bi-graph-up-arrow"></i>
+        <h3>Upload DSM Data</h3>
+    </div>
+
+    <div class="p-4">
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% if not table_exists %}
+            <div class="alert alert-danger">
+                ❌ DSM table does not exist. Please contact admin.
+            </div>
+        {% else %}
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="row mb-3">
+                <!-- Provider -->
+                <div class="col-md-6">
+                    <label class="form-label">Select Provider</label>
+                    <select name="provider" class="form-select" required>
+                        <option value="">-- Select --</option>
+                        {% for p in providers %}
+                        <option value="{{ p.name }}">{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Energy Type -->
+                <div class="col-md-6">
+                    <label class="form-label">Select Energy Type</label>
+                    <select name="energy_type" class="form-select" required>
+                        <option value="">-- Select --</option>
+                        {% for e in energy_types %}
+                        <option value="{{ e.name }}">{{ e.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Auto-filled user -->
+            <label class="form-label">Logged-in User</label>
+            <input type="text" class="form-control mb-3" value="{{ request.user.username }}" disabled>
+            <input type="hidden" name="uploaded_by" value="{{ request.user.username }}">
+
+            <!-- File Upload -->
+            <label class="form-label">Choose Excel File (multi-sheet)</label>
+
+            <div id="dropZone" class="drop-zone mb-3">
+                <i class="bi bi-cloud-upload fs-2 text-primary"></i>
+                <p class="fw-semibold mt-2">Drag & Drop File</p>
+                <p class="text-muted">or click to browse</p>
+
+                <input type="file" id="fileInput" name="data_file" hidden required>
+                <p id="fileName" class="small text-info mt-2"></p>
+            </div>
+
+            <div class="text-center">
+                <button class="btn btn-success upload-btn">
+                    <i class="bi bi-upload"></i> Upload File
+                </button>
+            </div>
+
+        </form>
+
+        {% endif %}
+    </div>
+</div>
+
+
+
+
+
+
+<script>
+document.addEventListener("DOMContentLoaded", () => 
+{
+
+  let dropZone = document.getElementById("dropZone");
+  let fileInput = document.getElementById("fileInput");
+  let fileName = document.getElementById("fileName");
+
+  dropZone.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", () => {
+    fileName.innerHTML = "📄 " + fileInput.files[0].name;
+  });
+
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.style.background = "#e4f3ff";
+  });
+
+  dropZone.addEventListener("dragleave", () => {
+    dropZone.style.background = "#f7fbff";
+  });
+
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.style.background = "#f7fbff";
+    let file = e.dataTransfer.files[0];
+    if (file) {
+      fileInput.files = e.dataTransfer.files;
+      fileName.innerHTML = "📄 " + file.name;
+    }
+  });
+
+});
+</script>
+
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Upload Installation Summary{% endblock %}
+
+{% block style_css %}
+<style>
+  .form-wrapper {
+    background: #fff;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .form-heading {
+    background: linear-gradient(to right, #1e90ff, #7b2cbf);
+    color: #fff;
+    padding: 15px 25px;
+    border-radius: 12px;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .btn-custom {
+    width: 180px;
+    font-weight: 500;
+  }
+
+  .form-label {
+    font-weight: 600;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="row mt-5 justify-content-center">
+    <div class="col-md-6 mt-5">
+      <div class="form-wrapper">
+        <div class="form-heading">📋 Upload Installation Summary Structure</div>
+
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <div class="form-group mt-3">
+            <label class="form-label">Energy Type <span class="text-danger">*</span></label>
+            <select class="form-control" name="energy_type" id="energyTypeSelect" required>
+              <option value="">-- Select Energy Type --</option>
+              {% for energy in energy_types %}
+                <option value="{{ energy.id }}">{{ energy.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group mt-3">
+            <label class="form-label">Upload Excel File <span class="text-danger">*</span></label>
+            <input type="file" name="file" class="form-control" required>
+          </div>
+
+          <div class="action-buttons">
+            <button type="submit" class="btn btn-success btn-custom">Upload File</button>
+            <button id="download-btn" type="button" onclick="downloadTemplate()" class="btn btn-primary btn-custom">
+              Get Template
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function downloadTemplate() {
+    const energyTypeId = document.getElementById('energyTypeSelect').value;
+
+    if (!energyTypeId) {
+      alert("Please select an energy type first.");
+      return;
+    }
+
+    const url = `/download-template/?energy_type=${energyTypeId}`;
+    window.location.href = url;
+  }
+
+  // Optional: Disable button unless energy type selected
+  document.addEventListener('DOMContentLoaded', function () {
+    const energyTypeSelect = document.getElementById('energyTypeSelect');
+    const downloadBtn = document.getElementById('download-btn');
+
+    function toggleDownloadButton() {
+      downloadBtn.disabled = !energyTypeSelect.value;
+    }
+
+    energyTypeSelect.addEventListener('change', toggleDownloadButton);
+    toggleDownloadButton();  // Run on page load
+  });
+</script>
+{% endblock %}

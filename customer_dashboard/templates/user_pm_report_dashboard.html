@@ -1,0 +1,500 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+
+<div class="container" style="margin-top: 70px;">
+ 
+  {% if error %}
+    <div class="alert alert-warning text-center">{{ error }}</div>
+  {% else %}
+
+  <!-- Summary Cards -->
+  <div class="row g-3 mb-4 text-center">
+  
+  </div>
+
+<!-- Charts Section -->
+<div class="row ">
+  <div class="col-md-6">
+    <div class="row mt-5 g-4">
+
+      <div class="col-md-6">
+        <div class="card stat-card bg-success-gradient text-white text-center">
+          <div class="card-body">
+            <div class="stat-icon"><i class="bi bi-check-circle-fill"></i></div>
+            <h3 class="counter" data-count="{{ completed }}">0</h3>
+            <p class="mb-0">Completed</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card stat-card bg-warning-gradient text-white text-center">
+          <div class="card-body">
+            <div class="stat-icon"><i class="bi bi-hourglass-split"></i></div>
+            <h3 class="counter" data-count="{{ pending }}">0</h3>
+            <p class="mb-0">Pending</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-4 g-4">
+      <div class="col-md-6">
+        <div class="card stat-card bg-primary-gradient text-white text-center">
+          <div class="card-body">
+            <div class="stat-icon"><i class="bi bi-list-task"></i></div>
+            <h3 class="counter" data-count="{{ completed|add:pending }}">0</h3>
+            <p class="mb-0">Total Tasks</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card stat-card bg-info-gradient text-white text-center">
+          <div class="card-body">
+            <div class="stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
+            <h3>{{ completion_rate }}%</h3>
+            <p class="mb-0">Completion Rate</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+  </div>
+
+  <!-- Chart Section -->
+  <div class="col-lg-6 col-md-12   mt-md-0">
+    <div class="chart-card rounded-4 p-3 h-100   text-center  mt-5">
+
+<!-- ====== Performance Overview Title ====== -->
+<h5 id="performanceTitle" class="fw-bold mb-3 performance-title">
+  <i class="bi bi-pie-chart"></i> Performance Overview
+</h5>
+
+<style>
+.performance-title {
+  background: linear-gradient(90deg, #1de7d6, #2b2d7f, #8a2be2, #ff007f);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-shadow: 0 0 10px rgba(141, 45, 255, 0.2);
+  animation: gradientFlow 6s ease infinite;
+  background-size: 300% 300%;
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(15px);
+  transition: all 0.8s ease;
+}
+
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.performance-title i {
+  color: #1de7d6;
+  margin-right: 8px;
+  transition: transform 0.4s ease;
+}
+.performance-title:hover i {
+  transform: rotate(20deg) scale(1.2);
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const title = document.getElementById("performanceTitle");
+
+  // Animate fade-in + float-up on load
+  setTimeout(() => {
+    title.style.opacity = 1;
+    title.style.transform = "translateY(0)";
+  }, 300);
+
+  // Optional: bounce icon periodically
+  const icon = title.querySelector("i");
+  setInterval(() => {
+    icon.style.transform = "scale(1.2) rotate(15deg)";
+    setTimeout(() => icon.style.transform = "scale(1) rotate(0)", 400);
+  }, 5000);
+});
+</script>
+
+
+
+
+
+        <div id="chartPie"></div>
+    </div>
+  </div>
+</div>
+
+
+
+
+  <!-- Tabs Section -->
+  <ul class="nav nav-tabs" id="reportTabs" role="tablist" style="margin-top: 70px !important;">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#completed">✅ Completed</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#pending">🕒 Pending</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#all">📋 All Checkpoints</button></li>
+   <a href="{% url 'user_completed_maintenance' %}" class="hmd"> <li class="nav-item"><button class="nav-link" >🛠️ Complate Task</button></li></a>
+
+</ul>
+
+<div class="tab-content mt-5">
+
+  <!-- COMPLETED TAB -->
+  <div class="tab-pane fade show active" id="completed">
+    <button class="btn btn-sm btn-outline-info mb-2 float-end" onclick="exportPDF('completed')">
+      <i class="bi bi-file-earmark-pdf"></i> Export PDF
+    </button>
+
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead>
+          <tr>
+            <th>WTG</th>
+            <th>Site</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in completed_records %}
+            <tr>
+              <td>{{ r.wtg_no }}</td>
+              <td>{{ r.site }}</td>
+              <td>{{ r.category }}</td>
+              <td class="text-success">Completed</td>
+              <td>{{ r.completed_on }}</td>
+              <td>{{ r.remarks }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PENDING TAB -->
+  <div class="tab-pane fade" id="pending">
+    <button class="btn btn-sm btn-outline-danger mb-2 float-end" onclick="exportPDF('pending')">
+      <i class="bi bi-file-earmark-pdf"></i> Export PDF
+    </button>
+
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead>
+          <tr><th>WTG</th><th>Category</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for r in pending_records %}
+            <tr><td>{{ r.wtg_no }}</td><td>{{ r.category }}</td><td class="text-warning">Pending</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ALL TAB -->
+  <div class="tab-pane fade" id="all">
+    <button class="btn btn-sm btn-outline-danger mb-2 float-end" onclick="exportPDF('all')">
+      <i class="bi bi-file-earmark-pdf"></i> Export PDF
+    </button>
+
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle">
+        <thead>
+          <tr><th>WTG</th><th>Category</th><th>Status</th><th>Date</th></tr>
+        </thead>
+        <tbody>
+          {% for r in all_records %}
+            <tr>
+              <td>{{ r.wtg_no }}</td>
+              <td>{{ r.category }}</td>
+              <td>
+                {% if r.status == "Completed" %}
+                  <span class="text-success">Completed</span>
+                {% else %}
+                  <span class="text-warning">Pending</span>
+                {% endif %}
+              </td>
+              <td>{{ r.completed_on }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+
+  {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // === Responsive Full-Width Area Chart (Completion Trend) ===
+  const trendChart = new ApexCharts(document.querySelector("#chartLine"), {
+    chart: {
+      type: "area",
+      height: 320,
+      foreColor: "#333",
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 1200,
+        animateGradually: { enabled: true, delay: 250 },
+        dynamicAnimation: { enabled: true, speed: 600 },
+      },
+      toolbar: { show: false },
+      zoom: { enabled: false },
+    },
+    colors: ["#00c9a7"],
+    dataLabels: { enabled: false },
+    stroke: { curve: "smooth", width: 3 },
+    fill: {
+      type: "gradient",
+      gradient: {
+        shadeIntensity: 0.5,
+        gradientToColors: ["#007bff"],
+        opacityFrom: 0.6,
+        opacityTo: 0.1,
+        stops: [0, 90, 100],
+      },
+    },
+    series: [{
+      name: "Completed Tasks",
+      data: {{ trend_counts|safe }}
+    }],
+    xaxis: {
+      categories: {{ trend_dates|safe }},
+      title: { text: "Date", style: { fontWeight: 600 } },
+      labels: { rotate: -45 },
+    },
+    yaxis: {
+      title: { text: "No. of Tasks", style: { fontWeight: 600 } },
+    },
+    tooltip: {
+      theme: "dark",
+      y: {
+        formatter: (val) => `${val} tasks`
+      }
+    },
+  });
+  trendChart.render();
+
+
+  // === Donut Chart (Completion Distribution) ===
+  const pieChart = new ApexCharts(document.querySelector("#chartPie"), {
+    chart: {
+      type: "donut",
+      height: 300,
+      animations: { enabled: true, easing: "easeinout", speed: 1000 },
+    },
+    labels: ["Completed", "Pending"],
+    series: [{{ completed }}, {{ pending }}],
+    colors: ["#28a745", "#ff9f43"],
+    legend: {
+      position: "bottom",
+      fontSize: "14px",
+      labels: { colors: "#555" },
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: "70%",
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: "Overall",
+              color: "#111",
+              formatter: function() {
+                return "{{ completion_rate }}%";
+              }
+            }
+          }
+        }
+      }
+    },
+    dataLabels: { enabled: false },
+  });
+  pieChart.render();
+
+
+  // === Animated Horizontal Bar Chart (WTG-wise Summary) ===
+  const barChart = new ApexCharts(document.querySelector("#chartBar"), {
+    chart: {
+      type: "bar",
+      height: 320,
+      stacked: true,
+      toolbar: { show: false },
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 1200,
+      },
+    },
+    series: [
+      { name: "Completed", data: {{ wtg_completed|safe }} },
+      { name: "Pending", data: {{ wtg_pending|safe }} },
+    ],
+    colors: ["#00E396", "#FEB019"],
+    xaxis: {
+      categories: {{ wtg_labels|safe }},
+      title: { text: "WTG Units", style: { fontWeight: 600 } },
+      labels: { style: { fontSize: "13px" } },
+    },
+    yaxis: {
+      title: { text: "Tasks Count", style: { fontWeight: 600 } },
+    },
+    legend: {
+      position: "top",
+      horizontalAlign: "center",
+      fontWeight: 500,
+    },
+    grid: { borderColor: "#eaeaea" },
+    tooltip: {
+      theme: "dark",
+      shared: true,
+      intersect: false,
+      y: { formatter: (val) => `${val} tasks` },
+    },
+    fill: { opacity: 0.9 },
+  });
+  barChart.render();
+});
+
+
+// === PDF Export Function (unchanged) ===
+function exportPDF(tabId) {
+  const element = document.getElementById(tabId);
+  const opt = {
+    margin: 0.4,
+    filename: `PM_Report_${tabId}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+  };
+  html2pdf().from(element).set(opt).save();
+}
+</script>
+<style>
+.chart-card {
+   border-radius: 15px;
+  padding: 20px;
+   transition: all 0.3s ease;
+}
+.chart-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+#chartPie, #chartBar, #chartLine {
+  width: 100%;
+  min-height: 320px;
+}
+
+.hmd:hover {
+    text-decoration: none !important;
+}
+/* ==== Gradient Stat Cards ==== */
+.stat-card {
+  border-radius: 16px;
+  padding: 15px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+.stat-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+/* === Background Gradients === */
+.bg-success-gradient {
+  background: linear-gradient(135deg, #00c853, #b2ff59);
+}
+.bg-warning-gradient {
+  background: linear-gradient(135deg, #ff9100, #ffca28);
+}
+.bg-primary-gradient {
+  background: linear-gradient(135deg, #2979ff, #82b1ff);
+}
+.bg-info-gradient {
+  background: linear-gradient(135deg, #00bcd4, #84ffff);
+}
+
+/* === Icons === */
+.stat-icon {
+  font-size: 2rem;
+  margin-bottom: 5px;
+  animation: bounce 2s infinite ease-in-out;
+}
+
+/* === Counter Animation === */
+.counter {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* === Chart Card Styling === */
+.chart-card {
+  border-radius: 16px;
+   transition: all 0.3s ease;
+}
+.chart-card:hover {
+  transform: translateY(-1px);
+ }
+
+/* === Simple Animations === */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+/* === Responsive Padding Fix === */
+@media (max-width: 768px) {
+  .stat-card {
+    margin-bottom: 15px;
+  }
+}
+
+</style>
+  </div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".counter").forEach(counter => {
+    const update = () => {
+      const target = +counter.getAttribute("data-count");
+      const current = +counter.innerText;
+      const increment = target / 40;
+      if (current < target) {
+        counter.innerText = Math.ceil(current + increment);
+        setTimeout(update, 25);
+      } else {
+        counter.innerText = target;
+      }
+    };
+    update();
+  });
+});
+</script>
+
+{% endblock %}

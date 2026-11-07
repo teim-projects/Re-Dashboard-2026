@@ -1,0 +1,512 @@
+{% extends "basesolar.html" %}
+{% block content %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+/* ================= MODERN VARIABLES ================= */
+:root {
+  --bg-app: #f4f7fe;
+  --card-bg: #ffffff;
+  --text-main: #2b3674;
+  --text-sec: #a3aed0;
+  --primary: #4318ff;
+  --accent-gradient: linear-gradient(135deg, #868CFF 0%, #4318FF 100%);
+  --line-gradient-start: #00d2ff;
+  --line-gradient-end: #3a7bd5;
+  --font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  --radius: 16px;
+  --shadow: 0px 10px 25px -5px rgba(112, 144, 176, 0.12);
+}
+
+body {
+  background-color: var(--bg-app);
+  font-family: var(--font-family);
+  color: var(--text-main);
+  margin: 0;
+  font-size: 12px; /* Small font as requested */
+}
+
+.dashboard {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ================= CARDS ================= */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border: none;
+  transition: transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+.title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-sec);
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ================= FILTERS ROW ================= */
+.kpi-filter-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) 1.2fr;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+/* Custom Select Styling */
+.select-wrapper {
+  position: relative;
+}
+.select-wrapper::after {
+  content: '▼';
+  font-size: 8px;
+  color: var(--primary);
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.filter-select {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: 1px solid #e0e5f2;
+  background-color: #f9fbfd;
+  color: var(--text-main);
+  font-weight: 600;
+  appearance: none; /* Remove default arrow */
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-select:hover {
+  background-color: #fff;
+  border-color: var(--primary);
+}
+
+.filter-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.1);
+}
+
+/* KPI Box */
+.kpi-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: 12px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-val {
+  font-size: 24px;
+  font-weight: 800;
+  z-index: 2;
+}
+
+.kpi-label {
+  position: absolute;
+  bottom: 4px;
+  font-size: 9px;
+  opacity: 0.8;
+  text-transform: uppercase;
+}
+
+/* ================= GRID & TABLES ================= */
+.grid {
+  display: grid;
+  grid-template-columns: 60% 38%; /* Adjusted slightly */
+  gap: 2%;
+  margin-bottom: 20px;
+}
+
+.table-wrap {
+  height: 220px;
+  overflow-y: auto;
+  border-radius: 8px;
+  /* Custom Scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+.table-wrap::-webkit-scrollbar { width: 5px; }
+.table-wrap::-webkit-scrollbar-track { background: transparent; }
+.table-wrap::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 20px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+thead th {
+  background: #fff;
+  color: var(--text-sec);
+  font-weight: 700;
+  text-align: left;
+  padding: 10px 12px;
+  position: sticky;
+  top: 0;
+  border-bottom: 2px solid #f4f7fe;
+  z-index: 10;
+}
+
+tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f4f7fe;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+tbody tr:hover td {
+  background-color: #f4f7fe;
+  color: var(--primary);
+}
+
+tfoot td {
+  background: #f9fbfd;
+  font-weight: 800;
+  padding: 10px 12px;
+  color: var(--primary);
+  position: sticky;
+  bottom: 0;
+}
+
+/* ================= CHART AREA ================= */
+#weather-chart {
+  width: 100%;
+  height: 250px;
+  position: relative;
+}
+
+/* ================= TOOLTIP ================= */
+#tooltip {
+  position: absolute;
+  background: rgba(43, 54, 116, 0.95);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(10px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+/* ================= RESPONSIVE ================= */
+@media(max-width: 900px){
+  .grid { grid-template-columns: 1fr; }
+  .kpi-filter-row { grid-template-columns: 1fr 1fr; }
+  .kpi-filter-row .card:last-child { grid-column: span 2; }
+}
+</style>
+
+<div class="dashboard">
+
+  <div class="kpi-filter-row" style="margin-top: 70px;">
+    <div class="card">
+      <div class="title">Year</div>
+      <div class="select-wrapper">
+        <select id="filter-year" class="filter-select">
+          <option value="">All Years</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="title">Quarter</div>
+      <div class="select-wrapper">
+        <select id="filter-quarter" class="filter-select">
+          <option value="">All Quarters</option>
+          <option>Q1</option><option>Q2</option>
+          <option>Q3</option><option>Q4</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Month</div>
+      <div class="select-wrapper">
+        <select id="filter-month" class="filter-select">
+          <option value="">All Months</option>
+          <option value="1">Jan</option><option value="2">Feb</option>
+          <option value="3">Mar</option><option value="4">Apr</option>
+          <option value="5">May</option><option value="6">Jun</option>
+          <option value="7">Jul</option><option value="8">Aug</option>
+          <option value="9">Sep</option><option value="10">Oct</option>
+          <option value="11">Nov</option><option value="12">Dec</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Day</div>
+      <div class="select-wrapper">
+        <select id="filter-day" class="filter-select">
+          <option value="">All Days</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 0; border:none; background:transparent; box-shadow:none;">
+      <div class="kpi-wrapper">
+        <span class="kpi-val" id="kpi-breakdown">0%</span>
+        <span class="kpi-label">GT Breakdown</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="title">Breakdown Details</div>
+      <div class="table-wrap">
+        <table id="breakdown-table"></table>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="title">Weather Conditions</div>
+      <div class="table-wrap">
+        <table id="weather-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title">
+      <span>Weather Analysis</span>
+      <span style="font-weight:400; color:#4318ff; background:#eff0ff; padding:2px 8px; border-radius:4px; font-size:10px;">Click bars to filter</span>
+    </div>
+    <div id="weather-chart"></div>
+  </div>
+
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const API = "{% url 'api_overall_breakdown_analysis' %}";
+let currentWeather = null;
+let cachedData = null;
+
+// Modern Color Palette for Bars (12 distinct colors)
+const colorPalette = [
+  "#4318ff", "#6ad2ff", "#eff4fb", "#ffb547", "#ff5630", 
+  "#00d68f", "#7934f3", "#2c3e50", "#e74c3c", "#f1c40f", 
+  "#9b59b6", "#3498db"
+];
+
+// Day Logic
+function updateDays(){
+  const m = document.getElementById("filter-month").value;
+  const y = document.getElementById("filter-year").value || new Date().getFullYear();
+  const dSel = document.getElementById("filter-day");
+  const prev = dSel.value;
+  dSel.innerHTML = '<option value="">All Days</option>';
+  if(!m) return;
+  const days = new Date(y,m,0).getDate();
+  for(let i=1; i<=days; i++) dSel.add(new Option(i,i));
+  if(prev && prev <= days) dSel.value = prev;
+}
+
+// Data Fetch
+async function loadData(){
+  const p = new URLSearchParams();
+  ["year","quarter","day","month"].forEach(k => {
+    const v = document.getElementById(`filter-${k}`)?.value;
+    if(v) p.append(k,v);
+  });
+
+  try {
+    const r = await fetch(`${API}?${p}`);
+    const d = await r.json();
+    cachedData = d;
+
+    // KPI Update
+    document.getElementById("kpi-breakdown").innerText = d.kpis.gt_breakdown_percentage + "%";
+
+    // Year Filter Populate (Once)
+    const y = document.getElementById("filter-year");
+    if(y.options.length === 1 && d.filters.years) {
+      d.filters.years.forEach(v => y.add(new Option(v,v)));
+    }
+
+    renderTable("breakdown-table", "Label", "label", d.breakdown_table);
+    renderTable("weather-table", "Condition", "condition", d.weather_table);
+    drawChart(d.weather_chart);
+
+  } catch(e) { console.error(e); }
+}
+
+function renderTable(id, col, key, rows){
+  let total = 0;
+  let html = `<thead><tr><th>${col}</th><th style="text-align:right">Count</th></tr></thead><tbody>`;
+  
+  if(!rows.length) html += `<tr><td colspan="2" style="text-align:center; padding:20px; color:#a3aed0;">No Data</td></tr>`;
+
+  rows.forEach(r => {
+    if(id === "weather-table" && currentWeather && r.condition !== currentWeather) return;
+    total += r.count;
+    html += `<tr><td>${r[key]}</td><td style="text-align:right; font-family:'DM Sans'; font-weight:700">${r.count.toLocaleString()}</td></tr>`;
+  });
+
+  html += `</tbody><tfoot><tr><td>Total</td><td style="text-align:right">${total.toLocaleString()}</td></tr></tfoot>`;
+  document.getElementById(id).innerHTML = html;
+}
+
+function drawChart(data){
+  d3.select("#weather-chart").html("");
+  if(!data || !data.length) return;
+
+  const el = document.getElementById("weather-chart");
+  const w = el.clientWidth;
+  const h = 250;
+  const m = {t:20, r:20, b:40, l:45};
+
+  const svg = d3.select(el).append("svg").attr("width", w).attr("height", h);
+  
+  // Define Linear Gradient for Trend Line
+  const defs = svg.append("defs");
+  const gradient = defs.append("linearGradient")
+    .attr("id", "lineGradient")
+    .attr("x1", "0%").attr("y1", "0%")
+    .attr("x2", "100%").attr("y2", "0%");
+    
+  gradient.append("stop").attr("offset", "0%").attr("stop-color", "#00d2ff");
+  gradient.append("stop").attr("offset", "100%").attr("stop-color", "#3a7bd5");
+
+  const width = w - m.l - m.r;
+  const height = h - m.t - m.b;
+  const g = svg.append("g").attr("transform", `translate(${m.l},${m.t})`);
+
+  // Scales
+  const x = d3.scaleBand().domain(data.map(d=>d.condition)).range([0,width]).padding(0.4);
+  const y = d3.scaleLinear().domain([0, d3.max(data,d=>d.count)*1.15]).range([height,0]);
+  
+  // Color Scale for Bars
+  const colorScale = d3.scaleOrdinal().range(colorPalette);
+
+  // Axes
+  g.append("g").attr("transform",`translate(0,${height})`)
+   .call(d3.axisBottom(x).tickSize(0).tickPadding(10))
+   .selectAll("text")
+   .style("font-size","10px")
+   .style("fill", "#a3aed0")
+   .style("font-family", "DM Sans")
+   .style("text-anchor","end")
+   .attr("transform","rotate(-25)");
+
+  // Y-Axis Grid
+  const yAxis = g.append("g").call(d3.axisLeft(y).ticks(5).tickSize(-width).tickPadding(10));
+  yAxis.select(".domain").remove(); // Remove vertical line
+  yAxis.selectAll(".tick line").attr("stroke", "#f4f7fe").attr("stroke-width", 2);
+  yAxis.selectAll("text").style("fill", "#a3aed0").style("font-family", "DM Sans");
+
+  // BARS (Multiple Colors)
+  g.selectAll(".bar").data(data).enter().append("rect")
+   .attr("x",d=>x(d.condition)).attr("width",x.bandwidth())
+   .attr("y",height).attr("height",0) // Start for animation
+   .attr("fill", d => currentWeather && d.condition !== currentWeather ? "#e0e5f2" : colorScale(d.condition))
+   .attr("rx", 6) // Rounded bars
+   .on("mouseover", function(e,d) {
+      d3.select(this).attr("opacity", 0.8);
+      showTip(e, `<b>${d.condition}</b><br>Count: ${d.count}`);
+   })
+   .on("mouseout", function() {
+      d3.select(this).attr("opacity", 1);
+      hideTip();
+   })
+   .on("click", (e,d) => {
+      currentWeather = (currentWeather === d.condition) ? null : d.condition;
+      renderTable("weather-table", "Condition", "condition", cachedData.weather_table);
+      drawChart(cachedData.weather_chart);
+   })
+   .transition().duration(800).ease(d3.easeCubicOut)
+   .attr("y",d=>y(d.count))
+   .attr("height",d=>height - y(d.count));
+
+  // TREND LINE (Gradient)
+  const trend = data.map((d,i)=>{
+     const s = data.slice(Math.max(0,i-1), Math.min(data.length,i+2));
+     return {c:d.condition, v:d3.mean(s, z=>z.count)};
+  });
+  
+  const line = d3.line()
+    .x(d=>x(d.c)+x.bandwidth()/2)
+    .y(d=>y(d.v))
+    .curve(d3.curveMonotoneX); // Smooth curve
+  
+  // Draw the gradient path
+  const path = g.append("path")
+    .datum(trend)
+    .attr("fill","none")
+    .attr("stroke", "url(#lineGradient)") // Apply Gradient
+    .attr("stroke-width", 4)
+    .attr("d", line)
+    .style("filter", "drop-shadow(0px 5px 5px rgba(0,0,0,0.2))"); // Add shadow to line
+
+  // Animate Line
+  const totalLength = path.node().getTotalLength();
+  path.attr("stroke-dasharray", totalLength + " " + totalLength)
+      .attr("stroke-dashoffset", totalLength)
+      .transition().duration(1200).ease(d3.easeLinear)
+      .attr("stroke-dashoffset", 0);
+  
+  // Dots
+  g.selectAll(".dot").data(trend).enter().append("circle")
+   .attr("cx",d=>x(d.c)+x.bandwidth()/2).attr("cy",d=>y(d.v))
+   .attr("r",0)
+   .attr("fill","#fff")
+   .attr("stroke", "#4318ff")
+   .attr("stroke-width", 2)
+   .transition().delay(800).duration(300)
+   .attr("r", 4);
+}
+
+/* Tooltip */
+const tip = document.getElementById("tooltip");
+function showTip(e, txt){
+  tip.innerHTML = txt;
+  tip.style.opacity = 1;
+  tip.style.transform = "translateY(0)";
+  tip.style.left = (e.pageX + 10) + "px";
+  tip.style.top = (e.pageY - 30) + "px";
+}
+function hideTip(){ 
+  tip.style.opacity = 0; 
+  tip.style.transform = "translateY(10px)";
+}
+
+/* Events */
+["filter-year","filter-quarter","filter-day"].forEach(id=>document.getElementById(id).addEventListener("change",loadData));
+document.getElementById("filter-month").addEventListener("change",()=>{ updateDays(); loadData(); });
+window.addEventListener("resize", ()=> { if(cachedData) drawChart(cachedData.weather_chart) });
+
+loadData();
+</script>
+{% endblock %}

@@ -1,0 +1,393 @@
+{% extends "basesolar.html" %}
+{% load static %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+/* Main wrapper */
+.page-wrapper {
+    margin-top: 80px;
+    padding: 0 20px 20px;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Header bar */
+.header-strip {
+    background: linear-gradient(280deg, #3fa9f5, #ffffff);
+    color: #003f77;
+    padding: 12px 20px;
+    border-radius: 16px 16px 0 0;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,.2);
+}
+
+/* 2-column layout for filters + first chart */
+.layout-main {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    background: #ffffff;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 10px 20px rgba(0,0,0,.15);
+}
+
+/* Sidebar filters */
+.filter-box {
+    background: #eef5ff;
+    padding: 16px;
+    border-right: 1px solid #d5e5ff;
+    border-radius: 0 0 0 16px;
+}
+
+.filter-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #44546a;
+    margin-bottom: 6px;
+}
+
+.filter-group {
+    margin-bottom: 16px;
+}
+
+.filter-select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #d3def1;
+    background: #ffffff;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg fill='%234b5c76' height='20' viewBox='0 0 24 24' width='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+}
+
+.chart-pane {
+    padding: 18px;
+}
+
+.chart-card {
+    background: #f7fbff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    border: 1px solid #c5ddf7;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 12px rgba(0,0,0,.08);
+    width: 100%;
+}
+
+.chart-title {
+    text-align: center;
+    font-weight: 700;
+    color: #1f3765;
+    margin-bottom: 10px;
+}
+
+.canvas-wrap {
+    height: 300px;
+}
+
+.legend-inline {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+/* NEW — Two charts in one row */
+.chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+/* Radiation full width */
+.full-width {
+    width: 100% !important;
+    margin-top: 20px;
+}
+
+/* Mobile responsive */
+@media(max-width: 900px) {
+    .layout-main { grid-template-columns: 1fr; }
+    .chart-row { grid-template-columns: 1fr; }
+}
+</style>
+
+
+<div class="page-wrapper">
+    <div class="header-strip">TREND ANALYSIS DASHBOARD</div>
+
+    <!-- FILTER PANEL + FIRST CHART -->
+    <div class="layout-main">
+
+        <!-- LEFT FILTERS -->
+        <div class="filter-box">
+            <div class="filter-group">
+                <div class="filter-label">Year</div>
+                <select id="filter-year" class="filter-select">
+                    <option value="">All</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <div class="filter-label">Month</div>
+                <select id="filter-month" class="filter-select">
+                    <option value="">All</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <div class="filter-label">Day</div>
+                <select id="filter-day" class="filter-select">
+                    <option value="">All</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <div class="filter-label">Site</div>
+                <select id="filter-site" class="filter-select">
+                    <option value="">All Sites</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- FIRST CHART -->
+        <div class="chart-pane">
+            <div class="chart-card">
+                <div class="chart-title">Yearly Generation Trend</div>
+                <div class="canvas-wrap"><canvas id="chart-yearly"></canvas></div>
+                <div id="legend-yearly" class="legend-inline"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- TWO CHARTS SIDE BY SIDE -->
+    <div class="chart-row">
+
+        <!-- PLANT AVAILABILITY -->
+        <div class="chart-card">
+            <div class="chart-title">Plant Availability</div>
+            <div class="canvas-wrap"><canvas id="chart-availability"></canvas></div>
+        </div>
+
+        <!-- PLF -->
+        <div class="chart-card">
+            <div class="chart-title">Monthly PLF Trend</div>
+            <div class="canvas-wrap"><canvas id="chart-plf"></canvas></div>
+            <div id="legend-plf" class="legend-inline"></div>
+        </div>
+
+    </div>
+
+    <!-- RADIATION FULL WIDTH -->
+    <div class="chart-card full-width">
+        <div class="chart-title">Daily Generation by Radiation</div>
+        <div class="canvas-wrap"><canvas id="chart-radiation"></canvas></div>
+    </div>
+
+</div>
+
+
+<script>
+const API = "{% url 'api_trend_analysis' %}";
+
+let chartYearly = null, chartAvail = null, chartRad = null, chartPlf = null;
+let cached = null;
+
+const palette = ["#0b69a3","#e66726","#2ca02c","#8b5cf6","#ef476f","#00a3a3","#ffa600"];
+
+/* ---------------------------------------------------
+   MAIN FUNCTION TO LOAD DATA
+--------------------------------------------------- */
+async function loadTrend() {
+
+  const params = new URLSearchParams();
+  ["filter-year","filter-month","filter-day","filter-site"].forEach(id=>{
+    const v = document.getElementById(id).value;
+    if (v) params.append(id.replace("filter-",""), v);
+  });
+
+  const res = await fetch(API + "?" + params.toString());
+  const data = await res.json();
+  if (data.status !== "ok") return;
+
+  cached = data;
+
+  populateFilters(data);
+  drawYearly(data);
+  drawAvailability(data);
+  drawRadiation(data);
+  drawPlf(data);
+}
+
+/* ---------------------------------------------------
+   POPULATE FILTERS (FIXED - WORKS 100%)
+--------------------------------------------------- */
+function populateFilters(data) {
+
+    /* -------- YEAR -------- */
+    const yearSel = document.getElementById("filter-year");
+    const prevYear = yearSel.value;
+    yearSel.innerHTML = "<option value=''>All</option>";
+    data.years.forEach(y => {
+        yearSel.innerHTML += `<option value="${y}">${y}</option>`;
+    });
+    yearSel.value = prevYear;
+
+    /* -------- MONTH -------- */
+    const monthSel = document.getElementById("filter-month");
+    const prevMonth = monthSel.value;
+    monthSel.innerHTML = "<option value=''>All</option>";
+    data.month_names.forEach((m, i) => {
+        monthSel.innerHTML += `<option value="${i + 1}">${m}</option>`;
+    });
+    monthSel.value = prevMonth;
+
+    /* -------- DAY -------- */
+    const daySel = document.getElementById("filter-day");
+    const prevDay = daySel.value;
+    daySel.innerHTML = "<option value=''>All</option>";
+    for (let d = 1; d <= 31; d++) {
+        daySel.innerHTML += `<option value="${d}">${d}</option>`;
+    }
+    daySel.value = prevDay;
+
+    /* -------- SITE -------- */
+    const siteSel = document.getElementById("filter-site");
+    const prevSite = siteSel.value;
+    siteSel.innerHTML = "<option value=''>All Sites</option>";
+    (data.sites || []).forEach(site => {
+        siteSel.innerHTML += `<option value="${site}">${site}</option>`;
+    });
+    siteSel.value = prevSite;
+}
+
+/* ---------------------------------------------------
+   YEARLY GENERATION TREND
+--------------------------------------------------- */
+function drawYearly(data) {
+
+  const ctx = document.getElementById("chart-yearly");
+  if (chartYearly) chartYearly.destroy();
+
+  const datasets = data.years.map((y,i)=>({
+    label: y,
+    data: data.gen_trend[y],
+    borderColor: palette[i],
+    backgroundColor: "transparent",
+    tension: .35,
+    pointRadius: 3
+  }));
+
+  chartYearly = new Chart(ctx, {
+    type: "line",
+    data: { labels: data.month_names, datasets },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+}
+
+/* ---------------------------------------------------
+   PLANT AVAILABILITY
+--------------------------------------------------- */
+function drawAvailability(data) {
+
+  const ctx = document.getElementById("chart-availability");
+  if (chartAvail) chartAvail.destroy();
+
+  chartAvail = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: data.years,
+      datasets:[{
+        label:"Plant Availability",
+        data:data.availability,
+        borderColor:"#0b69a3",
+        backgroundColor:"rgba(11,105,163,0.15)",
+        fill:true,
+        tension:.25
+      }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false }
+  });
+}
+
+/* ---------------------------------------------------
+   RADIATION SCATTER (CLEAN + POWER BI STYLE)
+--------------------------------------------------- */
+function drawRadiation(data) {
+
+    const ctx = document.getElementById("chart-radiation").getContext("2d");
+    if (chartRad) chartRad.destroy();
+
+    const pts = data.radiation_points
+        .filter(p => p.radiation && p.generation)
+        .map(p => ({ x: p.radiation, y: p.generation }))
+        .sort((a,b)=> a.x - b.x);
+
+    chartRad = new Chart(ctx, {
+        type: "scatter",
+        data: {
+            datasets: [{
+                label: "Radiation vs Generation",
+                data: pts,
+                backgroundColor: "rgba(0,110,255,0.55)",
+                borderColor: "rgba(0,110,255,0.8)",
+                pointRadius: 4,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display:false } },
+            scales: {
+                x: { type:"linear", title:{ display:true, text:"Radiation (kWh/m²)" } },
+                y: { title:{ display:true, text:"Daily Generation" } }
+            }
+        }
+    });
+}
+
+/* ---------------------------------------------------
+   MONTHLY PLF TREND
+--------------------------------------------------- */
+function drawPlf(data) {
+
+  const ctx = document.getElementById("chart-plf");
+  if (chartPlf) chartPlf.destroy();
+
+  const datasets = data.years.map((y,i)=>({
+    label:y,
+    data:data.plf_chart[y],
+    borderColor:palette[i],
+    tension:0.3,
+    pointRadius:4
+  }));
+
+  chartPlf = new Chart(ctx,{
+    type:"line",
+    data:{ labels:data.month_names, datasets },
+    options:{ responsive:true, maintainAspectRatio:false }
+  });
+}
+
+/* ---------------------------------------------------
+   FILTER LISTENERS
+--------------------------------------------------- */
+["filter-year","filter-month","filter-day","filter-site"].forEach(id=>{
+  document.getElementById(id).addEventListener("change", loadTrend);
+});
+
+/* Initial load */
+loadTrend();
+</script>
+
+
+{% endblock %}

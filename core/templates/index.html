@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Welcome To Renewable Energy Dashboard{% endblock title %}
+
+{% block style_css %}
+<style>
+  body {
+    overflow-x: hidden;
+  }
+  .section-title {
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  .mission-card {
+    background: white;
+    border-radius: 10px;
+    padding: 30px 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    transition: transform 0.3s ease;
+  }
+
+  .mission-card:hover {
+    transform: translateY(-5px);
+  }
+
+  .icon-bg {
+    background-color: #9c27b0;
+    color: white;
+    border-radius: 50%;
+    padding: 6px;
+    font-size: 12px;
+    margin-right: 10px;
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    text-align: center;
+    line-height: 12px;
+  }
+
+  ul.service-list {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  ul.service-list li {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+  }
+
+  .mission-icon {
+    width: 45px;
+    height: 45px;
+    background-color: #9c27b0;
+    color: white;
+    font-size: 24px;
+    line-height: 45px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+
+  .mission-title {
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #222;
+  }
+
+  .mission-desc {
+    color: #888;
+    font-size: 15px;
+  }
+
+  .section {
+    padding: 60px 0;
+  }
+
+  .chart-img {
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .custom-login-btnnn {
+    background-color: #4454B2 !important;
+    color: white !important;
+    transition: all 0.3s ease;
+    border-radius: 6px;
+    border: none;
+  }
+
+  .custom-login-btnnn:hover {
+    background-color: #2f3c8e !important;
+    color: #ffffff !important;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .custom-contact-btn {
+    background-color: #4EA852 !important;
+    color: white !important;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+  }
+
+  .custom-contact-btn:hover {
+    background-color: #3b8e41 !important;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .header {
+    background-color: #ffffff;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 500;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  .image-hover-effect {
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  border-radius: 12px;
+}
+
+.image-hover-effect:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+</style>
+{% endblock style_css %}
+
+{% block sidebar %}{% endblock sidebar %}
+
+{% block content %}
+<div class="header">
+  <div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center px-3">
+      <img src="{% static 'images/TeimLogo.png' %}" alt="TEIM Logo" height="50">
+      <img src="{% static 'images/crono.png' %}" alt="Intelimek Logo" height="50">
+    </div>
+  </div>
+</div>
+
+<section class="hero-section mt-5 pt-5">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-md-6 mb-5 mt-5" data-aos="fade-up">
+        <h1 class="hero-title">Renewable <br> Energy Dashboard</h1>
+        <p class="hero-subtitle">
+          Renewable Projects Asset Management Services. <br>
+          One stop solution for your commercial and technical operations of renewable projects.
+        </p>
+        <div class="row mt-4">
+          <div class="col-md-4 col-4">
+            <a href="{% url 'login' %}" class="btn px-4 py-2 custom-login-btnnn">LOGIN</a>
+          </div>
+          <div class="col-md-4 col-8">
+            <a href="#" class="btn px-4 py-2 custom-contact-btn">CONTACT US</a>
+          </div>
+        </div>
+      </div>
+
+   <div class="col-md-6 text-center mt-5" data-aos="fade-up">
+  <img src="{% static 'images/indexpage.jpeg' %}" alt="Dashboard Image" class="hero-img image-hover-effect" width="100%">
+</div>
+
+    </div>
+  </div>
+</section>
+
+<section class="py-5">
+  <div class="container">
+    <h2 class="section-title">Our Mission</h2>
+    <div class="row">
+      <div class="col-md-4 mb-4" data-aos="zoom-in">
+        <div class="mission-card">
+          <div class="mission-icon">✔</div>
+          <h5 class="mission-title">Delivering Quality</h5>
+          <p class="mission-desc">Ensuring all Standard Operating Procedures are Strictly Followed.</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4" data-aos="zoom-in">
+        <div class="mission-card">
+          <div class="mission-icon">✔</div>
+          <h5 class="mission-title">Holistic Approach</h5>
+          <p class="mission-desc">A Single One-stop Solutions for Our Clients Needs.</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4" data-aos="zoom-in">
+        <div class="mission-card">
+          <div class="mission-icon">✔</div>
+          <h5 class="mission-title">Adding Value</h5>
+          <p class="mission-desc">Resulting in less Breakdowns, Maximum Generation and Stable Asset Health.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="section-title">Services We Offer</h2>
+    <div class="row">
+      <div class="col-lg-6 mb-4" data-aos="fade-down">
+        <img src="{% static 'images/feature.png' %}" alt="Map + bar chart" class="chart-img">
+      </div>
+      <div class="col-lg-6"  data-aos="fade-down">
+        <ul class="service-list mt-3" style="margin-left: 50px;">
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Renewable energy Assessment Validation</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Project Implementation Monitoring</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Project Performance Monitoring</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Contract Management</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Warranty Analysis</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Insurance Claim Management</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> CDM/REC/GBI Documentation Support</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Revenue Management</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Health & Safety Management</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Owner's Engineer</li>
+          <li><span class="icon-bg"><i class="fas fa-check-circle"></i></span> Executive Analytical Dashboard</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include 'fotter.html' %}<br>
+{% endblock content %}
+
+{% block scripts %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+<script>
+  AOS.init({ duration: 1200, once: true });
+</script>
+<script>
+  function goBack() {
+    window.history.back();
+  }
+</script>
+{% endblock scripts %}

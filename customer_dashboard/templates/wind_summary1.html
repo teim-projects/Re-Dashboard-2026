@@ -1,0 +1,202 @@
+{% extends "basewind.html" %}
+{% load static %}
+
+{% block style_css %}
+<style>
+  .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .card {
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+
+  .card-body {
+    padding: 0;
+  }
+
+  /* Table wrapper for responsive scroll */
+  .table-responsive {
+    overflow-x: auto;
+  }
+
+  th {
+    text-align: center !important;
+    font-size: 15px;
+  }
+
+  td {
+    font-size: 14px;
+  }
+
+  /* Pagination style to match screenshot */
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: 4px 10px;
+    margin: 2px;
+    border-radius: 5px;
+    border: none;
+    background: #f8f9fa;
+    cursor: pointer;
+  }
+
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #9d4edd;
+    color: #fff !important;
+  }
+
+  .dataTables_wrapper .dataTables_info {
+    font-size: 13px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 80px;">
+
+  <div class="row g-4"> 
+
+    <!-- Capacity by State -->
+    <div class="col-12 col-md-6">
+      <div class="card">
+        <div class="form-heading text-center">Capacity (MW) by State wind</div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="capacityTable" class="table table-bordered text-center mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>State</th>
+                  <th>Capacity (MW)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in data.capacity_by_state %}
+                <tr>
+                  <td>{{ row.0 }}</td>
+                  <td>{{ row.1 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Land Type by State -->
+    <div class="col-12 col-md-6">
+      <div class="card">
+        <div class="form-heading text-center">State Wise Land Type</div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="landTable" class="table table-bordered text-center mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>State</th>
+                  <th>Land</th>
+                  <th>Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in data.land_type_by_state %}
+                <tr>
+                  <td>{{ row.0 }}</td>
+                  <td>{{ row.1 }}</td>
+                  <td>{{ row.2 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WTG Generation -->
+    <div class="col-12 col-md-6">
+      <div class="card">
+        <div class="form-heading text-center">Estimated Generation WTG Wise</div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="wtgTable" class="table table-bordered text-center mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>WTG Location</th>
+                  <th>Avg Generation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in data.wtg_generation %}
+                <tr>
+                  <td>{{ row.0 }}</td>
+                  <td>{{ row.1 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Power Sale -->
+    <div class="col-12 col-md-6">
+      <div class="card">
+        <div class="form-heading text-center">State Wise Power Sale</div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="powerTable" class="table table-bordered text-center mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Power Sale Detail</th>
+                  <th>State</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in data.power_sale %}
+                <tr>
+                  <td>{{ row.0 }}</td>
+                  <td>{{ row.1 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DataTables JS Init -->
+<script>
+$(document).ready(function() {
+  $('#capacityTable, #landTable, #wtgTable, #powerTable').DataTable({
+    "pageLength": 5,
+    "lengthChange": false,
+    "searching": false,
+    "ordering": false,
+    "info": true,
+    "pagingType": "simple"
+  });
+});
+</script>
+
+<!-- DataTables CSS/JS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<div class="sp" style="position: absolute; bottom: 0px; width: 100%;">
+
+</div>
+  {% include 'fotter.html' %}
+
+{% endblock %}

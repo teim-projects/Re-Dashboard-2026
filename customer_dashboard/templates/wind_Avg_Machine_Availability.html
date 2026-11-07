@@ -1,0 +1,339 @@
+{% extends "basewind.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container my-4" style="margin-top: 80px !important;">
+ 
+  <!-- ===== Filter Buttons ===== -->
+  <div class="d-flex haidshow flex-wrap gap-2  ">
+   <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+    <i class="fas fa-filter"></i> DATE RANGE
+  </button>
+  <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#providerModal">
+    <i class="fas fa-filter"></i> OEM PROVIDER
+  </button>
+  <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#customerModal">
+    <i class="fas fa-filter"></i> CUSTOMER
+  </button>
+  <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#stateModal">
+    <i class="fas fa-filter"></i> STATE NAME
+  </button>
+  <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#siteModal">
+    <i class="fas fa-filter"></i> SITE NAME
+  </button>
+  <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#wtgModal">
+    <i class="fas fa-filter"></i> WTG NUMBER
+  </button>
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+     <a href="?clear_filters=1" class="    text-danger small    ">
+    Clear ✕
+</a>    {% endif %}
+  </div>
+
+  <!-- ===== Active Filters Chips ===== -->
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    {% if date_from %}<span class="badge bg-light text-dark">From: {{ date_from }}</span>{% endif %}
+    {% if date_to %}<span class="badge bg-light text-dark">To: {{ date_to }}</span>{% endif %}
+    {% for p in selected_providers %}<span class="badge bg-info text-dark">Provider: {{ p }}</span>{% endfor %}
+    {% for c in selected_customers %}<span class="badge bg-info text-dark">Customer: {{ c }}</span>{% endfor %}
+    {% for s in selected_states %}<span class="badge bg-info text-dark">State: {{ s }}</span>{% endfor %}
+    {% for s in selected_sites %}<span class="badge bg-info text-dark">Site: {{ s }}</span>{% endfor %}
+    {% for w in selected_wtgs %}<span class="badge bg-info text-dark">WTG: {{ w }}</span>{% endfor %}
+  </div>
+
+  {% if no_data %}
+    <div class="alert alert-warning text-center fw-bold">{{ no_data_msg }}</div>
+  {% else %}
+    <!-- ===== Treemap Chart Card ===== -->
+    <!-- ===== Treemap Chart Card ===== -->
+<div class="card shadow p-3 mb-4">
+  <div id="maTreemap" ></div>
+  {% if not no_data %}
+  <div class="alert   text-center fw-bold  ">
+    Average Machine Availability: {{ overall_avg_ma }} %
+  </div>
+{% endif %}
+</div>
+
+
+
+
+<div class="p-3 mt-4">
+  <h5 class="form-heading">WTG-wise Average Machine Availability (%)</h5>
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover table-striped align-middle">
+      <thead class="table-dark sticky-top">
+        <tr class="text-center">
+          <th style="width: 350px;">WTG No.</th>
+          <th>Average MA (%)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in table_page %}
+        <tr class="text-center">
+          <td>{{ row.wtg_no }}</td>
+          <td>
+            <span class="badge 
+              {% if row.avg_ma >= 90 %}bg-success
+              {% elif row.avg_ma >= 75 %}bg-warning text-dark
+              {% else %}bg-danger
+              {% endif %}">
+              {{ row.avg_ma }}
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="2" class="text-center text-muted">No data available</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Controls -->
+  {% if table_page.has_other_pages %}
+  <nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center mt-3">
+      {% if table_page.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ table_page.previous_page_number }}{% for key, vals in request.GET.lists %}{% if key != 'page' %}{% for v in vals %}&{{ key }}={{ v }}{% endfor %}{% endif %}{% endfor %}" aria-label="Previous">
+          <span aria-hidden="true">&laquo;</span>
+        </a>
+      </li>
+      {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">&laquo;</span>
+      </li>
+      {% endif %}
+
+      {% for num in paginator.page_range %}
+        {% if table_page.number == num %}
+        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+        {% else %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}{% for key, vals in request.GET.lists %}{% if key != 'page' %}{% for v in vals %}&{{ key }}={{ v }}{% endfor %}{% endif %}{% endfor %}">{{ num }}</a>
+        </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if table_page.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ table_page.next_page_number }}{% for key, vals in request.GET.lists %}{% if key != 'page' %}{% for v in vals %}&{{ key }}={{ v }}{% endfor %}{% endif %}{% endfor %}" aria-label="Next">
+          <span aria-hidden="true">&raquo;</span>
+        </a>
+      </li>
+      {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">&raquo;</span>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+
+  {% endif %}
+</div>
+
+<!-- ===== Modals for Filters ===== -->
+
+<!-- ========== Modals ========== --> 
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex gap-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for p in providers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}"
+             {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+          <label class="form-check-label">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label">{{ c }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in states %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in sites %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for w in wtgs %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}"
+              {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label">{{ w }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted">No WTG numbers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Repeat similar modals for customerModal, stateModal, siteModal, wtgModal -->
+
+<!-- ApexCharts -->
+
+<style>
+     .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px !important;
+    border-top-right-radius: 15px !important;
+    font-size: 18px;
+    font-weight: 500;
+    text-align: center !important;
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+  const rawData = JSON.parse('{{ chart_data|escapejs }}');
+
+  var options = {
+    series: [{ data: rawData }],
+    chart: { type: 'treemap', height: 500 },
+    title: { text: 'Average Machine Availability (%)', align: 'center' },
+    legend: { show: false },
+    dataLabels: {
+      enabled: true,
+      style: { fontSize: '14px' },
+      formatter: function(text, op) { return [text, op.value + "%"]; },
+      offsetY: -4
+    },
+    colors: ['#00E396', '#FEB019', '#FF4560', '#775DD0', '#3F51B5', '#03A9F4', '#4CAF50', '#F9CE1D', '#FF9800', '#33B2DF']
+  };
+
+  var chart = new ApexCharts(document.querySelector("#maTreemap"), options);
+  chart.render();
+</script>
+	{% endblock %}

@@ -1,0 +1,607 @@
+
+{% extends "basesolar.html" %}
+{% load static %}
+
+{% block content %}
+
+<!-- D3 -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+  /* -------------------------
+     Layout base
+     ------------------------- */
+  :root{
+    --blue-600: #0f4c81;
+    --blue-400: #2b8bd3;
+    --accent: #e56a2a;
+    --muted: #7b8a99;
+    --glass: rgba(255,255,255,0.85);
+    --card-shadow: 0 6px 18px rgba(10,25,47,0.08);
+  }
+  body { font-family: "Poppins", Arial, sans-serif; background: linear-gradient(180deg,#e8f4ff 0%, #f5fbff 100%); color:#0b2540; }
+
+  .dashboard-wrap{ padding: 77px 30px 60px; } /* top space for fixed header in base */
+
+  /* -------------------------
+     Filters row
+     ------------------------- */
+  .filters-row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:18px; }
+  .filter-card {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 16px;
+    border-radius:14px;
+    background: var(--glass);
+    box-shadow: var(--card-shadow);
+    min-width:170px;
+    backdrop-filter: blur(6px);
+    transition: transform .18s ease, box-shadow .18s ease;
+    border: 1px solid rgba(15,76,129,0.06);
+  }
+  .filter-card:hover{ transform: translateY(-6px) scale(1.02); box-shadow: 0 12px 30px rgba(15,76,129,0.09); }
+
+  .filter-icon {
+    width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg,var(--blue-600), var(--blue-400));
+    color:white; font-size:18px; flex-shrink:0;
+    box-shadow: 0 6px 18px rgba(11,37,64,0.12);
+  }
+
+  .filter-body { display:flex; flex-direction:column; min-width:120px; }
+  .filter-label { font-size:12px; color:var(--muted); font-weight:600; }
+  .filter-control { margin-top:6px; }
+
+  /* small select/input look */
+  .filter-control select, .filter-control input {
+    padding:6px 10px; border-radius:8px; border:1px solid rgba(11,37,64,0.06); min-width:120px;
+    background: white;
+  }
+
+  /* -------------------------
+     KPI cards (rounded + icon)
+     Energetic bounce+scale animation
+     ------------------------- */
+  .kpi-row { display:flex; gap:14px; margin-left:auto; align-items:center; }
+  .kpi-card {
+    width:190px;
+    padding:12px 14px;
+    border-radius:12px;
+    background: linear-gradient(180deg,#ffffff,#fbfdff);
+    box-shadow: var(--card-shadow);
+    border: 1px solid rgba(11,37,64,0.05);
+    display:flex;
+    align-items:center;
+    gap:12px;
+    transition: transform .25s cubic-bezier(.2,.9,.2,1), box-shadow .25s ease;
+    cursor:default;
+  }
+  .kpi-card .kpi-icon {
+    width:56px; height:56px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg,#fff,#f3f9ff);
+    color: var(--blue-600); font-size:22px; box-shadow: 0 8px 18px rgba(11,37,64,0.06);
+  }
+  .kpi-card .kpi-text { display:flex; flex-direction:column; }
+  .kpi-card .kpi-label { font-size:12px; color:var(--muted); font-weight:600; }
+  .kpi-card .kpi-value { font-size:22px; font-weight:800; color:#0b2540; margin-top:6px; }
+
+  /* bounce+scale when data updates or on hover */
+  @keyframes bounceScale {
+    0% { transform: scale(0.96); }
+    40% { transform: scale(1.08); }
+    65% { transform: scale(0.98); }
+    100% { transform: scale(1); }
+  }
+  .kpi-card.bouncy { animation: bounceScale .72s cubic-bezier(.2,.9,.2,1); }
+
+  .kpi-card:hover { transform: translateY(-6px) scale(1.02); box-shadow: 0 18px 36px rgba(11,37,64,0.12); }
+
+  /* -------------------------
+     Grid for charts (powerBI like)
+     ------------------------- */
+  .charts-grid { display:grid; grid-template-columns: 46% 54%; gap:14px; align-items:start; margin-top:6px; }
+  .chart-panel { border-radius:10px; background:white; box-shadow: var(--card-shadow); padding:12px; border:1px solid rgba(11,37,64,0.04); }
+  .panel-title { font-weight:700; color:#16324f; margin-bottom:10px; font-size:15px; }
+
+  #treemap, #barchart { width:100%; height:460px; border-radius:6px; overflow:hidden; }
+
+  /* table */
+  .data-table-wrap { margin-top:14px; border-radius:10px; background:white; box-shadow: var(--card-shadow); padding:10px; border:1px solid rgba(11,37,64,0.04); }
+  .data-table-wrap table { width:100%; border-collapse:collapse; }
+  .data-table-wrap th, .data-table-wrap td { padding:8px 10px; border-bottom:1px solid #f1f3f5; font-size:13px; color:#223344; }
+
+  /* small responsive tweaks */
+  @media (max-width: 980px) {
+    .charts-grid { grid-template-columns: 1fr; }
+    .kpi-row { margin-top:8px; }
+    .filters-row { gap:10px; }
+    .kpi-card { width:140px; }
+  }
+
+  /* NEW GRID LAYOUT FOR FILTER + KPI SECTION */
+.filters-grid {
+    display: grid;
+    grid-template-columns: 62% 38%;
+    gap: 18px;
+    margin-bottom: 20px;
+}
+
+.filters-left {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.kpi-right {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.kpi-right .kpi-row {
+    display: flex;
+    gap: 14px;
+}
+.kpi-desc {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
+</style>
+
+<div class="dashboard-wrap container-fluid">
+  <!-- filters + KPIs row -->
+ <!-- FILTERS + KPIs NEW GRID LAYOUT -->
+<div class="filters-grid">
+
+  <!-- LEFT SIDE FILTERS (2×2 layout) -->
+  <div class="filters-left">
+      <div class="filter-card">
+        <div class="filter-icon"><i class="fas fa-map-marker-alt"></i></div>
+        <div class="filter-body">
+          <div class="filter-label">Site</div>
+          <div class="filter-control">
+            <select id="siteSelect"><option value="">All Sites</option></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-card">
+        <div class="filter-icon"><i class="fas fa-calendar-alt"></i></div>
+        <div class="filter-body">
+          <div class="filter-label">Year</div>
+          <div class="filter-control">
+            <select id="yearSelect"><option value="">All Years</option></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-card">
+        <div class="filter-icon"><i class="fas fa-calendar"></i></div>
+        <div class="filter-body">
+          <div class="filter-label">Month</div>
+          <div class="filter-control">
+            <select id="monthSelect">
+              <option value="">All</option>
+              <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+              <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+              <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+              <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-card">
+        <div class="filter-icon"><i class="fas fa-calendar-day"></i></div>
+        <div class="filter-body">
+          <div class="filter-label">Date</div>
+          <div class="filter-control">
+            <input id="dayInput" type="number" min="1" max="31" placeholder="All" style="width:86px;">
+          </div>
+        </div>
+      </div>
+  </div>
+
+  <!-- RIGHT SIDE KPI (two rows of three) -->
+  <div class="kpi-right">
+
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-icon"><i class="fas fa-sun"></i></div>
+        <div class="kpi-text">
+          <div class="kpi-label">Daily Generation</div>
+          <div class="kpi-value" id="kpiDaily">-</div>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-icon"><i class="fas fa-calendar"></i></div>
+        <div class="kpi-text">
+          <div class="kpi-label">Monthly Generation</div>
+          <div class="kpi-value" id="kpiMonthly">-</div>
+        </div>
+      </div>
+
+
+    </div>
+
+    <div class="kpi-row">
+
+          <div class="kpi-card">
+        <div class="kpi-icon"><i class="fas fa-globe"></i></div>
+        <div class="kpi-text">
+          <div class="kpi-label">Yearly Generation</div>
+          <div class="kpi-value" id="kpiYearly">-</div>
+        </div>
+      </div>
+    <div class="kpi-card">
+  <div class="kpi-icon" style="color: rgb(255, 197, 39) !important;">
+
+    <i class="fas fa-bolt"></i>
+
+  </div>
+
+  <div class="kpi-text">
+  
+
+    <!-- Description text added -->
+    <div class="kpi-desc">Shows cumulative yearly generation calculated using the applied filter criteria.
+</div>
+  </div>
+</div>
+
+    </div>
+ 
+  </div>
+
+</div>
+
+  <!-- charts -->
+  <div class="charts-grid">
+    <div class="chart-panel">
+      <div class="panel-title">Daily Generation by Year</div>
+      <div id="treemap"></div>
+    </div>
+
+    <div class="chart-panel">
+      <div class="panel-title">Generation by Month</div>
+      <div id="barchart"></div>
+    </div>
+  </div>
+
+  <div class="data-table-wrap mt-3">
+    <div style="font-weight:700; margin-bottom:8px;">Data Table (first 2k rows)</div>
+<div id="tableContainer"></div>
+
+<!-- Pagination controls -->
+<div id="paginationControls" class="mt-2" style="display:flex; gap:10px; align-items:center;">
+    <button id="prevPage" class="btn btn-sm btn-outline-primary">Prev</button>
+    <span id="pageInfo" style="font-weight:600;"></span>
+    <button id="nextPage" class="btn btn-sm btn-outline-primary">Next</button>
+</div>
+  </div>
+</div>
+<div id="treemapTooltip"
+     style="position:absolute; 
+            background:white; 
+            padding:8px 12px;
+            border-radius:8px;
+            box-shadow:0 4px 12px rgba(0,0,0,0.15);
+            font-size:13px;
+            color:#0b2540;
+            pointer-events:none;
+            opacity:0;
+            transition:opacity 0.2s ease;
+            z-index:999;">
+</div>
+<script>
+  const apiURL = "{% url 'api_solar_data' %}";
+
+  /* -------------------------
+     HELPERS
+  ------------------------- */
+  function $id(id){ return document.getElementById(id); }
+
+  function formatNumber(n){
+    if (n === null || n === undefined) return "-";
+    if (n >= 1e9) return (n/1e9).toFixed(2) + " bn";
+    if (n >= 1e6) return Math.round(n/1e6) + "M";
+    return Math.round(n).toLocaleString();
+  }
+
+  /* -------------------------
+     MASTER DROPDOWN DATA (FIX)
+  ------------------------- */
+  let masterYears = null;
+  let masterSites = null;
+
+  /* -------------------------
+     KPI ANIMATION
+  ------------------------- */
+  function animateCount(el, toVal){
+    if(!el) return;
+    const duration = 700;
+    const startTime = performance.now();
+    const numericTo = Number(toVal) || 0;
+
+    function step(now){
+      const progress = Math.min((now - startTime) / duration, 1);
+      const cur = Math.round(progress * numericTo);
+      el.textContent = formatNumber(cur);
+      if (progress < 1) requestAnimationFrame(step);
+      else {
+        el.textContent = formatNumber(numericTo);
+        const card = el.closest('.kpi-card');
+        if(card){
+          card.classList.remove('bouncy');
+          void card.offsetWidth;
+          card.classList.add('bouncy');
+          setTimeout(()=>card.classList.remove('bouncy'), 900);
+        }
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  /* -------------------------
+     FETCH API DATA
+  ------------------------- */
+  async function fetchData(){
+    const params = new URLSearchParams({
+      site: $id('siteSelect').value,
+      year: $id('yearSelect').value,
+      month: $id('monthSelect').value,
+      day: $id('dayInput').value
+    });
+
+    try {
+      const res = await fetch(apiURL + "?" + params.toString());
+      if (!res.ok) throw new Error("Network error");
+      return await res.json();
+    } catch (e) {
+      console.error("fetchData error", e);
+      return {};
+    }
+  }
+
+  /* -------------------------
+     DROPDOWNS (FIXED)
+  ------------------------- */
+  function renderSiteOptions(sites){
+    const sel = $id('siteSelect');
+    const selected = sel.value;
+
+    if (!masterSites && sites) {
+      masterSites = [...sites];   // 🔥 store once
+    }
+
+    sel.innerHTML = '<option value="">All Sites</option>';
+    (masterSites || []).forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      sel.appendChild(opt);
+    });
+
+    sel.value = selected;
+  }
+
+  function renderYearOptions(years){
+    const sel = $id('yearSelect');
+    const selected = sel.value;
+
+    if (!masterYears && years) {
+      masterYears = [...years];   // 🔥 store once
+    }
+
+    sel.innerHTML = '<option value="">All Years</option>';
+    (masterYears || []).forEach(y => {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      sel.appendChild(opt);
+    });
+
+    sel.value = selected;
+  }
+
+  /* -------------------------
+     KPIs
+  ------------------------- */
+  function renderKPIs(kpis){
+    animateCount($id('kpiDaily'), kpis.daily || 0);
+    animateCount($id('kpiMonthly'), kpis.monthly || 0);
+    animateCount($id('kpiYearly'), kpis.yearly || 0);
+  }
+
+  /* -------------------------
+     TREEMAP
+  ------------------------- */
+  function drawTreemap(containerSelector, treedata){
+    document.querySelector(containerSelector).innerHTML = "";
+    const width = document.querySelector(containerSelector).clientWidth;
+    const height = 460;
+
+    const root = d3.hierarchy({children: treedata || []})
+      .sum(d => d.value)
+      .sort((a,b)=>b.value - a.value);
+
+    d3.treemap()
+      .size([width, height])
+      .paddingInner(2)(root);
+
+    const svg = d3.select(containerSelector)
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    const color = d3.scaleOrdinal(d3.schemeTableau10);
+
+    const node = svg.selectAll("g")
+      .data(root.leaves())
+      .enter().append("g")
+      .attr("transform", d=>`translate(${d.x0},${d.y0})`);
+
+    node.append("rect")
+      .attr("width", d=>Math.max(0,d.x1-d.x0))
+      .attr("height", d=>Math.max(0,d.y1-d.y0))
+      .attr("fill",(d,i)=>color(i))
+      .attr("rx",6);
+
+    node.append("text")
+      .attr("x", d => (d.x1 - d.x0) / 2)
+      .attr("y", d => (d.y1 - d.y0) / 2)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .text(d => d.data.name)
+      .attr("fill", "white")
+      .style("font-weight", "700")
+      .style("font-size", "18px");
+  }
+
+  /* -------------------------
+     BAR CHART
+  ------------------------- */
+  function drawBarChart(selector, monthly){
+    document.querySelector(selector).innerHTML = "";
+    const margin = {top:20, right:20, bottom:70, left:70};
+
+    const width = document.querySelector(selector).clientWidth - margin.left - margin.right;
+    const height = 420 - margin.top - margin.bottom;
+
+    const svg = d3.select(selector)
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const data = monthly || [];
+
+    const x = d3.scaleBand().domain(data.map(d=>d.month)).range([0,width]).padding(0.18);
+    const yMax = d3.max(data, d=>d.value) || 1;
+    const y = d3.scaleLinear().domain([0, yMax * 1.12]).range([height, 0]);
+
+    svg.append("g").call(d3.axisLeft(y).ticks(6));
+    svg.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .attr("transform","rotate(-30)")
+      .style("text-anchor","end");
+
+    svg.selectAll(".bar")
+      .data(data)
+      .enter().append("rect")
+      .attr("x", d=>x(d.month))
+      .attr("y", d=>y(d.value))
+      .attr("width", x.bandwidth())
+      .attr("height", d=>height - y(d.value))
+      .attr("fill", "#e56a2a")
+      .attr("rx",4);
+  }
+
+  /* -------------------------
+     TABLE + PAGINATION
+  ------------------------- */
+  let currentPage = 1;
+  const rowsPerPage = 20;
+  let fullTableData = [];
+
+  function renderPaginatedTable(page){
+    const container = $id("tableContainer");
+    if (!fullTableData.length){
+      container.innerHTML = "<div style='color:#667a8a;padding:12px;'>No rows</div>";
+      return;
+    }
+
+    const start = (page - 1) * rowsPerPage;
+    const rows = fullTableData.slice(start, start + rowsPerPage);
+
+    let html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Site</th>
+            <th style="text-align:right">Daily</th>
+            <th style="text-align:right">Monthly</th>
+            <th style="text-align:right">Yearly</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    rows.forEach(r => {
+      html += `
+        <tr>
+          <td>${r.date}</td>
+          <td>${r.site}</td>
+          <td style="text-align:right">${(r.daily_generation||0).toLocaleString()}</td>
+          <td style="text-align:right">${(r.monthly_generation||0).toLocaleString()}</td>
+          <td style="text-align:right">${(r.yearly_generation||0).toLocaleString()}</td>
+        </tr>`;
+    });
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
+
+    const totalPages = Math.ceil(fullTableData.length / rowsPerPage);
+    $id("pageInfo").textContent = `Page ${currentPage} of ${totalPages}`;
+  }
+
+  $id("prevPage").addEventListener("click", () => {
+    if (currentPage > 1){
+      currentPage--;
+      renderPaginatedTable(currentPage);
+    }
+  });
+
+  $id("nextPage").addEventListener("click", () => {
+    const totalPages = Math.ceil(fullTableData.length / rowsPerPage);
+    if (currentPage < totalPages){
+      currentPage++;
+      renderPaginatedTable(currentPage);
+    }
+  });
+
+  /* -------------------------
+     REFRESH ALL
+  ------------------------- */
+  async function refreshAll(){
+    const data = await fetchData();
+
+    renderSiteOptions(data.sites || []);
+    renderYearOptions(data.years || []);
+    renderKPIs(data.kpis || {});
+    drawTreemap('#treemap', data.treemap || []);
+    drawBarChart('#barchart', data.monthly || []);
+
+    fullTableData = data.table_rows || [];
+    currentPage = 1;
+    renderPaginatedTable(currentPage);
+  }
+
+  /* -------------------------
+     INIT
+  ------------------------- */
+  (async ()=>{
+    await refreshAll();
+
+    ["siteSelect", "yearSelect", "monthSelect", "dayInput"].forEach(id => {
+      $id(id).addEventListener("change", refreshAll);
+    });
+
+    let resizeTO;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTO);
+      resizeTO = setTimeout(()=> refreshAll(), 300);
+    });
+  })();
+</script>
+
+
+{% endblock %}

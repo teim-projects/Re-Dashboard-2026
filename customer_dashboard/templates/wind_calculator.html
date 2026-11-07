@@ -1,0 +1,59 @@
+{% extends "basewind.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="card shadow-lg border-0">
+    <div class="card-header bg-primary text-white text-center">
+      <h5 class="mb-0">🌬️ Wind Power Calculator</h5>
+    </div>
+    <div class="card-body">
+      <form method="post" class="row g-3">
+        {% csrf_token %}
+        <div class="col-md-6">
+          <label for="wind_speed" class="form-label">Wind Speed (m/s)</label>
+          <input type="number" step="0.1" name="wind_speed" id="wind_speed" class="form-control" required>
+        </div>
+
+        <div class="col-md-6">
+          <label for="rotor_diameter" class="form-label">Rotor Diameter (m)</label>
+          <input type="number" step="0.1" name="rotor_diameter" id="rotor_diameter" class="form-control">
+        </div>
+
+        <div class="col-md-6">
+          <label for="swept_area" class="form-label">Swept Area (m²)</label>
+          <input type="number" step="0.1" name="swept_area" id="swept_area" class="form-control">
+          <div class="form-text text-muted">Enter either rotor diameter or swept area.</div>
+        </div>
+
+        <div class="col-md-6">
+          <label for="air_density" class="form-label">Air Density (kg/m³)</label>
+          <input type="number" step="0.001" name="air_density" id="air_density" value="1.225" class="form-control">
+        </div>
+
+        <div class="col-md-6">
+          <label for="efficiency" class="form-label">Efficiency (0–1)</label>
+          <input type="number" step="0.01" name="efficiency" id="efficiency" value="0.4" class="form-control">
+        </div>
+
+        <div class="col-md-12 text-center mt-3">
+          <button type="submit" class="btn btn-primary px-4">Calculate</button>
+        </div>
+      </form>
+
+      {% if result %}
+      <hr>
+      {% if result.error %}
+      <div class="alert alert-danger text-center">{{ result.error }}</div>
+      {% else %}
+      <div class="alert alert-success text-center">
+        <h5>Results</h5>
+        <p><strong>Swept Area:</strong> {{ result.area|floatformat:2 }} m²</p>
+        <p><strong>Power Output:</strong> {{ result.power_watts|floatformat:2 }} W (≈ {{ result.power_kw|floatformat:3 }} kW)</p>
+      </div>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

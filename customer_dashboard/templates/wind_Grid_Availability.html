@@ -1,0 +1,406 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="container my-4"  >
+ 
+
+  <!-- ===== Filter Buttons ===== --><div class="row mb-4">
+   <!-- ===== Filter Buttons ===== -->
+  <div class="d-flex flex-wrap gap-2 " style="margin-top: 70px;">
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+      <i class="fas fa-filter"></i> DATE RANGE
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#providerModal">
+      <i class="fas fa-filter"></i> OEM PROVIDER
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#customerModal">
+      <i class="fas fa-filter"></i> CUSTOMER
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#stateModal">
+      <i class="fas fa-filter"></i> STATE NAME
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#siteModal">
+      <i class="fas fa-filter"></i> SITE NAME
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#wtgModal">
+      <i class="fas fa-filter"></i> WTG NUMBER
+    </button>
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+      <a class="btn btn-sm btn-outline-danger ms-2" href="?clear_filters=1">Clear all</a>
+    {% endif %}
+  </div>
+
+  <!-- ===== Active Filters Chips ===== -->
+  <div class="d-flex flex-wrap gap-2 mb-3 mt-2">
+    {% if date_from %}<span class="badge bg-light text-dark">From: {{ date_from }}</span>{% endif %}
+    {% if date_to %}<span class="badge bg-light text-dark">To: {{ date_to }}</span>{% endif %}
+    {% for p in selected_providers %}<span class="badge bg-info text-dark">Provider: {{ p }}</span>{% endfor %}
+    {% for c in selected_customers %}<span class="badge bg-info text-dark">Customer: {{ c }}</span>{% endfor %}
+    {% for s in selected_states %}<span class="badge bg-info text-dark">State: {{ s }}</span>{% endfor %}
+    {% for s in selected_sites %}<span class="badge bg-info text-dark">Site: {{ s }}</span>{% endfor %}
+    {% for w in selected_wtgs %}<span class="badge bg-info text-dark">WTG: {{ w }}</span>{% endfor %}
+  </div>
+
+  
+  <!-- ===== Overall Cards ===== -->
+  
+    <div class="col-md-6">
+        <!-- ===== Toggle Filter Button ===== -->
+
+      <div class="card text-center shadow">
+        <div class="card-body">
+          <h5 class="card-title">Overall External Grid Availability</h5>
+          <h2 class="text-success">{{ overall_ext }} %</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card text-center shadow">
+        <div class="card-body">
+          <h5 class="card-title">Overall Internal Grid Availability</h5>
+          <h2 class="text-primary">{{ overall_int }} %</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Charts & Tables ===== -->
+  <div class="row">
+    <!-- External Grid Availability -->
+    <div class="col-md-6">
+       <div id="extTreemap" style="height:400px;"></div>
+   <table id="extTable" class="table table-sm mt-3 table-bordered table-hover">
+  <thead class="table-dark">
+    <tr><th class="text-center">WTG</th><th class="text-center">External Grid Availability (%)</th></tr>
+  </thead>
+  <tbody>
+    {% for d in ext_data %}
+      <tr>
+        <td class="text-center">{{ d.wtg }}</td>
+        <td class="text-center">{{ d.value|floatformat:2 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="2">No data available</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div id="extPagination" class="mt-2"></div>
+    </div>
+
+    <!-- Internal Grid Availability -->
+    <div class="col-md-6">
+       <div id="intTreemap" style="height:400px;"></div>
+
+<table id="intTable" class="table table-sm mt-3 table-bordered table-hover">
+  <thead class="table-dark">
+    <tr><th class="text-center">WTG</th><th class="text-center">Internal Grid Availability (%)</th></tr>
+  </thead>
+  <tbody>
+    {% for d in int_data %}
+      <tr>
+        <td class="text-center">{{ d.wtg }}</td>
+        <td class="text-center">{{ d.value|floatformat:2 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="2">No data available</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<div id="intPagination" class="mt-2"></div>
+    </div>
+  </div>
+</div><!-- ===== SweetAlert2 ===== -->
+
+
+<!-- ========== Modals ========== --> 
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex gap-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for p in providers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}"
+             {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+          <label class="form-check-label">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label">{{ c }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in states %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in sites %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for w in wtgs %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}"
+              {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label">{{ w }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted">No WTG numbers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+<style>
+  /* hidden state */
+  .hidden {
+    display: none !important;
+  }
+</style>
+<script>
+function paginateTable(tableId, paginationId, rowsPerPage = 10) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector("tbody");
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const pagination = document.getElementById(paginationId);
+  const totalPages = Math.ceil(rows.length / rowsPerPage);
+  let currentPage = 1;
+
+  function renderTable() {
+    rows.forEach((row, i) => {
+      row.style.display =
+        i >= (currentPage - 1) * rowsPerPage && i < currentPage * rowsPerPage
+          ? ""
+          : "none";
+    });
+  }
+
+  function renderPagination() {
+    pagination.innerHTML = "";
+    if (totalPages <= 1) return;
+
+    for (let i = 1; i <= totalPages; i++) {
+      const btn = document.createElement("button");
+      btn.textContent = i;
+      btn.className = "btn btn-sm " + (i === currentPage ? "btn-primary" : "btn-outline-primary") + " me-1";
+      btn.addEventListener("click", () => {
+        currentPage = i;
+        renderTable();
+        renderPagination();
+      });
+      pagination.appendChild(btn);
+    }
+  }
+
+  renderTable();
+  renderPagination();
+}
+
+// Apply to both tables
+document.addEventListener("DOMContentLoaded", function () {
+  paginateTable("extTable", "extPagination", 10);
+  paginateTable("intTable", "intPagination", 10);
+});
+</script>
+  {% include 'fotter.html' %}
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggleBtn = document.getElementById("toggleFilters");
+    const filterSection = document.getElementById("filterSection");
+
+    toggleBtn.addEventListener("click", function () {
+      filterSection.classList.toggle("hidden");  // add/remove .hidden
+
+      if (filterSection.classList.contains("hidden")) {
+        toggleBtn.innerHTML = '<i class="fas fa-sliders-h"></i>  ';
+      } else {
+        toggleBtn.innerHTML = '<i class="fas fa-sliders-h"></i> ';
+      }
+    });
+  });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    Swal.fire({
+      title: 'Overall Grid Availability',
+      html: `
+        <div style="font-size:18px; line-height:1.8;">
+          <b style="color:green;">External:</b> {{ overall_ext }} % <br>
+          <b style="color:blue;">Internal:</b> {{ overall_int }} %
+        </div>
+      `,
+      icon: 'success',
+      showConfirmButton: false,
+      timer: 3000,   // auto close after 4 sec
+      timerProgressBar: true,
+      position: 'center',
+      customClass: {
+        popup: 'rounded-4 shadow'
+      }
+    });
+  });
+</script>
+
+
+<!-- ===== ApexCharts ===== -->
+<!-- ===== ApexCharts ===== -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+  const extData = JSON.parse(`{{ ext_json|escapejs }}`);
+  const intData = JSON.parse(`{{ int_json|escapejs }}`);
+
+  // External Treemap
+  new ApexCharts(document.querySelector("#extTreemap"), {
+    series: [{ data: extData.map(d => ({ x: d.wtg, y: d.value })) }],
+    chart: { type: "treemap", height: 400 },
+    title: { text: "External Grid Availability", align: "center" },
+    plotOptions: {
+      treemap: {
+        distributed: true,
+        enableShades: false
+      }
+    },
+    colors: ["#008FFB", "#00E396", "#FEB019", "#FF4560", "#775DD0", "#3F51B5", "#546E7A", "#D4526E", "#8D5B4C", "#F86624"]
+  }).render();
+
+  // Internal Treemap
+  new ApexCharts(document.querySelector("#intTreemap"), {
+    series: [{ data: intData.map(d => ({ x: d.wtg, y: d.value })) }],
+    chart: { type: "treemap", height: 400 },
+    title: { text: "Internal Grid Availability", align: "center" },
+    plotOptions: {
+      treemap: {
+        distributed: true,
+        enableShades: false
+      }
+    },
+    colors: ["#00E396", "#FEB019", "#FF4560", "#775DD0", "#008FFB", "#3F51B5", "#546E7A", "#D4526E", "#8D5B4C", "#F86624"]
+  }).render();
+</script>
+
+{% endblock %}

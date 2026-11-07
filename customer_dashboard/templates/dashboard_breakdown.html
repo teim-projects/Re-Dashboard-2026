@@ -1,0 +1,438 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% block content %}
+
+<div class="container-fluid px-3" style="margin-top: 80px;">
+ <!-- FILTER BAR -->
+ 
+
+
+
+               <!-- Filter Buttons -->
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+      <i class="fas fa-filter"></i> DATE RANGE
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#providerModal">
+      <i class="fas fa-filter"></i> OEM PROVIDER
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#customerModal">
+      <i class="fas fa-filter"></i> CUSTOMER
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#stateModal">
+      <i class="fas fa-filter"></i> STATE NAME
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#siteModal">
+      <i class="fas fa-filter"></i> SITE NAME
+    </button>
+    <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#wtgModal">
+      <i class="fas fa-filter"></i> WTG NUMBER
+    </button>
+
+      <!-- Active filters chips -->
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3" >
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+      <span class="badge bg-secondary">Active filters:</span>
+      {% if date_from %}<span class="badge bg-light text-dark">From: {{ date_from }}</span>{% endif %}
+      {% if date_to %}<span class="badge bg-light text-dark">To: {{ date_to }}</span>{% endif %}
+      {% for x in selected_providers %}<span class="badge bg-info text-dark">Provider: {{ x }}</span>{% endfor %}
+      {% for x in selected_customers %}<span class="badge bg-info text-dark">Customer: {{ x }}</span>{% endfor %}
+      {% for x in selected_states %}<span class="badge bg-info text-dark">State: {{ x }}</span>{% endfor %}
+      {% for x in selected_sites %}<span class="badge bg-info text-dark">Site: {{ x }}</span>{% endfor %}
+      {% for x in selected_wtgs %}<span class="badge bg-info text-dark">WTG: {{ x }}</span>{% endfor %}
+      <a class="btn btn-sm btn-outline-danger ms-2" href="?clear_filters=1">Clear all</a>
+    {% endif %}
+  </div>
+  </div>
+ 
+  <!-- SUMMARY CARDS -->
+  <div class="row text-center mt-1 g-3 mb-3">
+    <div class="col-md-3 col-6">
+      <div class="card shadow  border-0 bg-light">
+        <div class="card-body">
+          <h6 class="text-muted mb-1">Force Majeure</h6>
+          <h5 class="fw-bold text-primary">{{ summary.total_fm|floatformat:2 }}</h5>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="card shadow border-0 bg-light">
+        <div class="card-body">
+          <h6 class="text-muted mb-1">Grid Failure</h6>
+          <h5 class="fw-bold text-danger">{{ summary.total_gf|floatformat:2 }}</h5>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="card shadow border-0 bg-light">
+        <div class="card-body">
+          <h6 class="text-muted mb-1">Scheduled Services</h6>
+          <h5 class="fw-bold text-success">{{ summary.total_s|floatformat:2 }}</h5>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="card shadow border-0 bg-light">
+        <div class="card-body">
+          <h6 class="text-muted mb-1">Unscheduled Services</h6>
+          <h5 class="fw-bold text-warning">{{ summary.total_u|floatformat:2 }}</h5>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="row g-3">
+    <div class=" " style="box-shadow: 0px 0px 1px black;">
+      <div class="">
+        <h6 class="mb-0 form-heading text-center">OEM-Wise Breakdown</h6>
+      </div>
+      <div class="card-body">
+        <div id="treemapChart" style="margin-top: -30px;"></div>
+        <div id="treemapLegend" style="text-align:center; margin-top:10px;"></div>
+      </div>
+    </div>
+
+    <div class="card my-3">
+      <div class="  text-center">
+        <h6 class="form-heading">WTG Wise Grid Failure</h6>
+      </div>
+      <div class="card-body">
+        <div id="donutChart"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+ 
+
+<!-- ========== Modals ========== --> 
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex gap-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for p in providers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}"
+             {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+          <label class="form-check-label">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label">{{ c }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in states %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in sites %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for w in wtgs %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}"
+              {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label">{{ w }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted">No WTG numbers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+<style>
+  /* hidden state */
+  .hidden {
+    display: none !important;
+  }
+</style><script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggleBtn = document.getElementById("toggleFilters");
+    const filterSection = document.getElementById("filterSection");
+
+    toggleBtn.addEventListener("click", function () {
+      filterSection.classList.toggle("hidden");  // add/remove .hidden
+
+      if (filterSection.classList.contains("hidden")) {
+        toggleBtn.innerHTML = '<i class="fas fa-sliders-h"></i>  ';
+      } else {
+        toggleBtn.innerHTML = '<i class="fas fa-sliders-h"></i> ';
+      }
+    });
+  });
+</script>
+<style>
+
+.form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+const treemapData = JSON.parse('{{ treemap_data|safe|escapejs }}');
+const donutData = JSON.parse('{{ donut_data|safe|escapejs }}');
+// -------- TREEMAP (OEM + WTG interactive legend) --------
+if (treemapData.length > 0) {
+  const grouped = {};
+  treemapData.forEach(item => {
+    const total = item.gf + item.fm + item.s + item.u;
+    if (!grouped[item.oem]) grouped[item.oem] = [];
+    grouped[item.oem].push({ x: item.wtg, y: total });
+  });
+
+  const colors = [
+    '#008FFB', '#00E396', '#FEB019', '#FF4560',
+    '#775DD0', '#26A69A', '#D7263D', '#1B998B'
+  ];
+
+  const oems = Object.keys(grouped);
+  const series = oems.map((oem, idx) => ({
+    name: oem,
+    data: grouped[oem],
+    color: colors[idx % colors.length]
+  }));
+
+  const treemapChart = new ApexCharts(document.querySelector("#treemapChart"), {
+    chart: { type: 'treemap', height: 400, toolbar: { show: false } },
+    dataLabels: {
+      enabled: true,
+      style: { fontSize: '12px', fontWeight: 'bold' }
+    },
+    tooltip: {
+      y: { formatter: val => val.toFixed(2) + ' hrs' }
+    },
+    legend: { show: false },
+    series: series
+  });
+
+  treemapChart.render().then(() => {
+    const legendContainer = document.querySelector("#treemapLegend");
+    legendContainer.innerHTML = '';
+    oems.forEach((oem, i) => {
+      const color = colors[i % colors.length];
+      const legendItem = document.createElement("div");
+      legendItem.style.display = "inline-flex";
+      legendItem.style.alignItems = "center";
+      legendItem.style.margin = "6px 12px";
+      legendItem.style.cursor = "pointer";
+      legendItem.innerHTML = `
+        <span style="width:15px;height:15px;background:${color};border-radius:3px;
+          display:inline-block;margin-right:6px;"></span>
+        <span style="font-size:14px;">${oem}</span>
+      `;
+      legendContainer.appendChild(legendItem);
+
+      legendItem.addEventListener("mouseenter", () => {
+        treemapChart.updateSeries(series.filter(s => s.name === oem));
+      });
+      legendItem.addEventListener("mouseleave", () => {
+        treemapChart.updateSeries(series);
+      });
+    });
+  });
+}
+
+// -------- GRADIENT LINE CHART (Rounded 2 decimals) --------
+if (donutData.length > 0) {
+  const labels = donutData.map(d => d.wtg);
+  const values = donutData.map(d => parseFloat(d.gf.toFixed(2))); // round before chart
+
+  const lineChart = new ApexCharts(document.querySelector("#donutChart"), {
+    chart: {
+      type: 'line',
+      height: 400,
+      zoom: { enabled: false },
+      toolbar: { show: false }
+    },
+    series: [{
+      name: 'Grid Failure (hrs)',
+      data: values
+    }],
+    stroke: {
+      curve: 'smooth',
+      width: 4
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        shade: 'dark',
+        gradientToColors: ['#00E396'],
+        shadeIntensity: 1,
+        type: 'horizontal',
+        opacityFrom: 1,
+        opacityTo: 1,
+        stops: [0, 100]
+      }
+    },
+    markers: {
+      size: 5,
+      colors: ['#fff'],
+      strokeColors: '#00E396',
+      strokeWidth: 2
+    },
+    dataLabels: {
+      enabled: true,
+      formatter: val => val.toFixed(2), // show 2 decimal places on points
+      style: { fontSize: '10px' }
+    },
+    xaxis: {
+      categories: labels,
+      title: { text: 'WTG Numbers' },
+      labels: {
+        rotate: -45,
+        style: { fontSize: '10px' }
+      }
+    },
+    yaxis: {
+      title: { text: 'Grid Failure (hrs)' },
+      labels: {
+        formatter: val => val.toFixed(2)
+      }
+    },
+    tooltip: {
+      y: { formatter: val => val.toFixed(2) + ' hrs' }
+    },
+    grid: {
+      borderColor: '#e0e0e0'
+    }
+  });
+
+  lineChart.render();
+}
+</script>
+
+  {% include 'fotter.html' %}
+
+{% endblock %}

@@ -1,0 +1,562 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block content %}
+<div class="container my-4" style="margin-top: 80px !important;">
+  
+
+<!-- FILTER BUTTONS + APPLIED FILTERS (NEW DESIGN) -->
+<div class="d-flex justify-content-between align-items-start w-100 mb-3  flex-wrap"  >
+
+    <!-- LEFT FILTER BUTTONS -->
+    <div class="d-flex flex-wrap gap-2">
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+            <i class="fa-solid fa-calendar-days text-primary"></i> Date
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#providerModal">
+            <i class="fa-solid fa-industry text-info"></i> OEM
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#customerModal">
+            <i class="fa-solid fa-user text-success"></i> Customer
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#stateModal">
+            <i class="fa-solid fa-map-location-dot text-warning"></i> State
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#siteModal">
+            <i class="fa-solid fa-map-pin text-danger"></i> Site
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#wtgModal">
+            <i class="fa-solid fa-bolt text-purple"></i> WTG
+        </button>
+
+    </div>
+
+    <!-- RIGHT SIDE: SMALL FILTER CHIPS -->
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+    <div class="d-flex flex-wrap gap-1 justify-content-end" style="max-width: 50%;">
+
+        {% if date_from and date_to %}
+        <span class="badge rounded-pill bg-primary-subtle text-primary small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-calendar"></i> {{ date_from }} → {{ date_to }}
+        </span>
+        {% endif %}
+
+        {% for p in selected_providers %}
+        <span class="badge rounded-pill bg-info-subtle text-info small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-industry"></i> {{ p }}
+        </span>
+        {% endfor %}
+
+        {% for c in selected_customers %}
+        <span class="badge rounded-pill bg-success-subtle text-success small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-user"></i> {{ c }}
+        </span>
+        {% endfor %}
+
+        {% for s in selected_states %}
+        <span class="badge rounded-pill bg-warning-subtle text-warning small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-location-dot"></i> {{ s }}
+        </span>
+        {% endfor %}
+
+        {% for s in selected_sites %}
+        <span class="badge rounded-pill bg-danger-subtle text-danger small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-map-pin"></i> {{ s }}
+        </span>
+        {% endfor %}
+
+        {% for w in selected_wtgs %}
+        <span class="badge rounded-pill bg-purple-subtle text-purple small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-bolt"></i> {{ w }}
+        </span>
+        {% endfor %}
+
+<a href="?clear_filters=1" class="badge rounded-pill bg-light border text-danger small px-3 py-2 shadow-sm">
+    Clear ✕
+</a>
+
+    </div>
+    {% endif %}
+
+</div>
+<style>
+    .text-purple { color: #7b2cbf !important; }
+    .bg-purple-subtle { background: #f3e8ff !important; }
+
+    .badge {
+        font-size: 12px !important;
+    }
+</style>
+  <!-- ========== Section 1: Generation Hours ========== -->
+  <div class="row mb-5">
+    <div class="col-md-8 mb-4">
+      <div class="card shadow-lg border-0 h-100 chart-card">
+        <div class="card-header form-heading d-flex justify-content-between align-items-center">
+          <strong>Average Day Generation Hours by WTG</strong>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="genMenu" data-bs-toggle="dropdown">
+              ☰
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="genMenu">
+              <li><a class="dropdown-item" href="#" onclick="downloadChart('genChart','svg')">Download SVG</a></li>
+              <li><a class="dropdown-item" href="#" onclick="downloadChart('genChart','png')">Download PNG</a></li>
+              <li><a class="dropdown-item" href="#" onclick="downloadCSV(genData,'Generation_Hours.csv')">Download CSV</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="card-body">
+  <div class="chart-wrapper" style="position: relative; width: 100%; min-height: 250px; max-height: 600px; overflow: auto;">
+    <canvas id="genChart"></canvas>
+  </div>
+</div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card shadow-lg border-0 h-100">
+        <div class="card-header form-heading">
+          <strong>Generation Hours</strong>
+        </div>
+        <div class="card-body">
+          <table id="genTable" class="table   table-sm table-bordered table-striped text-center">
+            <thead class="table-light">
+              <tr><th>WTG No</th><th>Generation Hours</th></tr>
+            </thead>
+            <tbody id="genTableBody" ></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Section 2: Operating Hours ========== -->
+  <div class="row">
+    <div class="col-md-8 mb-4">
+      <div class="card shadow-lg border-0 h-100 chart-card">
+        <div class="card-header form-heading d-flex justify-content-between align-items-center">
+          <strong>Average Operating Hours by WTG</strong>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-light dropdown-toggle" type="button" id="opMenu" data-bs-toggle="dropdown">
+              ☰
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="opMenu">
+              <li><a class="dropdown-item" href="#" onclick="downloadChart('opChart','svg')">Download SVG</a></li>
+              <li><a class="dropdown-item" href="#" onclick="downloadChart('opChart','png')">Download PNG</a></li>
+              <li><a class="dropdown-item" href="#" onclick="downloadCSV(opData,'Operating_Hours.csv')">Download CSV</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="position: relative; width: 100%;  ">
+            <canvas id="opChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+      <div class="card shadow-lg border-0 h-100">
+        <div class="card-header form-heading">
+          <strong>Operating Hours (Table)</strong>
+        </div>
+        <div class="card-body">
+          <table id="opTable" class="table  table-sm table-bordered table-striped text-center">
+            <thead class="table-light">
+              <tr><th>WTG No</th><th>Operating Hours</th></tr>
+            </thead>
+            <tbody id="opTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+ 
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex gap-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for p in providers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}"
+             {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+          <label class="form-check-label">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label">{{ c }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in states %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in sites %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for w in wtgs %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}"
+              {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label">{{ w }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted">No WTG numbers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- Styles -->
+   {% include 'fotter.html' %}
+
+<style>
+  .chart-card { border-radius: 15px; }
+  .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px !important;
+    border-top-right-radius: 15px !important;
+    font-size: 18px;
+    font-weight: 500;
+    text-align: center !important;
+  }/* ✅ Align DataTables search + length inline */
+/* Compact DataTables */
+.table-sm th, 
+.table-sm td {
+  padding: 4px 6px !important;   /* reduce padding */
+  font-size: 12px !important;    /* smaller font */
+  vertical-align: middle !important;
+}
+
+/* Adjust DataTables controls */
+.dataTables_wrapper .dataTables_length select,
+.dataTables_wrapper .dataTables_filter input {
+  padding: 2px 6px;
+  font-size: 12px;
+  height: auto;
+}
+.dataTables_wrapper .dataTables_filter input {
+  width: 160px !important;   /* narrower search box */
+}
+.dataTables_wrapper .dataTables_length select {
+  width: auto !important;
+}
+
+/* Reduce spacing in table header */
+.table thead th {
+  padding: 6px !important;
+  font-size: 12px;
+}
+
+
+</style>
+
+<!-- Libraries -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+<script>
+  // Data from Django
+  const genData = {{ gen_chart_data|safe }};
+  const opData = {{ op_chart_data|safe }};
+  let genChart, opChart;
+
+  // ===============================
+  // Chart Builder
+  // ===============================
+  function buildChart(ctxId, label) {
+    const ctx = document.getElementById(ctxId).getContext("2d");
+    return new Chart(ctx, {
+      type: 'bar',
+      data: { labels: [], datasets: [{ label: label, data: [], backgroundColor: [] }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,   // ✅ allow dynamic height
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            anchor: 'end',
+            align: 'right',
+            formatter: v => v.toFixed(2),
+            color: '#000',
+            font: { weight: 'bold', size: 12 }
+          }
+        },
+        scales: {
+          x: { beginAtZero: true, max: 30, title: { display: true, text: 'Hours' } },
+          y: { title: { display: true, text: 'WTG' } }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+  }
+
+  // ===============================
+  // Update Chart from Table
+  // ===============================
+  function updateChartFromTable(table, chart) {
+    const labels = [], values = [], colors = [];
+    table.rows({ page: 'current' }).every(function () {
+      const data = this.data();
+      labels.push(data[0]);
+      values.push(parseFloat(data[1]));
+      colors.push(["#007bff","#28a745","#ffc107","#dc3545","#17a2b8","#6f42c1"][labels.length % 6]);
+    });
+
+   // ✅ Dynamic chart height logic
+const rowCount = labels.length;
+
+// Set per-bar height based on row count
+let perBarHeight;
+if (rowCount < 10) {
+    perBarHeight = 70;       // Less than 10 rows
+} else if (rowCount <15) {
+    perBarHeight = 40;        // 10–19 rows
+} else if (rowCount < 25) {
+    perBarHeight = 30;        // 20–29 rows
+} else {
+    perBarHeight = 20;        // 30 or more rows
+}
+
+// Calculate chart height
+const newHeight = Math.max(250, rowCount * perBarHeight);
+chart.canvas.parentNode.style.height = newHeight + "px";
+
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.data.datasets[0].backgroundColor = colors;
+    chart.update();
+  }
+
+  // ===============================
+  // Document Ready
+  // ===============================
+  $(document).ready(function () {
+    // Fill table bodies
+    genData.forEach(r => $("#genTableBody").append(`<tr><td>${r.wtg}</td><td>${r.hours.toFixed(2)}</td></tr>`));
+    opData.forEach(r => $("#opTableBody").append(`<tr><td>${r.wtg}</td><td>${r.hours.toFixed(2)}</td></tr>`));
+
+  // Function to build dynamic lengthMenu
+function getLengthMenu(totalRows) {
+  let menu = [5, 10];
+  if (totalRows > 10) menu.push(20);
+  if (totalRows > 20) menu.push(50);
+  if (totalRows > 50) menu.push(100);
+  return menu;
+}
+
+// ✅ Init DataTables with dynamic menu + clean UI
+const genTable = $('#genTable').DataTable({
+  pageLength: 10,
+  lengthMenu: getLengthMenu(genData.length),
+  language: { 
+    search: "",                             // remove "Search:" text
+    searchPlaceholder: "🔍 Search WTG...",  // placeholder only
+    lengthMenu: "_MENU_"                    // only dropdown, no label
+  }
+});
+
+const opTable = $('#opTable').DataTable({
+  pageLength: 10,
+  lengthMenu: getLengthMenu(opData.length),
+  language: { 
+    search: "",
+    searchPlaceholder: "🔍 Search WTG...",
+    lengthMenu: "_MENU_"
+  }
+});
+
+
+    // Init Charts
+    genChart = buildChart("genChart", "Day Generation Hours");
+    opChart = buildChart("opChart", "Operating Hours");
+
+    // First load
+    updateChartFromTable(genTable, genChart);
+    updateChartFromTable(opTable, opChart);
+
+    // On table redraw (pagination/filter/search)
+    genTable.on('draw', () => updateChartFromTable(genTable, genChart));
+    opTable.on('draw', () => updateChartFromTable(opTable, opChart));
+  });
+
+  // ===============================
+  // Download Functions
+  // ===============================
+  function downloadChart(chartId, type) {
+    const chartCanvas = document.getElementById(chartId);
+    if (type === "png") {
+      const link = document.createElement("a");
+      link.href = chartCanvas.toDataURL("image/png");
+      link.download = chartId + ".png";
+      link.click();
+    }
+    else if (type === "svg") {
+      const svgData = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="${chartCanvas.width}" height="${chartCanvas.height}">
+          <foreignObject width="100%" height="100%">
+            ${new XMLSerializer().serializeToString(chartCanvas)}
+          </foreignObject>
+        </svg>`;
+      const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = chartId + ".svg";
+      link.click();
+    }
+  }
+
+  function downloadCSV(data, filename) {
+    let csv = "WTG,Hours\n";
+    data.forEach(r => { csv += `${r.wtg},${r.hours}\n`; });
+    const blob = new Blob([csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+  }
+</script>
+
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends "basewind.html" %}
+{% load static %}
+
+{% block title %}Generation & Breakdown Upload{% endblock %}
+
+{% block style_css %}
+<style>
+  .form-wrapper {
+    background: #fff;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+  .form-heading {
+    background: linear-gradient(to right, #0c8599, #38a3a5);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .form-label { font-weight: 500; margin-top: 12px; }
+  .form-control { border-radius: 10px; padding: 10px 14px; }
+  .btn-custom { width: 160px; font-weight: 500; font-size: 16px; }
+  .action-buttons { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+</style>
+{% endblock style_css %}
+
+{% block content %}
+<div class="main" style="min-height: 85vh;">
+  <div class="container">
+    <div class="row justify-content-center mt-4">
+      <div class="col-md-8 mt-5">
+        <div class="form-wrapper">
+          <div class="form-heading">📊 Upload Generation & Breakdown Data</div>
+
+          <!-- ✅ Messages -->
+          {% if messages %}
+            <div class="mt-2 mb-3">
+              {% for message in messages %}
+                <div class="alert 
+                  {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %}
+                  alert-dismissible fade show" 
+                  style="white-space: pre-line; font-size: 15px;">
+                  {{ message|safe }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row">
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Select Provider</label>
+                <select class="form-control" id="providerSelect" name="provider_name" required>
+                  <option value="">-- Select --</option>
+                  {% for provider in providers %}
+                    <option value="{{ provider.name }}">{{ provider.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Select Energy Type</label>
+                <select class="form-control" id="energySelect" name="energy_type" required>
+                  <option value="">-- Select --</option>
+                  {% for energy in energy_types %}
+                    <option value="{{ energy.name }}">{{ energy.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-12 mb-3">
+                <label class="form-label">Auto-Matched Provider Table</label>
+                <select class="form-control" name="table_name" id="tableSelect" required>
+                  <option value="">-- Auto-Select Table --</option>
+                  {% for table in user_tables %}
+                    <option value="{{ table.name|lower }}">{{ table.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-12 mb-3">
+                <label class="form-label">Choose Excel File (multi-sheet)</label>
+                <input type="file" class="form-control" name="data_file" accept=".xls,.xlsx" required>
+              </div>
+            </div>
+
+            <div class="action-buttons">
+              <button type="submit" class="btn btn-success btn-custom">📤 Upload File</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function normalize(text) { return text.trim().toLowerCase(); }
+
+  function autoSelectTable() {
+    const username = "{{ request.user.username|lower }}";
+    const provider = normalize(document.getElementById("providerSelect").value);
+    const energy = normalize(document.getElementById("energySelect").value);
+    const targetTable = `${username}_${provider}_${energy}`;
+    const tableDropdown = document.getElementById("tableSelect");
+    for (let i = 0; i < tableDropdown.options.length; i++) {
+      const option = tableDropdown.options[i];
+      if (option.value.toLowerCase() === targetTable) {
+        tableDropdown.selectedIndex = i; return;
+      }
+    }
+    tableDropdown.selectedIndex = 0;
+  }
+
+  document.getElementById("providerSelect").addEventListener("change", autoSelectTable);
+  document.getElementById("energySelect").addEventListener("change", autoSelectTable);
+  setTimeout(() => {
+    document.querySelectorAll('.alert').forEach(a => {
+      const bsAlert = new bootstrap.Alert(a);
+      bsAlert.close();
+    });
+  }, 6000);
+</script>
+
+{% include 'fotter.html' %}
+{% endblock content %}

@@ -1,0 +1,620 @@
+{% extends "basewind.html" %}
+{% load static %}
+{% block content %}
+<div class="container my-4" style="margin-top: 80px !important;">
+<!-- FILTER BUTTONS + APPLIED FILTERS (NEW DESIGN) -->
+<div class="d-flex justify-content-between align-items-start w-100 mb-3  flex-wrap"  >
+
+    <!-- LEFT FILTER BUTTONS -->
+    <div class="d-flex flex-wrap gap-2">
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+            <i class="fa-solid fa-calendar-days text-primary"></i> Date
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#providerModal">
+            <i class="fa-solid fa-industry text-info"></i> OEM
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#customerModal">
+            <i class="fa-solid fa-user text-success"></i> Customer
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#stateModal">
+            <i class="fa-solid fa-map-location-dot text-warning"></i> State
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#siteModal">
+            <i class="fa-solid fa-map-pin text-danger"></i> Site
+        </button>
+
+        <button type="button" class="btn btn-light border rounded-pill px-3 py-1"
+                data-bs-toggle="modal" data-bs-target="#wtgModal">
+            <i class="fa-solid fa-bolt text-purple"></i> WTG
+        </button>
+
+    </div>
+
+    <!-- RIGHT SIDE: SMALL FILTER CHIPS -->
+    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
+    <div class="d-flex flex-wrap gap-1 justify-content-end" style="max-width: 50%;">
+
+        {% if date_from and date_to %}
+        <span class="badge rounded-pill bg-primary-subtle text-primary small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-calendar"></i> {{ date_from }} → {{ date_to }}
+        </span>
+        {% endif %}
+
+        {% for p in selected_providers %}
+        <span class="badge rounded-pill bg-info-subtle text-info small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-industry"></i> {{ p }}
+        </span>
+        {% endfor %}
+
+        {% for c in selected_customers %}
+        <span class="badge rounded-pill bg-success-subtle text-success small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-user"></i> {{ c }}
+        </span>
+        {% endfor %}
+
+        {% for s in selected_states %}
+        <span class="badge rounded-pill bg-warning-subtle text-warning small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-location-dot"></i> {{ s }}
+        </span>
+        {% endfor %}
+
+        {% for s in selected_sites %}
+        <span class="badge rounded-pill bg-danger-subtle text-danger small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-map-pin"></i> {{ s }}
+        </span>
+        {% endfor %}
+
+        {% for w in selected_wtgs %}
+        <span class="badge rounded-pill bg-purple-subtle text-purple small px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-bolt"></i> {{ w }}
+        </span>
+        {% endfor %}
+
+<a href="?clear_filters=1" class="badge rounded-pill bg-light border text-danger small px-3 py-2 shadow-sm">
+    Clear ✕
+</a>
+
+    </div>
+    {% endif %}
+
+</div>
+<style>
+    .text-purple { color: #7b2cbf !important; }
+    .bg-purple-subtle { background: #f3e8ff !important; }
+
+    .badge {
+        font-size: 12px !important;
+    }
+</style>
+    <div class="row">
+<!-- Filter Buttons -->
+ 
+
+    {% if no_data %}
+        <div class="alert alert-warning text-center fw-bold">{{ no_data_msg }}</div>
+    {% else %}
+        <!-- ===== Treemap Chart Card ===== -->
+       <!-- ===== Treemap Chart Card ===== -->
+<div class="card shadow-sm mb-3 col-md-12 col-12 col-lg-12">
+  <select id="yearSelector" class="form-select form-select-sm mt-2" style="width:100px;">
+    <option value="">All Years</option>
+  </select>
+  <div id="customLegend" style="text-align:center;"></div>
+
+<div id="lineChartApex"></div>
+ <p id="totalHours" style="font-weight:bold; z-index: 50000;" class="text-center"></p> 
+           <!-- ===== Table Card ===== -->
+      <!-- ===== Table Card ===== -->
+<div class="  mb-4 border-0 col-md-12 col-12 col-lg-12  ">
+    
+
+          <button id="toggleTableBtn" class="btn btn-sm btn-light" style="float: right !important;">
+    Show Table
+</button>
+ <div class="card-body p-2" id="tableCardBody" style="display: none;">
+       <strong class="text-center">
+                Generation Hours Table
+
+      </strong>
+        <!-- Search Box -->
+        <div class="d-flex justify-content-end mb-2">
+            <input type="text" id="tableSearch" class="form-control w-25" placeholder="Search WTG..." />
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered text-center align-middle mb-0">
+                <thead class="table-dark text-uppercase">
+                    <tr>
+                        <th scope="col">WTG No</th>
+                         <th scope="col">Year</th>
+                        <th scope="col">Hours</th>
+                    </tr>
+                </thead>
+                <tbody id="generationTableBody">
+                    {% regroup table_data by year as year_list %}
+                    {% for year_group in year_list %}
+                        <!-- Year Header Row -->
+                        <tr class="table-secondary fw-bold text-center year-row">
+                            <td colspan="3">Year: {{ year_group.grouper }}</td>
+                        </tr>
+
+                        <!-- All WTGs for this year -->
+                        {% for row in year_group.list %}
+                        <tr class="data-row">
+                            <td class="fw-bold text-primary">{{ row.wtg_no }}</td>
+                            <td>{{ row.year }}</td>
+                            <td class="text-success">{{ row.hours|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav aria-label="Table pagination" class="mt-3">
+            <ul class="pagination justify-content-center mb-0" id="tablePagination"></ul>
+        </nav>
+    </div>
+</div>
+</div>
+<!-- ===== Rotation CSS ===== -->
+    {% endif %}
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const toggleBtn = document.getElementById("toggleTableBtn");
+    const tableBody = document.getElementById("tableCardBody");
+
+    toggleBtn.addEventListener("click", function() {
+        if (tableBody.style.display === "none" || tableBody.style.display === "") {
+            tableBody.style.display = "block";
+            toggleBtn.textContent = "Hide Table";
+        } else {
+            tableBody.style.display = "none";
+            toggleBtn.textContent = "Show Table";
+        }
+    });
+
+    // Optional: Add search functionality
+    const searchInput = document.getElementById("tableSearch");
+    const tableRows = document.querySelectorAll("#generationTableBody tr.data-row");
+
+    searchInput.addEventListener("input", function() {
+        const searchTerm = this.value.toLowerCase();
+        tableRows.forEach(row => {
+            const wtg = row.cells[0].textContent.toLowerCase();
+            row.style.display = wtg.includes(searchTerm) ? "" : "none";
+        });
+    });
+});
+</script>
+
+<!-- ===== Modals ===== -->
+
+<!-- ========== Modals ========== --> 
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select Date Range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body d-flex gap-2">
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key not in "date_from,date_to" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Provider(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for p in providers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}"
+             {% if not selected_providers or p in selected_providers %}checked{% endif %}>
+          <label class="form-check-label">{{ p }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No providers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "provider" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+<!-- Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Customer(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for c in customers %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}"
+              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
+            <label class="form-check-label">{{ c }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No customers found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "customer" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- State Modal -->
+<div class="modal fade" id="stateModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select State(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in states %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}"
+              {% if not selected_states or s in selected_states %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No states found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "state" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Site Modal -->
+<div class="modal fade" id="siteModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Select Site(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        {% for s in sites %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}"
+              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
+            <label class="form-check-label">{{ s }}</label>
+          </div>
+        {% empty %}<p class="text-muted">No sites found.</p>{% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "site" %}
+          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer"><button type="submit" class="btn btn-primary">Apply</button></div>
+    </form>
+  </div>
+</div>
+
+
+<!-- WTG Modal -->
+<div class="modal fade" id="wtgModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="get" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Select WTG(s)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% for w in wtgs %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}"
+              {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
+            <label class="form-check-label">{{ w }}</label>
+          </div>
+        {% empty %}
+          <p class="text-muted">No WTG numbers found.</p>
+        {% endfor %}
+      </div>
+      {% for key,vals in request.GET.lists %}
+        {% if key != "wtg" %}
+          {% for v in vals %}
+            <input type="hidden" name="{{ key }}" value="{{ v }}">
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Apply</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  /* Hover highlight for rows */
+    .table-hover tbody tr:hover {
+        background-color: rgba(0, 123, 255, 0.1);
+        transition: background-color 0.3s ease;
+    }
+
+    /* Alternate row shading for better readability */
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+
+    /* Responsive font size for smaller screens */
+    @media (max-width: 768px) {
+        .table td, .table th {
+            font-size: 0.85rem;
+            padding: 0.5rem;
+        }
+    }
+    .rotate {
+        transform: rotate(90deg);
+        transition: transform 0.3s ease;
+    }
+    /* Table header text shadow for clarity */
+    .table-dark th {
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    /* Card header gradient and shadow effect */
+    .card-header {
+        border-radius: 0.25rem 0.25rem 0 0;
+        text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+    }.table-responsive {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    background: #343a40;
+    color: white;
+    z-index: 2;
+}
+
+</style>
+  {% include 'fotter.html' %}
+
+<script>
+    document.querySelectorAll(".year-header").forEach(header => {
+        header.addEventListener("click", function() {
+            const icon = this.querySelector("i.fas");
+            const targetId = this.getAttribute("data-bs-target");
+            const target = document.querySelector(targetId);
+
+            // Toggle icon rotation based on collapse state
+            if (target.classList.contains("show")) {
+                icon.classList.remove("rotate");
+            } else {
+                icon.classList.add("rotate");
+            }
+        });
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+const rawData = {{ chart_data|safe }};
+const years = [...new Set(rawData.map(d => d.year))].sort();
+
+// Color palette
+const palette = ["#007bff","#28a745","#ffc107","#dc3545","#17a2b8","#6f42c1","#fd7e14","#20c997"];
+const yearColors = {};
+years.forEach((y,i)=>yearColors[y]=palette[i % palette.length]);
+
+// Pagination setup
+const pageSize = 30;
+let currentPage = 0; // 0-based
+
+// Build Treemap data
+function buildTreemapSeries(filterYear=null){
+  const start = currentPage * pageSize;
+  const end = start + pageSize;
+  const visibleWTGs = [...new Set(rawData.map(d=>d.wtg))].sort().slice(start,end);
+
+  const treemapData = [];
+
+  rawData.forEach(d=>{
+    if(filterYear && d.year != filterYear) return;
+    if(!visibleWTGs.includes(d.wtg)) return;
+    treemapData.push({
+      x: `${d.wtg} (${d.year})`,
+      y: +d.hours || 0,
+      fillColor: yearColors[d.year]
+    });
+  });
+
+  return { series:[{ data:treemapData }], visibleWTGs };
+}
+
+// Update total hours
+function updateTotalHours(filterYear=null){
+  const filtered = filterYear ? rawData.filter(d=>d.year==filterYear) : rawData;
+  const total = filtered.reduce((sum,d)=> sum + Math.max(0, parseFloat(d.hours) || 0), 0);
+  const el = document.getElementById("totalHours");
+  if(!el) return;
+  if(filtered.length === 0){
+    el.textContent = "No data available";
+  } else {
+    const label = filterYear ? `(${filterYear})` : "(All Years)";
+    el.textContent = `Total Generation Hours ${label}: ${Math.round(total).toLocaleString()} hrs`;
+  }
+}
+
+// Render custom interactive legend
+function renderLegend(){
+  const legendContainer = document.getElementById("customLegend");
+  legendContainer.innerHTML = '';
+
+  years.forEach((y)=>{
+    const item = document.createElement("span");
+    item.classList.add("legend-item");
+    item.dataset.year = y;
+    item.style.cursor = "pointer";
+    item.style.marginRight = "15px";
+    item.innerHTML = `
+      <span style="display:inline-block;width:15px;height:15px;background:${yearColors[y]};margin-right:5px;border-radius:3px;"></span>
+      ${y}
+    `;
+    legendContainer.appendChild(item);
+
+    // Hover → dim others, highlight this year
+    item.addEventListener("mouseenter", ()=>{
+      document.querySelectorAll(".apexcharts-treemap-rect").forEach(rect=>{
+        const label = rect.getAttribute("data:treemapLabel") || "";
+        if(label.includes(y)) {
+          rect.style.opacity = "1";
+          rect.style.stroke = "#000";
+          rect.style.strokeWidth = "2px";
+        } else {
+          rect.style.opacity = "0.2";
+          rect.style.stroke = "none";
+        }
+      });
+    });
+
+    // Mouse leave → reset all
+    item.addEventListener("mouseleave", ()=>{
+      document.querySelectorAll(".apexcharts-treemap-rect").forEach(rect=>{
+        rect.style.opacity = "1";
+        rect.style.stroke = "none";
+      });
+    });
+
+    // Click → filter chart
+    item.addEventListener("click", ()=>{
+      document.getElementById("yearSelector").value = y;
+      renderTreemap(y);
+    });
+  });
+}
+
+// Populate year dropdown
+function populateYearDropdown(){
+  const yearSelector = document.getElementById("yearSelector");
+  yearSelector.innerHTML = '<option value="">All Years</option>';
+  years.forEach(y=>{
+    const opt = document.createElement("option");
+    opt.value = y;
+    opt.textContent = y;
+    yearSelector.appendChild(opt);
+  });
+}
+
+let chart = null;
+
+// Render Treemap with pagination
+function renderTreemap(filterYear=null){
+  const { series } = buildTreemapSeries(filterYear);
+
+  const options = {
+    chart: {
+      type: 'treemap',
+      height: 500,
+      toolbar: { show:true, tools:{ download:true } }
+    },
+    series: series,
+    legend: { show:false },
+    plotOptions: {
+      treemap: {
+        distributed: true,
+        enableShades: false,
+      }
+    },
+    dataLabels: {
+      enabled: true,
+      formatter: function(text, opt) {
+        return `${text}\n${opt.value} hrs`;
+      },
+      style: { fontSize: '12px', colors: ['#fff'] }
+    },
+    tooltip: {
+      y: { formatter: val => `${val} hrs` }
+    }
+  };
+
+  if(chart) chart.destroy();
+  chart = new ApexCharts(document.querySelector("#lineChartApex"), options);
+  chart.render().then(()=>{
+    renderLegend();
+    updateTotalHours(filterYear);
+    updatePaginationControls();
+  });
+}
+
+// Update pagination buttons
+function updatePaginationControls(){
+  const totalWTGs = [...new Set(rawData.map(d=>d.wtg))].length;
+  const totalPages = Math.ceil(totalWTGs / pageSize);
+  document.getElementById("pageInfo").textContent = `Page ${currentPage+1} of ${totalPages}`;
+  document.getElementById("prevPage").disabled = (currentPage === 0);
+  document.getElementById("nextPage").disabled = (currentPage >= totalPages-1);
+}
+
+// Initial render
+populateYearDropdown();
+renderTreemap();
+
+// Year dropdown change
+document.getElementById("yearSelector").addEventListener("change", function(){
+  const yr = this.value || null;
+  renderTreemap(yr);
+});
+
+// Pagination buttons
+document.getElementById("prevPage").addEventListener("click", ()=>{
+  if(currentPage > 0){
+    currentPage--;
+    renderTreemap(document.getElementById("yearSelector").value || null);
+  }
+});
+document.getElementById("nextPage").addEventListener("click", ()=>{
+  const totalWTGs = [...new Set(rawData.map(d=>d.wtg))].length;
+  const totalPages = Math.ceil(totalWTGs / pageSize);
+  if(currentPage < totalPages-1){
+    currentPage++;
+    renderTreemap(document.getElementById("yearSelector").value || null);
+  }
+});
+</script>
+
+
+
+
+{% endblock %}

@@ -1,0 +1,1054 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+  <link rel="icon" type="image/png" href="{% static 'images/TeimLogo.png' %}">
+
+  <!-- Bootstrap 4 CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+
+  <!-- AOS CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f8f9fa;
+    }
+
+    .header {
+      background-color: #ffffff;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 500;
+      border-bottom: 1px solid silver;
+    }
+
+    .sidebar {
+      background-color: #2c3e50;
+      color: white;
+      padding-top: 20px;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 260px;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 999;
+    }
+
+    .nav-link {
+       margin-bottom: 10px;
+      border-radius: 10px;
+      width: 230px;
+    }
+        .nav-link:hover {
+      color: blue !important;
+    }
+
+    .sidebar.active {
+      transform: translateX(0);
+    }
+
+    .sidebar .nav-link {
+      color: white;
+    }
+
+    .sidebar .nav-link:hover {
+      background-color: #1a252f;
+    }
+
+    .sidebar .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+       border: none;
+      color: rgb(255, 255, 255);
+      font-size: 24px;
+            background-color: #2c3e50;
+font-weight: bold;
+      cursor: pointer;
+    }
+
+    .footer{
+border-top: 1px solid silver;
+    }
+    body::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    body::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    body::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 10px;
+    }
+
+    body::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .modal-confirm i {
+      font-size: 50px;
+      color: #f0ad4e;
+    }
+
+    .modal-confirm h5 {
+      font-weight: 600;
+    }
+     :root {
+    --bg-color: #f8f9fa;
+    --text-color: #000;
+    --header-bg: #ffffff;
+    --sidebar-bg: #2c3e50;
+    --nav-hover: #1a252f;
+    --btn-color: #dc3545;
+  }
+
+  body.dark-mode {
+    --bg-color: #1e1e2f;
+    --text-color: #ffffff;
+    --header-bg: #2c2c3e;
+    --sidebar-bg: #1c1c2b;
+    --nav-hover: #34344e;
+    --btn-color: #ff4757;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .header {
+    background-color: var(--header-bg);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .sidebar {
+    background-color: var(--sidebar-bg);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .sidebar .nav-link:hover {
+    background-color: var(--nav-hover);
+  }
+
+  .btn-danger {
+    background-color: var(--btn-color);
+    border-color: var(--btn-color);
+    transition: all 0.3s ease-in-out;
+  }
+
+  .toggle-switch {
+    position: fixed;
+    top: -5px;
+    right: 15px;
+    z-index: 1000;
+  }
+
+  .toggle-switch input {
+    height: 0;
+    width: 0;
+    visibility: hidden;
+  }
+
+  .toggle-switch label {
+    cursor: pointer;
+    width: 60px;
+    height: 30px;
+    background: #ccc;
+    display: block;
+    border-radius: 100px;
+    position: relative;
+    transition: background 0.3s ease-in-out;
+  }
+
+  .toggle-switch label::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 26px;
+    height: 26px;
+    background: white;
+    border-radius: 90px;
+    transition: 0.3s;
+  }
+
+  .toggle-switch input:checked + label {
+    background: #4c4cff;
+  }
+
+  .toggle-switch input:checked + label::after {
+    left: calc(100% - 2px);
+    transform: translateX(-100%);
+  }
+  /* Default icon hover (light mode) */
+.theme-btn i {
+  color: #333;
+  transition: color 0.3s ease;
+}
+
+.theme-btn:hover i {
+  color: #000; /* Slightly darker on hover */
+}
+
+/* Dark mode icon hover */
+body.dark-mode .theme-btn i {
+  color: #f9e79f;
+}
+/* Dark mode global text color */
+body.dark-mode {
+  background-color: #121212; /* optional: dark background */
+  color: white !important;
+}
+
+body.dark-mode p,
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode h6,
+body.dark-mode span,
+body.dark-mode div,
+body.dark-mode a,
+body.dark-mode li,
+body.dark-mode label,
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
+body.dark-mode th,
+body.dark-mode td {
+  color: rgb(0, 0, 0) !important;
+}
+
+/* Optional: input/select placeholder color in dark mode */
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #cccccc !important;
+}
+
+body.dark-mode table{
+  color: white !important;
+
+}
+
+body.dark-mode .theme-btn:hover i {
+  color: #ffe066; /* Brighter yellow on hover */
+}
+
+/* Default: desktop view */
+.dashboard-option-header {
+  display: block;
+}
+
+.dashboard-option-header-mobile {
+  display: none;
+}
+
+/* On mobile (max-width: 768px) */
+@media (max-width: 768px) {
+  .dashboard-option-header {
+    display: none !important;
+  }
+
+  .dashboard-option-header-mobile {
+    display: block !important;
+    margin-top: 20px;
+  }
+}
+
+.energy-label {
+  display: inline-block;
+  cursor: pointer;
+  border-radius: 25px;
+  padding: 10px 18px;
+  font-weight: 500;
+  color: #007bff;
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  transition: 0.3s;
+  position: relative;
+  font-size: 15px;
+  
+}
+
+.energy-label i.fa-bolt {
+  margin-right: 8px;
+  color: #ff9900;
+}
+
+.check-icon {
+  display: none;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #28a745;
+  color: white;
+  border-radius: 50%;
+  padding: 3px;
+  font-size: 10px;
+}
+
+.energy-input:checked + .energy-label {
+  background-color: #007bff;
+  color: white;
+}
+
+.energy-input:checked + .energy-label .check-icon {
+  display: inline-block;
+}
+
+.energy-label.active {
+  background-color: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
+.energy-label.active .check-icon {
+  display: inline-block;
+}
+.shadow-3d {
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 4px 6px rgba(0, 0, 0, 0.15),
+    0 10px 20px rgba(0, 0, 0, 0.19);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border-radius: 12px;
+}
+
+.shadow-3d:hover {
+  transform: translateY(-5px);
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.18),
+    0 10px 20px rgba(0, 0, 0, 0.22),
+    0 20px 30px rgba(0, 0, 0, 0.25);
+}
+
+label {
+             color: #000000;
+}
+
+
+.sidebar {
+  overflow-y: auto;  /* Enable vertical scrolling */
+  max-height: 100vh; /* Optional: full viewport height */
+}
+
+/* Scrollbar track */
+.sidebar::-webkit-scrollbar {
+  width: 0px;
+}
+    .headingtext{
+        font-weight: 600;
+        color: #718096;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+        border-left: 4px solid #764ba2;
+        padding-left: 10px;
+    }
+/* Scrollbar handle */
+.sidebar::-webkit-scrollbar-thumb {
+  background: #6c5ce7;        /* Scroll thumb color */
+  border-radius: 0px;
+}
+
+/* Scrollbar track background */
+.sidebar::-webkit-scrollbar-track {
+  background: #f1f1f1;        /* Scroll track color */
+  border-radius: 0px;
+}
+
+/* Optional: on hover */
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: #4a38c4;
+}
+.nav-link.active {
+  background-color: #ffffff;
+  color: #007bff !important;
+  font-weight: bold;
+}
+
+body.dark-mode .nav-link.active {
+  background-color: #34344e;
+  color: #ffe066 !important;
+  font-weight: bold;
+}/* Fixed sidebar width on all screens */
+#mySidebar {
+  width: 300px !important;
+}
+
+/* Ensure all w3-bar-item have the same fixed width and wrap text */
+.w3-bar-item {
+  width: 100%;
+  max-width: 250px;
+  word-wrap: break-word;
+  white-space: normal;
+  box-sizing: border-box;
+ }
+
+/* Sidebar button style */
+.sidebar2 {
+  background-color: #343434;
+  padding: 10px;
+  border-radius: 10px;
+margin: 0 10px;
+  color: white;
+  text-decoration: none;
+   display: inline-block;
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+  box-shadow: 0px 0px 10px black;
+}
+
+/* Optional hover effect */
+.w3-bar-item:hover {
+  text-decoration: none;
+}
+   /* Make sidebar hidden by default on small screens */
+    @media (max-width: 991px) {
+      #mySidebar {
+        display: none;
+      }
+
+      #myOverlay {
+        display: none;
+      }
+
+      #openNav {
+        display: block;
+      
+      }
+    }
+
+    @media (min-width: 992px) {
+      #mySidebar {
+        display: block !important;
+      }
+
+      #openNav {
+        display: none;
+      }
+    }
+
+      .haddding {
+        font-weight: 600;
+        color: #718096;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 15px;
+        border-left: 4px solid #764ba2;
+        padding-left: 10px;
+    }
+
+
+    
+/* ================= AI CIRCLE ================= */
+.ai-circle{
+  width:70px;
+  height:70px;
+  background:radial-gradient(circle at top,#3b82f6,#0f172a);
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  cursor:pointer;
+  box-shadow:0 0 20px rgba(59,130,246,.6);
+}
+
+.ai-circle i{
+  font-size:28px;
+  color:#fff;
+  z-index:2;
+}
+
+/* Pulsing rings */
+.ai-ring{
+  position:absolute;
+  width:100%;
+  height:100%;
+  border-radius:50%;
+  border:2px solid rgba(59,130,246,.6);
+  animation:pulse 2.5s infinite;
+}
+
+.ai-ring.delay{
+  animation-delay:1.2s;
+}
+
+@keyframes pulse{
+  0%{transform:scale(1);opacity:1;}
+  100%{transform:scale(1.6);opacity:0;}
+}
+
+.ai-label{
+  font-size:12px;
+  color:#cbd5f5;
+  margin-top:6px;
+}
+
+/* ================= MODAL ================= */
+.ai-modal{
+  border-radius:16px;
+  background:linear-gradient(145deg,#020617,#0f172a);
+  color:#e5e7eb;
+  box-shadow:0 25px 60px rgba(0,0,0,.5);
+}
+
+.ai-modal .modal-title{
+  font-weight:600;
+}
+
+.ai-option{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:14px 16px;
+  margin-bottom:10px;
+  background:rgba(255,255,255,.05);
+  border-radius:12px;
+  text-decoration:none;
+  color:#e5e7eb;
+  transition:all .3s ease;
+}
+
+.ai-option i{
+  font-size:18px;
+  color:#38bdf8;
+}
+
+.ai-option:hover{
+  background:linear-gradient(90deg,#2563eb,#06b6d4);
+  color:#fff;
+  transform:translateX(6px);
+}
+ 
+
+  </style>
+</head>
+
+<body>
+
+  
+<div class="header d-flex justify-content-between align-items-center px-3" data-aos="fade-down">
+
+  {% if user.is_authenticated %}
+  <div class="d-flex align-items-center">
+    <button class="btn btn-light mr-3" onclick="openSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- ✅ Show Hello button only if NOT superuser -->
+    {% if not request.user.is_superuser %}
+<div class="dashboard-option-header">
+  <div class="d-flex gap-3 flex-wrap">
+
+  
+
+  <!-- <h5 class="mb-0 me-3 text-dark haddding">Hello, {{ request.user }}</h5> -->
+  <button class="w3-button w3-xlarge w3-hide-large" id="openNav" onclick="w3_open()">☰</button>
+  </div>
+</div>
+
+
+    {% endif %}
+  </div>
+
+  <h5 class="mb-0 me-3 text-dark haddding">Hello, {{ request.user }}</h5>
+  <!-- <button class="w3-button w3-xlarge w3-hide-large" id="openNav" onclick="w3_open()">☰</button> -->
+
+  <div class="dark-mode-toggle" data-aos="zoom-in">
+    <button id="themeToggleBtn" class="btn btn-light theme-btn" title="Toggle Dark Mode">
+      <i id="themeIcon" class="fas fa-moon"></i>
+    </button>
+  </div>
+
+  {% else %}
+  <!-- Guest View -->
+  <div class="container-fluid py-2 w-100">
+    <div class="d-flex justify-content-between align-items-center px-3">
+      <img src="{% static 'images/TeimLogo.png' %}" alt="TEIM Logo" height="50">
+      <img src="{% static 'images/crono.png' %}" alt="Intelimek Logo" height="50">
+
+      <div class="toggle-switch" data-aos="zoom-in">
+        <input type="checkbox" id="themeToggle">
+        <label for="themeToggle" title="Toggle Dark Mode"></label>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+
+<!-- Sidebar -->
+<div id="sidebar" class="sidebar" style="z-index: 1000; overflow: scroll;">
+  <button class="close-btn" onclick="closeSidebar()">X</button>
+  <center>
+    <div class="text-center mt-5 bg-white pt-1" style="border-radius: 10px; width:70%;">
+      <img src="{% static 'images/TeimLogo.png' %}" alt="TEIM Logo" class="img-fluid" style="height: 70px; width: 100px;" />
+    </div>
+  </center>
+
+  <!-- ✅ Show Hello button only if NOT superuser -->
+  {% if not request.user.is_superuser %}
+  <div class="dashboard-option-header-mobile ml-4">
+    <div class="d-flex gap-3 flex-wrap">
+      <!-- Solar -->
+      <div class="energy-toggle">
+        <input type="radio" name="energy_type" id="energy_btn1" class="energy-input d-none"
+          {% if request.path == '/solar/' %}checked{% endif %}>
+        <label for="energy_btn1"
+               class="energy-label {% if request.path == '/solar/' %}active{% endif %}"
+               onclick="window.location.href='{% url 'solar_dashboard' %}'">
+          <i class="fas fa-sun"></i> Solar
+          <span class="check-icon"><i class="fas fa-check"></i></span>
+        </label>
+      </div>
+
+      <!-- Wind -->
+      <div class="energy-toggle">
+        <input type="radio" name="energy_type" id="energy_btn2" class="energy-input d-none"
+          {% if request.path == '/' %}checked{% endif %}>
+        <label for="energy_btn2"
+               class="energy-label {% if request.path == '/' %}active{% endif %}"
+               onclick="window.location.href='{% url 'wind_dashboard' %}'">
+          <i class="fas fa-wind"></i> Wind
+          <span class="check-icon"><i class="fas fa-check"></i></span>
+        </label>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+ <ul class="nav flex-column mt-4 pl-3">
+
+    {% if request.user.is_superuser %}
+
+    <!-- Admin Header -->
+    <li class="nav-item mb-2">
+        <a class="nav-link bg-white text-dark text-center font-weight-bold" href="{% url 'tracking_dashboard' %}">
+            <i class="fas fa-user-shield"></i> Admin Dashboard
+        </a>
+    </li>
+
+    <!-- ===================== MASTER SETUP ===================== -->
+    <li class="nav-item">
+        <a class="nav-link" data-toggle="collapse" href="#mastersSubmenu" role="button">
+            <i class="fas fa-cogs"></i> Master Setup 
+            <i class="fas fa-caret-down float-right"></i>
+        </a>
+
+        <div class="collapse ml-3" id="mastersSubmenu">
+            <ul class="nav flex-column">
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'add_energy_type' %}">
+                        <i class="fas fa-bolt"></i> Energy Types
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'register_user' %}">
+                        <i class="fas fa-user-plus"></i> Create User
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'add_provider' %}">
+                        <i class="fas fa-database"></i> Customer Table Setup
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'upload_installation_summary' %}">
+                        <i class="fas fa-building"></i> Installation Summary Setup
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'add_pm_structure' %}">
+                        <i class="fas fa-tools"></i> PM Structure Setup
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'add_dsm_structure' %}">
+                        <i class="fas fa-balance-scale"></i>
+ DSM Structure Setup
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </li>
+
+
+    <!-- ===================== RECORDS ===================== -->
+    <li class="nav-item mt-2">
+        <a class="nav-link" data-toggle="collapse" href="#RecordsSubmenu" role="button">
+            <i class="fas fa-folder-open"></i> Records 
+            <i class="fas fa-caret-down float-right"></i>
+        </a>
+
+        <div class="collapse ml-3" id="RecordsSubmenu">
+            <ul class="nav flex-column">
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'user_list' %}">
+                        <i class="fas fa-users"></i> Manage Users
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'existing_providers' %}">
+                        <i class="fas fa-handshake"></i> Manage Providers
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'manage_preventive_maintenance' %}">
+                        <i class="fas fa-toolbox"></i> Preventive Maintenance
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'manage_installation_data' %}">
+                        <i class="fas fa-database"></i> Installation Records
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'client_info' %}">
+                        <i class="fas fa-id-card"></i> Client Information
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </li>
+
+
+    <!-- ===================== UPLOAD DATA ===================== -->
+    <li class="nav-item mt-2">
+        <a class="nav-link" data-toggle="collapse" href="#uploadSubmenu" role="button">
+            <i class="fas fa-upload"></i> Upload Data
+            <i class="fas fa-caret-down float-right"></i>
+        </a>
+
+        <div class="collapse ml-3" id="uploadSubmenu">
+            <ul class="nav flex-column">
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'upload_files' %}">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Generation & Breakdown
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'upload_preventive_maintenance' %}">
+                        <i class="fas fa-tools"></i> Upload PM Checkpoints
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'upload_dsm_data' %}">
+                        <i class="fas fa-wave-square"></i> Upload DSM Data
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'upload_installation_data' %}">
+                        <i class="fas fa-file-upload"></i> Upload Installation Summary
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </li>
+
+
+    <!-- Modify Data -->
+    <li class="nav-item mt-2">
+        <a class="nav-link" href="{% url 'modify_data' %}">
+            <i class="fas fa-edit"></i> Modify Records
+        </a>
+    </li>
+
+
+    {% else %}
+
+    <!-- ===================== CUSTOMER AREA ===================== -->
+    <li class="nav-item mb-2">
+        <a class="nav-link bg-white text-dark text-center font-weight-bold" href="{% url 'dashboard' %}">
+            <i class="fas fa-user"></i> Customer Dashboard
+        </a>
+    </li>
+ 
+
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'wind_dashboard' %}">
+            <i class="fas fa-chart-line"></i> Interactive Dashboard
+        </a>
+    </li>
+
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'user_generation_info' %}">
+            <i class="fas fa-id-card"></i> Profile Information
+        </a>
+    </li>
+
+
+    <!-- Upload / Modify Gen Data -->
+    <li class="nav-item mt-2">
+        <a class="nav-link" data-toggle="collapse" href="#customerGen" role="button">
+            <i class="fas fa-bolt"></i> Generation Data
+            <i class="fas fa-caret-down float-right"></i>
+        </a>
+
+        <div class="collapse ml-3" id="customerGen">
+            <ul class="nav flex-column">
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'customer_upload' %}">
+                        <i class="fas fa-upload"></i> Upload Data
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'Modifydata' %}">
+                        <i class="fas fa-edit"></i> Modify Data
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </li>
+
+
+    <!-- PM Data -->
+    <!-- <li class="nav-item mt-2">
+        <a class="nav-link" data-toggle="collapse" href="#pmCustomer" role="button">
+            <i class="fas fa-tools"></i> PM Data
+            <i class="fas fa-caret-down float-right"></i>
+        </a>
+
+        <div class="collapse ml-3" id="pmCustomer">
+            <ul class="nav flex-column">
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'my_preventive_maintenance' %}">
+                        <i class="fas fa-database"></i> Manage PM Records
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'my_preventive_maintenance' %}">
+                        <i class="fas fa-edit"></i> Modify Data
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </li> -->
+    <li class="nav-item">
+ <a class="nav-link" href="{% url 'my_preventive_maintenance' %}">
+                        <i class="fas fa-database"></i> Manage PM Records
+                    </a>
+    </li>
+
+
+        <li class="nav-item">
+ <a class="nav-link" href="{% url 'customer_upload_dsm' %}">
+                        <i class="fas fa-database"></i> Upload DSM Data
+                    </a>
+    </li>
+    {% endif %}
+
+    <!-- Logout -->
+    <li class="nav-item text-center mt-3">
+        <a href="#" class="btn btn-danger" data-toggle="modal" data-target="#logoutModal">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </li>
+
+</ul>
+
+</div>
+
+
+  <!-- Logout Modal -->
+  <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="logoutModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content text-center p-4 modal-confirm">
+        <div class="mb-3">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h5>Do you want to logout?</h5>
+        <div class="d-flex justify-content-center mt-4">
+          <a href="{% url 'logout' %}" class="btn btn-primary mr-2">Yes, Logout</a>
+          <button type="button" class="btn btn-danger" data-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+ <!-- AI ANALYSIS MODAL -->
+<div class="modal fade" id="aiAnalysisModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content ai-modal">
+
+      <div class="modal-header border-0">
+        <h5 class="modal-title">
+          🤖 AI Advanced Analysis
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <a href="{% url 'breakdown_analysis' %}" class="ai-option">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Breakdown Analysis
+        </a>
+
+        <a href="{% url 'user_pm_report_dashboard' %}" class="ai-option">
+          <i class="fa-solid fa-tools"></i>
+          Preventive Maintenance
+        </a>
+
+        <a href="{% url 'calculation_history' %}" class="ai-option">
+          <i class="fa-solid fa-calculator"></i>
+          Open Access Calculator
+        </a>
+
+        <a href="#" class="ai-option">
+          <i class="fas fa-balance-scale"></i>
+          DSM Charges
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+
+
+<!-- {% if not request.user.is_superuser %} -->
+  <!-- Sidebar -->
+  <!-- <nav class="w3-sidebar w3-bar-block w3-collapse" style="padding-top: 100px; z-index: 100;" id="mySidebar">
+    <button class="w3-bar-item w3-button w3-hide-large" onclick="w3_close()">Close ×</button>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+    <a href="#" class="w3-bar-item text-center"><span class="sidebar2">Homepage</span></a>
+  </nav> -->
+
+  <!-- Overlay for small screens -->
+  <!-- <div class="w3-overlay w3-hide-large" onclick="w3_close()" style="cursor:pointer" id="myOverlay"></div> -->
+<!-- {% endif %} -->
+
+ 
+
+<!-- JavaScript -->
+<script>
+  function w3_open() {
+    document.getElementById("mySidebar").style.display = "block";
+    document.getElementById("myOverlay").style.display = "block";
+  }
+
+  function w3_close() {
+    document.getElementById("mySidebar").style.display = "none";
+    document.getElementById("myOverlay").style.display = "none";
+  }
+</script>
+  <!-- Wind Section   End -->
+
+  <!-- Scripts -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+  <!-- AOS JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+  <script>
+    AOS.init();
+
+    function openSidebar() {
+      document.getElementById("sidebar").classList.add("active");
+    }
+
+    function closeSidebar() {
+      document.getElementById("sidebar").classList.remove("active");
+    }
+  </script>
+
+ <script>
+  AOS.init();
+
+  function openSidebar() {
+    document.getElementById("sidebar").classList.add("active");
+  }
+
+  function closeSidebar() {
+    document.getElementById("sidebar").classList.remove("active");
+  }
+
+  // Dark Mode Icon Toggle
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const themeIcon = document.getElementById('themeIcon');
+  const body = document.body;
+
+  function setTheme(theme) {
+    if (theme === 'dark') {
+      body.classList.add('dark-mode');
+      themeIcon.classList.remove('fa-moon');
+      themeIcon.classList.add('fa-sun');
+    } else {
+      body.classList.remove('dark-mode');
+      themeIcon.classList.remove('fa-sun');
+      themeIcon.classList.add('fa-moon');
+    }
+    localStorage.setItem('theme', theme);
+  }
+
+  themeToggleBtn.addEventListener('click', () => {
+    const isDark = body.classList.contains('dark-mode');
+    setTheme(isDark ? 'light' : 'dark');
+  });
+
+  // Load theme on page load
+  window.addEventListener('DOMContentLoaded', () => {
+    const storedTheme = localStorage.getItem('theme') || 'light';
+    setTheme(storedTheme);
+  });
+</script>
+
+</body>
+
+</html>

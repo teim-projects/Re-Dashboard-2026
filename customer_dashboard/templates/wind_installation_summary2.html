@@ -1,0 +1,195 @@
+{% extends "basewind.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container my-4">
+  <h3 class="text-center mb-4 fw-bold text-primary">⚡ Installation Summary 2</h3>
+  <hr class="mb-5">
+
+  <div class="row">
+    <!-- Chart 1 -->
+    <div class="col-md-6 mb-4">
+      <div class="card shadow-lg border-0 h-100 chart-card">
+        <div class="card-header form-heading">
+          <strong>WTG Loc No. Count By Power Sale</strong>
+        </div>
+        <div class="card-body">
+          <canvas id="powerSaleChart" style="height:250px; width:100%"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart 2 -->
+    <div class="col-md-6 mb-4">
+      <div class="card shadow-lg border-0 h-100 chart-card">
+        <div class="card-header form-heading">
+          <strong>Count of WTG Loc No. By Land</strong>
+        </div>
+        <div class="card-body">
+          <canvas id="landChart" style="height:250px; width:100%"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ Table 1: WTG Locations -->
+    <div class="col-md-6 mb-4">
+      <div class="card shadow-lg border-0 h-100">
+        <div class="card-header form-heading">
+          <strong>WTG Locations</strong>
+        </div>
+        <div class="card-body">
+          <table id="wtgTable" class="table table-bordered table-striped table-hover text-center">
+            <thead class="table-light">
+              <tr>
+                <th>WTG Loc No.</th>
+                <th>Avg. Estimate Generation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in wtg_locations %}
+              <tr>
+                <td>{{ row.0 }}</td>
+                <td>{{ row.1 }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="2">No Data Available</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ Table 2: OEM Wise -->
+    <div class="col-md-6 mb-4">
+      <div class="card shadow-lg border-0 h-100 ">
+        <div class="card-header  form-heading">
+          <strong>OEM WTG Wise Breakup</strong>
+        </div>
+        <div class="card-body">
+          <table id="oemTable" class="table table-bordered table-striped table-hover text-center">
+            <thead class="table-light">
+              <tr>
+                <th>Capacity (MW)</th>
+                <th>Firm</th>
+                <th>Make</th>
+                <th>WTG Loc. Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in oem_breakup %}
+              <tr>
+                <td>{{ row.0 }}</td>
+                <td>{{ row.1 }}</td>
+                <td>{{ row.2 }}</td>
+                <td>{{ row.3 }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="4">No Data Available</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% if no_data %}
+<script>
+    Swal.fire({
+        icon: 'info',
+        title: 'No Data Available',
+        text: '{{ no_data_msg }}',
+        confirmButtonColor: '#3085d6'
+    });
+</script>
+{% endif %}
+
+<!-- ✅ Styles -->
+<style>
+  .chart-card { border-radius: 15px; }
+  .bg-gradient-primary { background: linear-gradient(90deg, #007bff, #00c6ff); }
+  .bg-gradient-success { background: linear-gradient(90deg, #20c997, #28a745); }
+  .bg-gradient-info { background: linear-gradient(90deg, #17a2b8, #00cfd5); }
+  .bg-gradient-warning { background: linear-gradient(90deg, #ffc107, #ff8c00); }
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: 4px 10px;
+    margin: 2px;
+    border-radius: 6px;
+    background: #f8f9fa;
+  }
+  .dataTables_wrapper .dataTables_filter input {
+    border-radius: 8px;
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+  }
+
+    .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px !important;
+    border-top-right-radius: 15px !important;
+    font-size: 18px;
+    font-weight: 500;
+    text-align: center !important;
+  }
+</style>
+
+<!-- ✅ Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" />
+
+<script>
+  // Chart.js Config
+  const chartData = JSON.parse('{{ data|escapejs }}');
+  const commonOptions = {
+    plugins: {
+      legend: { position: "bottom", labels: { boxWidth: 15, padding: 15 } },
+      datalabels: {
+        color: "#fff",
+        font: { weight: "bold", size: 12 },
+        formatter: (value) => value
+      }
+    },
+    cutout: "65%",
+    responsive: true,
+    maintainAspectRatio: false
+  };
+
+  function createDoughnutChart(id, labels, counts, colors) {
+    new Chart(document.getElementById(id), {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: colors,
+          borderWidth: 2,
+          borderColor: "#fff"
+        }]
+      },
+      options: commonOptions,
+      plugins: [ChartDataLabels]
+    });
+  }
+
+  createDoughnutChart("powerSaleChart", chartData.power_sale_labels, chartData.power_sale_counts, ["#007bff", "#20c997", "#ffc107", "#dc3545"]);
+  createDoughnutChart("landChart", chartData.land_labels, chartData.land_counts, ["#6f42c1", "#17a2b8", "#28a745", "#fd7e14"]);
+
+  // DataTables Init
+  $(document).ready(function() {
+    $('#wtgTable').DataTable({
+      pageLength: 5,
+      lengthMenu: [5, 10, 25, 50],
+    });
+    $('#oemTable').DataTable({
+      pageLength: 5,
+      lengthMenu: [5, 10, 25, 50],
+    });
+  });
+</script>
+{% endblock %}

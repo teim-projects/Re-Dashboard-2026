@@ -1,0 +1,460 @@
+{% extends "basesolar.html" %}
+{% load static %}
+{% block content %}
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+.container-top { margin-top: 90px; }
+
+/* FILTER UI */
+  .filter-card {
+    background:#ffffff; padding:10px 14px; border-radius:10px;
+    box-shadow:0 6px 18px rgba(16,64,128,0.06);
+    width:140px !important;
+}
+.filter-label { font-size:12px; font-weight:600; color:#51627a; }
+.filter-control { width:100%; padding:8px; border-radius:8px; border:1px solid #cfe2f5; }
+
+/* KPI */
+.kpis { display:flex; gap:12px; margin-left:auto; }
+.kpi-card {
+    background:linear-gradient(180deg,#ffffff,#f3f8ff);
+    padding:12px; border-radius:12px;
+    width:150px; text-align:center;
+    box-shadow:0 6px 14px rgba(0,0,0,0.06);
+}
+.kpi-title { font-size:12px; color:#64748b; }
+.kpi-value { font-size:24px; font-weight:800; color:#0b3f78; }
+
+/* CHART AREA */
+.grid-cards {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-top:20px;
+}
+.card {
+    background:#fff; border-radius:14px; padding:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.08);
+}
+.chart-title { font-size:16px; font-weight:700; color:#223a5e; margin-bottom:10px; }
+
+/* NEW — Scrollable chart container */
+.chart-container {
+    height: 450px;
+    overflow-y: auto;
+    padding-right: 10px;
+    border-right: 2px solid #eee;
+}
+.chart-svg { width:100%; }
+
+.d3-tooltip {
+    position: fixed;          /* ⭐ important */
+    pointer-events: none;
+    background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    white-space: nowrap;
+    z-index: 9999;
+}
+
+
+.filter-kpi-grid {
+    margin-top: 80px;
+    display: grid;
+    grid-template-columns: repeat(4, 180px) repeat(2, 120px);
+    grid-gap: 14px 16px;
+    align-items: center;
+}
+
+
+.kpi-card-small {
+    background: #f8faff;
+    padding: 12px 0;
+    border-radius: 12px;
+    width: 160px !important;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(30, 60, 90, 0.10);
+}
+.kpi-title {
+    font-size: 12px;
+    color: #6d7c8b;
+}
+.kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #083d77;
+}
+
+ .card {
+    background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
+}
+.reset-btn {
+    transition: 0.3s;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.reset-btn.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+
+.reset-btn {
+    cursor: pointer;
+    font-weight: 700;
+    background: #ffeeee;
+    color: #d62828;
+    text-align: center;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.filter-kpi-row {
+    margin-top: 80px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: nowrap;          
+    align-items: center;
+    overflow-x: auto;            /* ⭐ enables smooth left-right scroll */
+    padding-bottom: 6px;
+}
+
+.filter-kpi-row::-webkit-scrollbar {
+    height: 3px;
+}
+.filter-kpi-row::-webkit-scrollbar-thumb {
+    background: #cfd8e3;
+    border-radius: 4px;
+}
+
+
+.kpi-animate {
+    animation: pop 0.4s ease-out;
+}
+
+@keyframes pop {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    60% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+
+</style>
+
+
+<div class="container-fluid container-top">
+
+    <!-- FILTERS + KPI ROW -->
+<div class="filter-kpi-row">
+
+    <div class="filter-card">
+        <div class="filter-label">Site</div>
+        <select id="site" class="filter-control"></select>
+    </div>
+
+    <div class="filter-card">
+        <div class="filter-label">Year</div>
+        <select id="year" class="filter-control"></select>
+    </div>
+
+    <div class="filter-card">
+        <div class="filter-label">Month</div>
+        <select id="month" class="filter-control">
+            <option value="">All</option>
+            …
+        </select>
+    </div>
+
+    <div class="filter-card">
+        <div class="filter-label">Day</div>
+        <input id="day" class="filter-control" type="number" placeholder="All">
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-card-small">
+        <div class="kpi-title">GF</div>
+        <div id="kpi-gf" class="kpi-value">0</div>
+    </div>
+
+    <div class="kpi-card-small">
+        <div class="kpi-title">FM</div>
+        <div id="kpi-fm" class="kpi-value">0</div>
+    </div>
+
+    <div class="kpi-card-small">
+        <div class="kpi-title">S</div>
+        <div id="kpi-s" class="kpi-value">0</div>
+    </div>
+
+    <div class="kpi-card-small">
+        <div class="kpi-title">U</div>
+        <div id="kpi-u" class="kpi-value">0</div>
+    </div>
+
+    <!-- Reset button -->
+    <div class="filter-card reset-btn" id="btn-reset">Reset</div>
+
+</div>
+
+
+
+
+
+    <!-- CHART GRID -->
+    <div class="grid-cards mb-5">
+
+        <div class="card">
+            <div class="chart-title">Generation Hours by Weather Condition</div>
+            <div id="weather-chart" class="chart-container"></div>
+        </div>
+
+        <div class="card">
+            <div class="chart-title">Frequently Occurring Breakdowns</div>
+            <div id="breakdown-chart" class="chart-container"></div>
+        </div>
+
+    </div>
+
+</div>
+
+<div id="tooltip" class="d3-tooltip"></div>
+
+
+<script>
+const API = "{% url 'api_weather_breakdown' %}";
+const tooltip = d3.select("#tooltip");
+
+// cache elements
+const siteEl  = document.getElementById("site");
+const yearEl  = document.getElementById("year");
+const monthEl = document.getElementById("month");
+const dayEl   = document.getElementById("day");
+const resetBtn = document.getElementById("btn-reset");
+
+/* ---------------------------
+   LOAD PAGE DATA
+--------------------------- */
+async function loadPage() {
+    const params = new URLSearchParams();
+
+    ["site","year","month","day"].forEach(id => {
+        const v = document.getElementById(id).value;
+        if (v) params.append(id, v);
+    });
+
+    const res = await fetch(API + "?" + params.toString());
+    const data = await res.json();
+
+    setFilterOptions(data);
+
+    drawWeatherChart(data.weather_data);
+    drawBreakdownChart(data.breakdown_data);
+
+    // ✅ Update KPIs
+    if (data.kpis) {
+        document.getElementById("kpi-gf").innerText = data.kpis.gf || 0;
+        document.getElementById("kpi-fm").innerText = data.kpis.fm || 0;
+        document.getElementById("kpi-s").innerText  = data.kpis.s  || 0;
+        document.getElementById("kpi-u").innerText  = data.kpis.u  || 0;
+
+        ["kpi-gf","kpi-fm","kpi-s","kpi-u"].forEach(animateKPI);
+    }
+
+    checkResetVisibility();
+}
+
+function animateKPI(id) {
+    const el = document.getElementById(id);
+    el.classList.add("kpi-animate");
+    setTimeout(() => el.classList.remove("kpi-animate"), 400);
+}
+
+function checkResetVisibility() {
+    if (siteEl.value || yearEl.value || monthEl.value || dayEl.value) {
+        resetBtn.classList.add("active");
+    } else {
+        resetBtn.classList.remove("active");
+    }
+}
+
+/* ---------------------------
+   FILL FILTER DROPDOWNS
+--------------------------- */
+function setFilterOptions(data){
+    const prevSite  = siteEl.value;
+    const prevYear  = yearEl.value;
+    const prevMonth = monthEl.value;
+
+    siteEl.innerHTML = "<option value=''>All Sites</option>";
+    data.sites.forEach(s => {
+        siteEl.innerHTML += `<option value="${s}">${s}</option>`;
+    });
+
+    yearEl.innerHTML = "<option value=''>All Years</option>";
+    data.years.forEach(y => {
+        yearEl.innerHTML += `<option value="${y}">${y}</option>`;
+    });
+
+    monthEl.innerHTML = "<option value=''>All</option>";
+    if (data.months) {
+        data.months.forEach(m => {
+            monthEl.innerHTML += `<option value="${m}">${m}</option>`;
+        });
+    }
+
+    siteEl.value  = prevSite;
+    yearEl.value  = prevYear;
+    monthEl.value = prevMonth;
+}
+
+/* ---------------------------
+   WEATHER CHART
+--------------------------- */
+function drawWeatherChart(data){
+    const container = d3.select("#weather-chart");
+    container.selectAll("*").remove();
+    if (!data || !data.length) return;
+
+    const width = container.node().clientWidth;
+    const height = data.length * 30 + 50;
+    const margin = {top:20, right:20, bottom:40, left:200};
+
+    const svg = container.append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .classed("chart-svg", true);
+
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const sorted = [...data].sort((a,b) => b.value - a.value);
+
+    const y = d3.scaleBand()
+        .domain(sorted.map(d => d.label))
+        .range([0, height - margin.bottom])
+        .padding(0.15);
+
+    const x = d3.scaleLinear()
+        .domain([0, d3.max(sorted, d => d.value)])
+        .range([0, width - margin.left - margin.right]);
+
+    g.append("g").call(d3.axisLeft(y));
+
+    g.append("g")
+        .attr("transform", `translate(0,${height-margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(5));
+
+    g.selectAll("rect")
+        .data(sorted)
+        .enter()
+        .append("rect")
+        .attr("y", d => y(d.label))
+        .attr("height", y.bandwidth())
+        .attr("width", d => x(d.value))
+        .attr("fill", "#1f6fb6")
+        .attr("rx", 6)
+.on("mousemove", (ev,d)=>{
+    const val = Number(d.value).toFixed(2);
+    tooltip
+        .style("opacity",1)
+        .style("left",(ev.clientX + 15) + "px")
+        .style("top",(ev.clientY + 15) + "px")
+        .html(`<div>${d.label}</div><div>${val} hrs</div>`);
+})
+.on("mouseleave",()=>tooltip.style("opacity",0));
+
+}
+
+/* ---------------------------
+   BREAKDOWN CHART
+--------------------------- */
+function drawBreakdownChart(data){
+    const container = d3.select("#breakdown-chart");
+    container.selectAll("*").remove();
+    if (!data || !data.length) return;
+
+    const width = container.node().clientWidth;
+    const height = data.length * 30 + 50;
+    const margin = {top:20, right:20, bottom:40, left:300};
+
+    const svg = container.append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .classed("chart-svg", true);
+
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const sorted = [...data].sort((a,b)=>b.count - a.count);
+
+    const y = d3.scaleBand()
+        .domain(sorted.map(d => d.label))
+        .range([0, height - margin.bottom])
+        .padding(0.15);
+
+    const x = d3.scaleLinear()
+        .domain([0, d3.max(sorted, d => d.count)])
+        .range([0, width - margin.left - margin.right]);
+
+    g.append("g").call(
+        d3.axisLeft(y).tickFormat(d => d.length > 45 ? d.slice(0,45)+"..." : d)
+    );
+
+    g.append("g")
+        .attr("transform", `translate(0,${height-margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(5));
+
+    g.selectAll("rect")
+        .data(sorted)
+        .enter()
+        .append("rect")
+        .attr("y", d => y(d.label))
+        .attr("height", y.bandwidth())
+        .attr("width", d => x(d.count))
+        .attr("fill", "#003366")
+        .attr("rx", 6)
+.on("mousemove", (ev,d)=>{
+    tooltip
+        .style("opacity",1)
+        .style("left",(ev.clientX + 15) + "px")
+        .style("top",(ev.clientY + 15) + "px")
+        .html(`<div>${d.label}</div><div>${d.count} times</div>`);
+})
+.on("mouseleave",()=>tooltip.style("opacity",0));
+
+}
+
+/* ---------------------------
+   EVENTS
+--------------------------- */
+["site","year","month","day"].forEach(id=>{
+    document.getElementById(id).addEventListener("change", loadPage);
+});
+
+resetBtn.addEventListener("click", ()=>{
+    ["site","year","month","day"].forEach(id=>{
+        document.getElementById(id).value = "";
+    });
+    loadPage();
+});
+
+window.addEventListener("resize", ()=>{
+    clearTimeout(window._rs);
+    window._rs = setTimeout(loadPage,200);
+});
+
+// initial load
+loadPage();
+</script>
+
+
+{% endblock %}

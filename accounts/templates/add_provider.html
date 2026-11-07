@@ -1,0 +1,439 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Add Provider{% endblock %}
+
+{% block style_css %}
+<style>
+  .form-wrapper {
+    background: #fff;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .form-heading {
+    background: linear-gradient(to right, #7b2cbf, #9d4edd);
+    color: #fff;
+    padding: 15px 25px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .form-label {
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  .form-control {
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+
+  .btn-custom {
+    width: 180px;
+    font-weight: 500;
+    font-size: 16px;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+  }
+
+  .mapping-sheet {
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 18px;
+    margin: 18px 0;
+    background: #fff;
+  }
+
+  .mapping-columns {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(220px, 1.4fr) minmax(180px, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+
+  .mapping-column-title {
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #343a40;
+  }
+
+  .canonical-label,
+  .mapping-target,
+  .discard-zone {
+    box-sizing: border-box;
+    margin-bottom: 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+  }
+
+  .canonical-label {
+    height: 46px;
+    padding: 9px;
+    background: #f8f9fa;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+
+  .mapping-target {
+    height: 46px;
+    min-height: 46px;
+    padding: 4px 8px;
+    border-style: dashed;
+    background: #fbfcff;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
+
+  .mapping-target.drop-active,
+  .discard-zone.drop-active {
+    border-color: #0d6efd;
+    background: #eef5ff;
+  }
+
+  .discard-zone {
+    min-height: 330px;
+    padding: 7px;
+    background: #fff8f1;
+    border-color: #f0c99f;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .column-tile {
+    display: inline-block;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 7px 10px;
+    border-radius: 18px;
+    background: #e7f1ff;
+    border: 1px solid #b6d4fe;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .discard-zone .column-tile {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .column-tile:active {
+    cursor: grabbing;
+  }
+
+  .mapping-help {
+    color: #6c757d;
+    font-size: 0.9rem;
+  }
+
+  .mapping-target .mapping-help {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 576px) {
+    .form-heading {
+      font-size: 18px;
+    }
+
+    .btn-custom {
+      width: 100%;
+      font-size: 14px;
+    }
+
+    .form-control {
+      font-size: 14px;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .mapping-columns {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .discard-zone {
+      min-height: 120px;
+    }
+  }
+</style>
+{% endblock style_css %}
+
+{% block content %}
+<div class="container mt-4" style="min-height: 100vh;">
+  <div class="row justify-content-center">
+    <div class="col-md-10 mt-5">
+      <div class="form-wrapper">
+        <div class="form-heading">🔧 Add New Provider & Upload Table Structure</div>
+
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+
+        {% if breakdown_wizard %}
+        <form method="POST" id="mappingWizard">
+          {% csrf_token %}
+          <h4>Review breakdown column mapping</h4>
+          <p class="mapping-help">
+            Drag each source column to its canonical field. Leave unused columns in the discarded area.
+            Event date, Machine / asset ID, and Breakdown remarks are required. You can combine multiple
+            source columns for Machine / asset ID or Breakdown remarks; multiple values are joined with an underscore.
+          </p>
+          {% for sheet in breakdown_sheets %}
+          <section class="mapping-sheet" data-sheet-index="{{ sheet.index }}">
+            <h5 class="mb-3">Sheet: {{ sheet.name }}</h5>
+            <div class="mapping-columns">
+              <div>
+                <div class="mapping-column-title">Canonical schema</div>
+                {% for field in canonical_fields %}
+                  {% if not field.system and not field.internal %}
+                  <div class="canonical-label" data-canonical-label="{{ field.name }}">{{ field.label }}</div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              <div>
+                <div class="mapping-column-title">Mapped file columns</div>
+                {% for field in canonical_fields %}
+                  {% if not field.system and not field.internal %}
+                  <div class="mapping-target"
+                       data-canonical-target="{{ field.name }}"
+                       {% if field.name in multi_source_fields %}data-allow-multiple="true"{% endif %}>
+                    <span class="mapping-help">
+                      {% if field.name in multi_source_fields %}Drop source columns here (multiple allowed){% else %}Drop {{ field.label }} column here{% endif %}
+                    </span>
+                  </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+              <div>
+                <div class="mapping-column-title">Discarded file columns</div>
+                <div class="discard-zone" data-discard-zone>
+                  {% for header in sheet.headers %}
+                  <div class="column-tile"
+                       draggable="true"
+                       data-source-header="{{ header.name }}"
+                       data-source-index="{{ header.index }}"
+                       data-initial-mapping="{{ header.mapped_to }}">
+                    {{ header.name }}
+                    <input type="hidden"
+                           name="map_{{ sheet.index }}_{{ header.index }}"
+                           value="{{ header.mapped_to }}">
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </section>
+          {% endfor %}
+          <div class="action-buttons">
+            <button type="submit" name="action" value="confirm_structure" class="btn btn-success btn-custom">Confirm mapping</button>
+            <button type="submit" name="action" value="cancel_structure" class="btn btn-outline-secondary">Cancel</button>
+          </div>
+        </form>
+        {% else %}
+        <form method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="row">
+
+
+
+            <div class="col-md-6 mb-3">
+  <label class="form-label">Select User</label>
+  <select name="selected_user" class="form-control" required>
+    <option value="" disabled selected>-- Select User --</option>
+    {% for user in users %}
+      <option value="{{ user.username }}">{{ user.username }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+
+
+
+
+
+           <div class="col-md-6 mb-3">
+  <label class="form-label">Provider Name</label>
+
+  <select class="form-control mb-2" id="providerDropdown">
+    <option value="">-- Select Existing Provider --</option>
+    {% for provider in providers %}
+      <option value="{{ provider.name }}">{{ provider.name|title }}</option>
+    {% endfor %}
+  </select>
+
+  <input type="text" name="provider_name" id="providerInput" class="form-control" placeholder="Or enter new provider name" required>
+  <small class="text-muted">Selecting a provider will auto-fill the input. You can also type manually.</small>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const dropdown = document.getElementById("providerDropdown");
+    const input = document.getElementById("providerInput");
+
+    dropdown.addEventListener("change", function () {
+      input.value = this.value;
+    });
+  });
+</script>
+
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Select Energy Type</label>
+              <select name="energy_type" class="form-control" required>
+                <option value="" disabled selected>-- Select --</option>
+                {% for energy in energy_types %}
+                  <option value="{{ energy.id }}">{{ energy.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Upload Table Structure (CSV or Excel)</label>
+<input type="file" name="structure_file" class="form-control" accept=".csv,.xls,.xlsx,.xlsm,.ods,.odt" required>
+              <small class="text-muted">Only header row needed. File won't be saved.</small>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button type="submit" name="action" value="preview_structure" class="btn btn-success btn-custom">➕ Review & Create Provider</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+
+ 
+ 
+
+    </div>
+  </div>
+</div>
+
+  {% include 'fotter.html' %}
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const dropdown = document.getElementById("providerDropdown");
+    const input = document.getElementById("providerInput");
+
+    if (dropdown && input) {
+      dropdown.addEventListener("change", function () {
+        input.value = this.value;
+      });
+
+      const providerForm = document.querySelector("form");
+      providerForm.addEventListener("submit", function (e) {
+        if (!dropdown.value && !input.value.trim()) {
+          e.preventDefault();
+          alert("Please select or enter a provider name.");
+        }
+      });
+    }
+
+    const wizard = document.getElementById("mappingWizard");
+    if (!wizard) return;
+
+    let draggedTile = null;
+    const showTargetPlaceholder = target => {
+      if (target.querySelector(".column-tile")) return;
+      const field = target.dataset.canonicalTarget;
+      const label = target.closest(".mapping-sheet")
+        .querySelector(`[data-canonical-label="${field}"]`).textContent.trim();
+      const placeholder = document.createElement("span");
+      placeholder.className = "mapping-help";
+      placeholder.textContent = target.dataset.allowMultiple
+        ? "Drop source columns here (multiple allowed)"
+        : `Drop ${label} column here`;
+      target.appendChild(placeholder);
+    };
+
+    const updateTarget = (target, tile) => {
+      const existing = [...target.querySelectorAll(".column-tile")]
+        .filter(existingTile => existingTile !== tile);
+      if (existing.length && target.dataset.allowMultiple !== "true") return false;
+      target.querySelector(".mapping-help")?.remove();
+      target.appendChild(tile);
+      tile.querySelector("input").value = target.dataset.canonicalTarget;
+      return true;
+    };
+
+    wizard.querySelectorAll(".column-tile").forEach(tile => {
+      const initialMapping = tile.dataset.initialMapping;
+      if (initialMapping) {
+        const target = tile.closest(".mapping-sheet")
+          .querySelector(`[data-canonical-target="${initialMapping}"]`);
+        if (target) updateTarget(target, tile);
+      }
+
+      tile.addEventListener("dragstart", event => {
+        draggedTile = tile;
+        event.dataTransfer.setData("text/plain", tile.dataset.sourceIndex);
+      });
+    });
+
+    wizard.querySelectorAll("[data-canonical-target], [data-discard-zone]").forEach(zone => {
+      zone.addEventListener("dragover", event => {
+        event.preventDefault();
+        zone.classList.add("drop-active");
+      });
+      zone.addEventListener("dragleave", () => zone.classList.remove("drop-active"));
+      zone.addEventListener("drop", event => {
+        event.preventDefault();
+        zone.classList.remove("drop-active");
+        if (!draggedTile || draggedTile.closest(".mapping-sheet") !== zone.closest(".mapping-sheet")) return;
+        const sourceTarget = draggedTile.closest("[data-canonical-target]");
+        if (zone.hasAttribute("data-discard-zone")) {
+          zone.appendChild(draggedTile);
+          draggedTile.querySelector("input").value = "";
+          if (sourceTarget) showTargetPlaceholder(sourceTarget);
+        } else if (!updateTarget(zone, draggedTile)) {
+          alert("That field accepts one source column. Move its current tile to Discarded first.");
+        } else if (sourceTarget && sourceTarget !== zone) {
+          showTargetPlaceholder(sourceTarget);
+        }
+        draggedTile = null;
+      });
+    });
+
+    wizard.addEventListener("submit", event => {
+      const submitter = event.submitter;
+      if (submitter && submitter.value === "cancel_structure") return;
+      const requiredFields = ["gen_date", "loc_no", "breakdown_remarks"];
+      for (const sheet of wizard.querySelectorAll(".mapping-sheet")) {
+        for (const field of requiredFields) {
+          const target = sheet.querySelector(`[data-canonical-target="${field}"]`);
+          if (!target.querySelector(".column-tile")) {
+            event.preventDefault();
+            alert(`Map a file column to ${field} before confirming.`);
+            return;
+          }
+        }
+      }
+    });
+  });
+</script>
+
+{% endblock %}

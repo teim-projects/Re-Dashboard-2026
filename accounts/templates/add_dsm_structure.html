@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<style>
+  .fade-in { animation: fadeIn 0.6s ease-in-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+  .card { border-radius: 1rem; transition: all 0.3s ease-in-out; }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
+
+  .drop-zone {
+    border: 1px dashed #adb5bd;
+    border-radius: 12px;
+    background-color: #f8f9fa;
+    text-align: center;
+    padding: 40px 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .drop-zone:hover { border-color: #0d6efd; background-color: #eef5ff; }
+  .drop-zone.dragover { background-color: #e9f3ff; border-color: #0d6efd; }
+</style>
+
+<div class="container fade-in" style="margin-top: 70px;">
+
+  <!-- Show Django Messages -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+ 
+  <div class="main" style="min-height: 68vh;">
+    
+    <!-- ==================== FORM 1: ADD COLUMN ==================== -->
+    <!-- <div class="card shadow-sm my-4 fade-in">
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="add_column" value="1" />
+
+          <h5 class="fw-bold text-secondary mb-3">➕ Add DSM Column Manually</h5>
+
+          <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+              <label class="form-label">Column Name</label>
+              <input type="text" name="column_name" class="form-control" placeholder="e.g. meter_reading" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Data Type</label>
+              <select name="column_type" class="form-select">
+                <option value="TEXT">TEXT</option>
+                <option value="INT">INT</option>
+                <option value="FLOAT">FLOAT</option>
+                <option value="DATE">DATE</option>
+              </select>
+            </div>
+
+            <div class="col-md-2 text-end">
+              <button type="submit" class="btn btn-outline-success w-100">Add</button>
+            </div>
+          </div>
+
+          <div class="form-text mt-2">Add one column at a time — DSM table stays safe (no delete).</div>
+        </form>
+      </div>
+    </div> -->
+
+    <!-- <div class="text-center fw-bold text-muted">OR</div> -->
+
+    <!-- ==================== FORM 2: UPLOAD STRUCTURE FILE ==================== -->
+    <div class="card shadow-sm my-4 fade-in">
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+
+          <label class="form-label fw-semibold mb-2">📁 Upload DSM Structure File (CSV / XLS / XLSX / ODS)</label>
+
+          <div id="dropZone" class="drop-zone mb-3">
+            <i class="bi bi-cloud-arrow-up fs-1 text-primary"></i>
+            <p class="fw-semibold mt-2">Drag & Drop file here</p>
+            <p class="small text-secondary">or</p>
+            <button type="button" id="browseBtn" class="btn btn-outline-primary btn-sm">Browse</button>
+
+            <input type="file" id="fileInput" name="structure_file" hidden required>
+            <p id="fileName" class="small text-info mt-2"></p>
+          </div>
+
+          <div class="text-end">
+            <button type="submit" class="btn btn-primary px-4">🚀 Create / Replace DSM Structure</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ==================== FORM 3: DELETE DSM TABLE ==================== -->
+    <div class="card shadow-sm my-4 fade-in border-danger">
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="delete_dsm_table" value="1">
+
+          <h5 class="fw-bold text-danger">🗑️ Delete DSM Table</h5>
+          <p class="small text-muted mb-3">This will remove the entire DSM table and all stored data.</p>
+
+          <button class="btn btn-outline-danger">Delete DSM Table</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ==================== DRAG & DROP SCRIPT ==================== -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+  const dropZone = document.getElementById("dropZone");
+  const fileInput = document.getElementById("fileInput");
+  const browseBtn = document.getElementById("browseBtn");
+  const fileName = document.getElementById("fileName");
+
+  browseBtn.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("click", () => fileInput.click());
+
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      fileInput.files = e.dataTransfer.files;
+      fileName.textContent = `📄 Selected: ${file.name}`;
+    }
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length > 0) {
+      fileName.textContent = `📄 Selected: ${fileInput.files[0].name}`;
+    }
+  });
+
+});
+</script>
+
+{% endblock %}
