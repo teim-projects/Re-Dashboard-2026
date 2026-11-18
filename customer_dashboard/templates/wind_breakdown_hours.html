@@ -146,41 +146,15 @@
       <p class="text-muted small m-0 mt-1">WTG downtime hours ranking, incident trip frequencies &amp; root cause distribution</p>
     </div>
 
-    <!-- Filter Buttons -->
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-      <button type="button" class="btn btn-sm btn-white border shadow-sm px-3 py-1 rounded-pill" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
-        <i class="fas fa-calendar-alt text-primary me-1"></i> Date Range
-      </button>
-      <button type="button" class="btn btn-sm btn-white border shadow-sm px-3 py-1 rounded-pill" data-bs-toggle="modal" data-bs-target="#providerModal">
-        <i class="fas fa-industry text-info me-1"></i> OEM Provider
-      </button>
-      <button type="button" class="btn btn-sm btn-white border shadow-sm px-3 py-1 rounded-pill" data-bs-toggle="modal" data-bs-target="#wtgModal">
-        <i class="fas fa-fan text-success me-1"></i> WTG Select
-      </button>
+    <div>
       <a href="{% url 'breakdown_analysis' %}" class="btn btn-sm btn-outline-primary px-3 py-1 rounded-pill">
         <i class="fas fa-chart-pie me-1"></i> Full Pareto Analysis
-      </a>
-      <a href="?clear_filters=1" class="btn btn-sm btn-outline-danger px-3 py-1 rounded-pill">
-        <i class="fas fa-sync-alt me-1"></i> Reset
       </a>
     </div>
   </div>
 
-  <!-- ACTIVE FILTERS BAR -->
-  {% if date_from or date_to or selected_providers or selected_wtgs %}
-  <div class="d-flex flex-wrap gap-2 mb-4 align-items-center bg-white p-2 px-3 rounded-3 border">
-    <span class="text-muted small fw-semibold"><i class="fas fa-filter text-primary me-1"></i> Active Filters:</span>
-    {% if date_from and date_to %}
-      <span class="filter-chip"><i class="far fa-calendar"></i> {{ date_from }} to {{ date_to }}</span>
-    {% endif %}
-    {% for p in selected_providers %}
-      <span class="filter-chip"><i class="fas fa-industry"></i> OEM: {{ p }}</span>
-    {% endfor %}
-    {% for w in selected_wtgs %}
-      <span class="filter-chip"><i class="fas fa-fan"></i> WTG: {{ w }}</span>
-    {% endfor %}
-  </div>
-  {% endif %}
+  <!-- UNIFIED 6-PILL FILTER BAR -->
+  {% include "includes/wind_filter_bar.html" %}
 
   <!-- KPI SUMMARY CARDS -->
   <div class="row g-3 mb-4">
@@ -274,7 +248,7 @@
       </div>
     </div>
     <div class="p-3">
-      <div id="breakdownRankingChart" style="min-height: 420px;"></div>
+      <div id="breakdownRankingChart" style="min-height: 480px;"></div>
       <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
         <span id="chartPaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
         <nav aria-label="Chart Pagination">
@@ -296,7 +270,7 @@
           <div class="badge bg-light text-muted border">Monthly Hours</div>
         </div>
         <div class="p-3">
-          <div id="monthlyBdTrendChart" style="min-height: 320px;"></div>
+          <div id="monthlyBdTrendChart" style="min-height: 400px;"></div>
         </div>
       </div>
     </div>
@@ -310,7 +284,7 @@
           </div>
         </div>
         <div class="p-3">
-          <div id="causeDonutChart" style="min-height: 320px;"></div>
+          <div id="causeDonutChart" style="min-height: 400px;"></div>
         </div>
       </div>
     </div>
@@ -366,83 +340,6 @@
 
 </div>
 
-<!-- MODALS -->
-<div class="modal fade" id="dateRangeModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="get">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold">Select Date Range</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label fw-semibold">From Date</label>
-            <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">To Date</label>
-            <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary px-4">Apply Date Filter</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="providerModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="get">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold">Filter by OEM Provider</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          {% for p in providers %}
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}" id="prov_{{ forloop.counter }}"
-              {% if p in selected_providers %}checked{% endif %}>
-            <label class="form-check-label" for="prov_{{ forloop.counter }}">{{ p }}</label>
-          </div>
-          {% endfor %}
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary px-4">Apply OEM Filter</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<div class="modal fade" id="wtgModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="get">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold">Select Specific Turbines</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
-          {% for w in wtgs %}
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}" id="wtg_{{ forloop.counter }}"
-              {% if w in selected_wtgs %}checked{% endif %}>
-            <label class="form-check-label" for="wtg_{{ forloop.counter }}">{{ w }}</label>
-          </div>
-          {% endfor %}
-        </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary px-4">Apply WTG Filter</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <!-- SCRIPTS -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -452,9 +349,11 @@
   const fullWtgData = {{ all_wtgs_json|safe|default:"[]" }};
   const monthlyCats = {{ monthly_cats_json|safe|default:"[]" }};
   const monthlyBd = {{ monthly_bd_json|safe|default:"[]" }};
-  const topCauses = {{ top_causes_json|safe|default:"[]" }};
+  const topCauses = {{ top_causes_json|safe|default:"{}" }};
 
   let rankingChartInstance = null;
+  let monthlyTrendInstance = null;
+  let causeChartInstance = null;
 
   function renderRankingChart(sliceMode) {
     let subset = [...fullWtgData];
@@ -467,7 +366,7 @@
     }
 
     const categories = subset.map(d => d.wtg);
-    const seriesData = subset.map(d => d.hours);
+    const seriesData = subset.map(d => Number(d.total_hrs !== undefined ? d.total_hrs : (d.hours !== undefined ? d.hours : 0)));
 
     const options = {
       series: [{ name: "Downtime Hours", data: seriesData }],
@@ -485,10 +384,13 @@
           dataLabels: { position: "top" }
         }
       },
-      colors: subset.map(d => d.hours > 1500 ? "#ef4444" : (d.hours > 500 ? "#f59e0b" : "#10b981")),
+      colors: subset.map(d => {
+        const h = Number(d.total_hrs !== undefined ? d.total_hrs : (d.hours !== undefined ? d.hours : 0));
+        return h > 1500 ? "#ef4444" : (h > 500 ? "#f59e0b" : "#10b981");
+      }),
       dataLabels: {
         enabled: true,
-        formatter: (val) => val > 0 ? val.toLocaleString() + " hrs" : "",
+        formatter: (val) => val > 0 ? Number(val).toLocaleString() + " hrs" : "",
         offsetX: 24,
         style: { fontSize: "11px", colors: ["#334155"], fontWeight: 700 }
       },
@@ -501,7 +403,7 @@
       },
       legend: { show: false },
       tooltip: {
-        y: { formatter: (v) => v.toLocaleString() + " hrs downtime" }
+        y: { formatter: (v) => v != null ? Number(v).toLocaleString() + " hrs downtime" : "" }
       },
       grid: { borderColor: "#f1f5f9" }
     };
@@ -515,11 +417,17 @@
 
   // Monthly Spline Chart
   function renderMonthlyTrend() {
+    const el = document.querySelector("#monthlyBdTrendChart");
+    if (!el) return;
+    if (monthlyTrendInstance) {
+      monthlyTrendInstance.destroy();
+    }
+    const hasData = Array.isArray(monthlyBd) && monthlyBd.length > 0 && monthlyBd.some(v => v > 0);
     const options = {
-      series: [{ name: "Fleet Downtime Hours", data: monthlyBd }],
+      series: [{ name: "Fleet Downtime Hours", data: monthlyBd || [] }],
       chart: {
         type: "area",
-        height: 320,
+        height: 400,
         toolbar: { show: false }
       },
       colors: ["#ef4444"],
@@ -529,29 +437,59 @@
       },
       dataLabels: { enabled: false },
       stroke: { curve: "smooth", width: 2.5 },
-      xaxis: { categories: monthlyCats },
-      yaxis: { labels: { formatter: v => Math.round(v).toLocaleString() + "h" } },
-      tooltip: { y: { formatter: v => v.toLocaleString() + " hrs" } },
-      grid: { borderColor: "#f1f5f9" }
+      xaxis: { categories: monthlyCats || [] },
+      yaxis: { labels: { formatter: v => v != null ? Math.round(v).toLocaleString() + "h" : "" } },
+      tooltip: { y: { formatter: v => v != null ? Number(v).toLocaleString() + " hrs" : "" } },
+      grid: { borderColor: "#f1f5f9" },
+      noData: {
+        text: "No monthly breakdown data available",
+        style: { color: "#64748b", fontSize: "14px" }
+      }
     };
-    new ApexCharts(document.querySelector("#monthlyBdTrendChart"), options).render();
+    monthlyTrendInstance = new ApexCharts(el, options);
+    monthlyTrendInstance.render();
+  }
+
+  // Helper to extract cause labels & values
+  function getTopCausesData() {
+    let labels = [];
+    let series = [];
+    if (Array.isArray(topCauses)) {
+      labels = topCauses.map(d => (d && (d.cause || d.label)) ? String(d.cause || d.label) : "");
+      series = topCauses.map(d => Number((d && (d.hours !== undefined ? d.hours : d.value)) || 0));
+    } else if (topCauses && typeof topCauses === "object") {
+      if (Array.isArray(topCauses.list) && topCauses.list.length > 0) {
+        labels = topCauses.list.map(d => d.cause);
+        series = topCauses.list.map(d => Number(d.hours) || 0);
+      } else {
+        labels = Array.isArray(topCauses.labels) ? topCauses.labels : [];
+        series = Array.isArray(topCauses.values) ? topCauses.values.map(v => Number(v) || 0) : [];
+      }
+    }
+    return { labels, series };
   }
 
   // Causes Donut Chart
   function renderCauseDonut() {
-    const labels = topCauses.map(d => d.cause);
-    const series = topCauses.map(d => d.hours);
+    const el = document.querySelector("#causeDonutChart");
+    if (!el) return;
+    if (causeChartInstance) {
+      causeChartInstance.destroy();
+    }
+    const { labels, series } = getTopCausesData();
+    const hasData = series.length > 0 && series.some(v => v > 0);
 
     const options = {
-      series: series.length > 0 ? series : [1],
-      labels: labels.length > 0 ? labels : ["No Outages"],
-      chart: { type: "donut", height: 320 },
-      colors: ["#ef4444", "#f59e0b", "#3b82f6", "#8b5cf6", "#10b981"],
+      series: hasData ? series : [1],
+      labels: hasData ? labels : ["No Outages"],
+      chart: { type: "donut", height: 400 },
+      colors: ["#ef4444", "#f59e0b", "#3b82f6", "#8b5cf6", "#10b981", "#06b6d4", "#ec4899", "#84cc16"],
       legend: { position: "bottom", fontSize: "11px" },
-      dataLabels: { enabled: true, formatter: (val) => Math.round(val) + "%" },
-      tooltip: { y: { formatter: (v) => v.toLocaleString() + " hrs" } }
+      dataLabels: { enabled: hasData, formatter: (val) => Math.round(val) + "%" },
+      tooltip: { y: { formatter: (v) => hasData ? Number(v).toLocaleString() + " hrs" : "0 hrs" } }
     };
-    new ApexCharts(document.querySelector("#causeDonutChart"), options).render();
+    causeChartInstance = new ApexCharts(el, options);
+    causeChartInstance.render();
   }
 
   let chartSourceData = [...fullWtgData];
@@ -609,13 +547,13 @@
     }
 
     const categories = subset.map(d => d.wtg);
-    const seriesData = subset.map(d => d.hours);
+    const seriesData = subset.map(d => Number(d.total_hrs !== undefined ? d.total_hrs : (d.hours !== undefined ? d.hours : 0)));
 
     const options = {
       series: [{ name: "Downtime Hours", data: seriesData }],
       chart: {
         type: "bar",
-        height: Math.max(380, subset.length * 30),
+        height: Math.max(450, subset.length * 34),
         toolbar: { show: true, tools: { download: true } }
       },
       plotOptions: {
@@ -627,23 +565,29 @@
           dataLabels: { position: "top" }
         }
       },
-      colors: subset.map(d => d.hours > 1500 ? "#ef4444" : (d.hours > 500 ? "#f59e0b" : "#10b981")),
+      colors: subset.map(d => {
+        const h = Number(d.total_hrs !== undefined ? d.total_hrs : (d.hours !== undefined ? d.hours : 0));
+        return h > 1500 ? "#ef4444" : (h > 500 ? "#f59e0b" : "#10b981");
+      }),
       dataLabels: {
         enabled: true,
-        formatter: (val) => val > 0 ? val.toLocaleString() + " hrs" : "",
+        formatter: (val) => val > 0 ? Number(val).toLocaleString() + " hrs" : "",
         offsetX: 24,
         style: { fontSize: "11px", colors: ["#334155"], fontWeight: 700 }
       },
       xaxis: {
         categories: categories,
-        title: { text: "Downtime Hours" }
+        title: { text: "Downtime Hours" },
+        labels: {
+          formatter: (val) => val != null ? Number(val).toLocaleString() : ""
+        }
       },
       yaxis: {
         labels: { style: { fontWeight: 600, fontSize: "11px" } }
       },
       legend: { show: false },
       tooltip: {
-        y: { formatter: (v) => v.toLocaleString() + " hrs" }
+        y: { formatter: (v) => v != null ? Number(v).toLocaleString() + " hrs" : "" }
       },
       grid: { borderColor: "#f1f5f9" }
     };

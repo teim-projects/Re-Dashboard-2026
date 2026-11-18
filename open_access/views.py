@@ -438,7 +438,21 @@ def calculation_history(request):
         per_page = 10
 
     plant_type_filter = request.GET.get("plant_type", "all")
-    all_records = CalculationRecord.objects.filter(user=request.user)
+    user_records = CalculationRecord.objects.filter(user=request.user)
+    
+    total_records_count = user_records.count()
+    wind_count = user_records.filter(plant_type="wind").count()
+    solar_count = user_records.filter(plant_type="solar").count()
+    
+    from django.db.models import Avg, Sum
+    stats = user_records.aggregate(
+        avg_saving=Avg("per_unit_savings"),
+        total_savings=Sum("estimated_savings")
+    )
+    avg_saving = stats.get("avg_saving") or 0.0
+    total_savings = stats.get("total_savings") or 0.0
+
+    all_records = user_records
     if plant_type_filter in ["wind", "solar"]:
         all_records = all_records.filter(plant_type=plant_type_filter)
     all_records = all_records.order_by("-created_at")
@@ -455,6 +469,11 @@ def calculation_history(request):
             "records": page_obj.object_list,
             "per_page": per_page,
             "plant_type_filter": plant_type_filter,
+            "total_records_count": total_records_count,
+            "wind_count": wind_count,
+            "solar_count": solar_count,
+            "avg_saving": round(avg_saving, 2),
+            "total_savings": round(total_savings, 2),
         },
     )
 

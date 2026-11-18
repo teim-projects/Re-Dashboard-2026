@@ -490,6 +490,10 @@ def _create_provider_structure_tables(pending):
 
 @login_required
 def add_provider_with_structure(request):
+    if not request.user.is_superuser:
+        messages.error(request, "Access restricted: Only administrators can configure providers and tables.")
+        return redirect("dashboard")
+
     energy_types = EnergyType.objects.all()
     staff_users = User.objects.filter(is_superuser=False)
 
@@ -874,7 +878,12 @@ from django.contrib import messages
 from django.db import connection
 from .models import Provider  # ✅ Moved this to the top — keep it here
 
+@login_required
 def view_existing_providers(request):
+    if not request.user.is_superuser:
+        messages.error(request, "Access restricted: Only administrators can manage providers and tables.")
+        return redirect("dashboard")
+
     if request.method == "POST":
         table_to_delete = request.POST.get("delete_table_name")
         if table_to_delete:

@@ -1,995 +1,1574 @@
 {% extends "basewind.html" %}
 {% load custom_filters %}
-{% block title %}{% if request.resolver_match.url_name == "recurrence_risk" %}Recurrence Risk{% else %}Smart Breakdown Intelligence{% endif %}{% endblock %}
+{% load humanize %}
+
+{% block title %}{% if request.resolver_match.url_name == "recurrence_risk" %}Recurrence Risk Diagnostics{% else %}Smart Breakdown Intelligence{% endif %}{% endblock %}
 
 {% block content %}
 
-<!-- Load FontAwesome for icons -->
+<!-- Load FontAwesome & Chart Libraries -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-<!-- Load Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<div class="container-fluid py-4" style="font-family: 'Inter', sans-serif; margin-top: 60px;" >
+<!-- STYLING SYSTEM -->
+<style>
+  :root {
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+    --card-radius: 14px;
+    --primary-color: #2563eb;
+    --border-color: #e2e8f0;
+  }
 
-    {% if error_msg %}
-    <div class="alert alert-warning" role="alert">{{ error_msg }}</div>
-    {% endif %}
+  body {
+    background-color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
 
-    <!-- PAGE TITLE -->
-    <!-- <h1 class="fw-bold text-center mb-2 page-title" style="color:#2c3e50;">Smart Breakdown Intelligence</h1>
-    <p class="text-center text-muted mb-5 page-subtitle">
-        ML-powered repetitive breakdown detection & severity classification
-    </p> -->
+  .dash-container {
+    padding: 24px 32px 60px 32px;
+    margin-top: 65px;
+  }
 
-<!-- ============================
-     MODERN FILTER SECTION
-============================= -->
-<div class="filter-wrapper mb-4">
+  /* Filter Wrapper */
+  .filter-wrapper {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    padding: 18px 24px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+    margin-bottom: 24px;
+  }
 
-    <form method="GET" id="filtersForm" class="row gy-3 gx-4 align-items-end justify-content-between">
+  .filter-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #475569;
+    margin-bottom: 6px;
+    display: block;
+  }
 
-        <!-- Breakdown Type -->
-        {% if request.resolver_match.url_name != "recurrence_risk" %}
-        <div class="col-md-2">
-            <label class="filter-label">Type</label>
-            <select class="filter-field auto-submit" name="btype">
-                <option value="repetitive" {% if btype == "repetitive" %}selected{% endif %}>Repetitive Breakdown</option>
-                <option value="extended" {% if btype == "extended" %}selected{% endif %}>Extended Breakdown</option>
-            </select>
-        </div>
-        {% endif %}
+  .filter-field {
+    width: 100%;
+    height: 40px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 6px 12px;
+    background: #ffffff;
+    font-size: 0.88rem;
+    color: #1e293b;
+    transition: all 0.2s ease;
+  }
 
-        {% if request.resolver_match.url_name == "recurrence_risk" %}
-        {% for field in recurrence_filter_fields %}
-        <div class="col-12 col-sm-6 col-xl-2">
-            <label class="filter-label" for="riskFilter{{ field }}">{{ recurrence_filter_labels|get_item:field }}</label>
-            <select class="filter-field auto-submit" id="riskFilter{{ field }}" name="{{ field }}">
-                <option value="">All {{ recurrence_filter_labels|get_item:field }}</option>
-                {% for value in recurrence_filter_options|get_item:field %}
-                    {% if value == "__missing__" %}
-                    <option value="__missing__" {% if selected_recurrence_filters|get_item:field == value %}selected{% endif %}>Unknown / Not provided</option>
-                    {% else %}
-                    <option value="{{ value }}" {% if selected_recurrence_filters|get_item:field == value %}selected{% endif %}>{{ value }}</option>
-                    {% endif %}
-                {% endfor %}
-            </select>
-        </div>
-        {% endfor %}
-        {% else %}
+  .filter-field:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  }
+
+  /* Modern KPI Cards */
+  .kpi-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border-color);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  }
+
+  .kpi-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+  }
+
+  .kpi-card.tot-alerts::before { background: #3b82f6; }
+  .kpi-card.sev-scope::before  { background: #f59e0b; }
+  .kpi-card.wtg-impacted::before { background: #10b981; }
+  .kpi-card.top-wtg::before    { background: #8b5cf6; }
+
+  .kpi-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 6px;
+  }
+
+  .kpi-value {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.15;
+  }
+
+  .kpi-subtext {
+    font-size: 0.76rem;
+    color: #94a3b8;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Soft Backgrounds */
+  .bg-blue-50   { background-color: #eff6ff !important; }
+  .bg-rose-50   { background-color: #fff1f2 !important; }
+  .bg-amber-50  { background-color: #fffbeb !important; }
+  .bg-emerald-50{ background-color: #ecfdf5 !important; }
+  .bg-purple-50 { background-color: #faf5ff !important; }
+
+  /* Chart Card */
+  .chart-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border-color);
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  .chart-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+  }
+
+  .chart-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .chart-subtitle {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .btn-filter-toggle {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-filter-toggle:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .btn-filter-toggle.active {
+    background: #1e293b;
+    color: #ffffff;
+    border-color: #1e293b;
+  }
+
+  /* Alert Feed Card */
+  .table-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border-color);
+    padding: 22px;
+  }
+
+  .alert-card {
+    background: #ffffff !important;
+    padding: 16px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .alert-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Conditional Card Background Colors & Left Accent Borders */
+  .alert-card.border-sev-critical {
+    background-color: #fef2f2 !important;
+    border: 1px solid #fecaca !important;
+    border-left: 5px solid #ef4444 !important;
+  }
+  .alert-card.border-sev-high {
+    background-color: #fff7ed !important;
+    border: 1px solid #fed7aa !important;
+    border-left: 5px solid #f97316 !important;
+  }
+  .alert-card.border-sev-medium {
+    background-color: #fffbeb !important;
+    border: 1px solid #fde68a !important;
+    border-left: 5px solid #f59e0b !important;
+  }
+  .alert-card.border-sev-low {
+    background-color: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+    border-left: 5px solid #10b981 !important;
+  }
+
+  /* Severity Badges (Pills) */
+  .sev-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .badge-sev-critical { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+  .badge-sev-high     { background-color: #ffedd5; color: #c2410c; border: 1px solid #fdba74; }
+  .badge-sev-medium   { background-color: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+  .badge-sev-low      { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+
+  /* Action Box with Natural Text Wrap */
+  .alert-action-box {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    border-radius: 8px;
+    width: 100%;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  }
+
+  .alert-action-text {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: #1e293b;
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  /* Modern Recurrence Risk Cards */
+  .risk-card {
+    background: #ffffff;
+    border-radius: var(--card-radius);
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .risk-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.08);
+  }
+  .risk-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+  }
+  .risk-card-critical::before { background: #ef4444; }
+  .risk-card-high::before     { background: #f97316; }
+  .risk-card-moderate::before { background: #f59e0b; }
+  .risk-card-normal::before   { background: #10b981; }
+
+  .risk-card-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .risk-card-critical .risk-card-label { color: #dc2626; }
+  .risk-card-high .risk-card-label     { color: #ea580c; }
+  .risk-card-moderate .risk-card-label { color: #d97706; }
+  .risk-card-normal .risk-card-label   { color: #059669; }
+
+  .risk-card-count {
+    font-size: 2.2rem;
+    line-height: 1.1;
+    font-weight: 800;
+    margin-top: 4px;
+    color: #0f172a;
+  }
+
+  .risk-card-icon-pill {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+  .risk-card-critical .risk-card-icon-pill { background: #fee2e2; color: #dc2626; }
+  .risk-card-high .risk-card-icon-pill     { background: #ffedd5; color: #ea580c; }
+  .risk-card-moderate .risk-card-icon-pill { background: #fef3c7; color: #d97706; }
+  .risk-card-normal .risk-card-icon-pill   { background: #dcfce7; color: #059669; }
+
+  .risk-pill-badge {
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .risk-card-critical .risk-pill-badge { background: #fee2e2; color: #b91c1c; }
+  .risk-card-high .risk-pill-badge     { background: #ffedd5; color: #c2410c; }
+  .risk-card-moderate .risk-pill-badge { background: #fef3c7; color: #b45309; }
+  .risk-card-normal .risk-pill-badge   { background: #dcfce7; color: #15803d; }
+
+  .risk-card-action {
+    font-size: 0.76rem;
+    color: #64748b;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Pagination styling */
+  .pagination .page-link {
+    color: #475569;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-color: #e2e8f0;
+    border-radius: 6px;
+    margin: 0 2px;
+    transition: all 0.15s ease;
+  }
+  .pagination .page-item.active .page-link {
+    background-color: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+    font-weight: 700;
+  }
+  .pagination .page-link:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .hidden-alert { display: none; }
+</style>
+
+<div class="dash-container">
+
+  {% if error_msg %}
+  <div class="alert alert-warning border-0 shadow-sm rounded-3 mb-4" role="alert">
+    <i class="fas fa-triangle-exclamation me-2"></i> {{ error_msg }}
+  </div>
+  {% endif %}
+
+  <!-- PAGE HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+      <div class="d-flex align-items-center gap-2">
+        <h3 class="fw-bold text-dark m-0">
+          {% if request.resolver_match.url_name == "recurrence_risk" %}
+            Recurrence Risk Diagnostics
+          {% else %}
+            Smart Breakdown Intelligence
+          {% endif %}
+        </h3>
+        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 rounded-pill">
+          {% if btype == "extended" %}Extended P90 Outages{% elif btype == "recurrence" %}ML Recurrence Risk{% else %}Frequency Pareto{% endif %}
+        </span>
+      </div>
+      <p class="text-muted small m-0 mt-1">
+        Machine-level incident trip clustering, recurring failure frequency &amp; severity tracking
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'wind_breakdown_hours' %}" class="btn btn-sm btn-outline-primary px-3 py-1 rounded-pill">
+        <i class="fas fa-clock me-1"></i> Breakdown Hours
+      </a>
+      <a href="{% url 'dashboard_breakdown' %}" class="btn btn-sm btn-outline-secondary px-3 py-1 rounded-pill">
+        <i class="fas fa-chart-pie me-1"></i> Fleet Overview
+      </a>
+    </div>
+  </div>
+
+  <!-- UNIFIED 6-PILL FILTER BAR -->
+  {% include "includes/wind_filter_bar.html" %}
+
+  <!-- SECONDARY MODERN FILTER SECTION -->
+  <div class="filter-wrapper">
+    <form method="GET" id="filtersForm" class="row gy-3 gx-3 align-items-end">
+
+      <!-- Breakdown Type -->
+      {% if request.resolver_match.url_name != "recurrence_risk" %}
+      <div class="col-lg-2 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="fas fa-layer-group text-primary me-1"></i>Type</label>
+        <select class="filter-field auto-submit" name="btype">
+          <option value="repetitive" {% if btype == "repetitive" %}selected{% endif %}>Repetitive Breakdown</option>
+          <option value="extended" {% if btype == "extended" %}selected{% endif %}>Extended Breakdown</option>
+        </select>
+      </div>
+      {% endif %}
+
+      {% if request.resolver_match.url_name == "recurrence_risk" %}
         <!-- From Date -->
-        <div class="col-md-2">
-            <label class="filter-label">From</label>
-            <input type="date" class="filter-field" name="from" value="{{ date_from }}">
+        <div class="col-lg-3 col-md-4 col-sm-6">
+          <label class="filter-label"><i class="far fa-calendar-alt text-primary me-1"></i>From Date</label>
+          <input type="date" class="filter-field" name="from" value="{{ date_from }}">
         </div>
 
         <!-- To Date -->
-        <div class="col-md-2">
-            <label class="filter-label">To</label>
-            <input type="date" class="filter-field" name="to" value="{{ date_to }}">
+        <div class="col-lg-3 col-md-4 col-sm-6">
+          <label class="filter-label"><i class="far fa-calendar-alt text-primary me-1"></i>To Date</label>
+          <input type="date" class="filter-field" name="to" value="{{ date_to }}">
         </div>
 
-        <!-- WTG -->
-        <div class="col-md-2">
-            <label class="filter-label">WTG</label>
-            <select class="filter-field" name="wtg">
-                <option value="">All WTGs</option>
-                {% for m in wtg_options %}
-                    <option value="{{ m }}" {% if wtg_filter == m %}selected{% endif %}>{{ m }}</option>
-                {% endfor %}
-            </select>
+        <!-- WTG Selector -->
+        <div class="col-lg-2 col-md-4 col-sm-6">
+          <label class="filter-label"><i class="fas fa-fan text-success me-1"></i>Turbine WTG</label>
+          <select class="filter-field" name="wtg">
+            <option value="">All WTGs</option>
+            {% for m in wtg_options %}
+              <option value="{{ m }}" {% if wtg_filter == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
         </div>
 
-        <div class="col-md-2">
-            {% if btype == "extended" %}
-            <label class="filter-label">Threshold</label>
-            <div class="filter-field d-flex align-items-center" aria-label="Analysis threshold">
-                Component P90
+        <!-- Risk Tier -->
+        <div class="col-lg-2 col-md-4 col-sm-6">
+          <label class="filter-label"><i class="fas fa-shield-halved text-danger me-1"></i>Risk Tier</label>
+          <select class="filter-field" name="severity">
+            <option value="">All Risk Tiers</option>
+            <option value="CRITICAL_RECURRENCE" {% if severity_filter == "CRITICAL_RECURRENCE" %}selected{% endif %}>Critical Risk (≥15 Trips)</option>
+            <option value="HIGH_RECURRENCE_RISK" {% if severity_filter == "HIGH_RECURRENCE_RISK" %}selected{% endif %}>High Risk (8-14 Trips)</option>
+            <option value="MODERATE_RECURRENCE" {% if severity_filter == "MODERATE_RECURRENCE" %}selected{% endif %}>Moderate Risk (3-7 Trips)</option>
+            <option value="NORMAL" {% if severity_filter == "NORMAL" %}selected{% endif %}>Normal / Low (&lt;3 Trips)</option>
+          </select>
+        </div>
+      {% else %}
+        <!-- From Date -->
+        <div class="col-lg-2 col-md-4 col-sm-6">
+          <label class="filter-label"><i class="far fa-calendar-alt text-primary me-1"></i>From Date</label>
+          <input type="date" class="filter-field" name="from" value="{{ date_from }}">
+        </div>
+
+        <!-- To Date -->
+        <div class="col-lg-2 col-md-4 col-sm-6">
+          <label class="filter-label"><i class="far fa-calendar-alt text-primary me-1"></i>To Date</label>
+          <input type="date" class="filter-field" name="to" value="{{ date_to }}">
+        </div>
+
+        <!-- WTG Selector -->
+        <div class="col-lg-2 col-md-4 col-sm-6">
+          <label class="filter-label"><i class="fas fa-fan text-success me-1"></i>Turbine WTG</label>
+          <select class="filter-field" name="wtg">
+            <option value="">All WTGs</option>
+            {% for m in wtg_options %}
+              <option value="{{ m }}" {% if wtg_filter == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Severity / Threshold -->
+        <div class="col-lg-2 col-md-4 col-sm-6">
+          {% if btype == "extended" %}
+            <label class="filter-label"><i class="fas fa-sliders text-warning me-1"></i>Threshold</label>
+            <div class="filter-field d-flex align-items-center text-muted fw-bold">
+              Component P90
             </div>
-            {% elif btype == "recurrence" %}
-            <label class="filter-label">Risk tier</label>
+          {% elif btype == "recurrence" %}
+            <label class="filter-label"><i class="fas fa-shield-halved text-danger me-1"></i>Risk Tier</label>
             <select class="filter-field" name="severity">
-                <option value="">All tiers</option>
-                <option value="CRITICAL_RECURRENCE" {% if severity_filter == "CRITICAL_RECURRENCE" %}selected{% endif %}>Critical recurrence</option>
-                <option value="HIGH_RECURRENCE_RISK" {% if severity_filter == "HIGH_RECURRENCE_RISK" %}selected{% endif %}>High recurrence risk</option>
-                <option value="MODERATE_RECURRENCE" {% if severity_filter == "MODERATE_RECURRENCE" %}selected{% endif %}>Moderate recurrence</option>
-                <option value="NORMAL" {% if severity_filter == "NORMAL" %}selected{% endif %}>Normal</option>
+              <option value="">All Tiers</option>
+              <option value="CRITICAL_RECURRENCE" {% if severity_filter == "CRITICAL_RECURRENCE" %}selected{% endif %}>Critical Recurrence</option>
+              <option value="HIGH_RECURRENCE_RISK" {% if severity_filter == "HIGH_RECURRENCE_RISK" %}selected{% endif %}>High Recurrence Risk</option>
+              <option value="MODERATE_RECURRENCE" {% if severity_filter == "MODERATE_RECURRENCE" %}selected{% endif %}>Moderate Recurrence</option>
+              <option value="NORMAL" {% if severity_filter == "NORMAL" %}selected{% endif %}>Normal</option>
             </select>
-            {% else %}
-            <label class="filter-label">Severity</label>
+          {% else %}
+            <label class="filter-label"><i class="fas fa-triangle-exclamation text-warning me-1"></i>Severity</label>
             <select class="filter-field" name="severity">
-                <option value="">All</option>
-                <option value="Critical" {% if severity_filter == "Critical" %}selected{% endif %}>Critical</option>
-                <option value="High" {% if severity_filter == "High" %}selected{% endif %}>High</option>
-                <option value="Medium" {% if severity_filter == "Medium" %}selected{% endif %}>Medium</option>
-                <option value="Low" {% if severity_filter == "Low" %}selected{% endif %}>Low</option>
+              <option value="">All Severities</option>
+              <option value="Critical" {% if severity_filter == "Critical" %}selected{% endif %}>Critical</option>
+              <option value="High" {% if severity_filter == "High" %}selected{% endif %}>High</option>
+              <option value="Medium" {% if severity_filter == "Medium" %}selected{% endif %}>Medium</option>
+              <option value="Low" {% if severity_filter == "Low" %}selected{% endif %}>Low</option>
             </select>
-            {% endif %}
+          {% endif %}
         </div>
-        {% endif %}
+      {% endif %}
 
-        {% if request.resolver_match.url_name != "recurrence_risk" %}
-        <div class="col-md-2 text-center">
-            <button class="btn btn-primary w-100 apply-btn">
-                <i class="fa-solid fa-filter"></i> Apply
-            </button>
-            <a href="{% if request.resolver_match.url_name == 'recurrence_risk' %}{% url 'recurrence_risk' %}{% else %}{% url 'breakdown_analysis' %}{% endif %}" class="btn btn-light w-100 mt-2 reset-btn">
-                Reset
-            </a>
+      <!-- Buttons -->
+      <div class="col-lg-2 col-md-4 col-sm-6 ms-auto">
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary w-100 fw-semibold shadow-sm" style="height: 40px;">
+            <i class="fas fa-filter me-1"></i> Apply
+          </button>
+          <a href="{% if request.resolver_match.url_name == 'recurrence_risk' %}{% url 'recurrence_risk' %}{% else %}{% url 'breakdown_analysis' %}{% endif %}" class="btn btn-outline-secondary px-3" style="height: 40px; display: flex; align-items: center;" title="Reset filters">
+            <i class="fas fa-rotate-right"></i>
+          </a>
         </div>
-        {% else %}
-        <div class="col-12 col-sm-6 col-xl-2 ms-xl-auto text-end">
-            <a href="{% url 'recurrence_risk' %}" class="btn btn-light reset-btn">
-                Reset
-            </a>
-        </div>
-        <div class="col-12">
-            <small class="text-muted">Filters combine together; values missing from uploaded data can be selected as Unknown / Not provided.</small>
-        </div>
-        {% endif %}
+      </div>
 
     </form>
-</div>
+  </div>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".auto-submit").forEach(el => {
-        el.addEventListener("change", function () {
-            document.getElementById("filtersForm").submit();
-        });
-    });
-});
-</script>
-
-
-
-
-  
-
-
-
-
-    {% if btype == "recurrence" %}
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4 recurrence-risk-cards">
-        {% for card in risk_cards %}
-        <div class="col">
-            <section class="risk-tier-card risk-{{ card.style }}">
-                <div class="risk-tier-icon" aria-hidden="true">
-                    {% if card.style == "critical" %}
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                    {% elif card.style == "high" %}
-                    <i class="fa-solid fa-arrow-trend-up"></i>
-                    {% elif card.style == "moderate" %}
-                    <i class="fa-solid fa-gauge-high"></i>
-                    {% else %}
-                    <i class="fa-solid fa-circle-check"></i>
-                    {% endif %}
-                </div>
-                <div class="risk-tier-label">{{ card.label }}</div>
-                <div class="risk-tier-count">{{ card.count }}</div>
-                <div class="risk-tier-caption">WTGs</div>
-            </section>
-        </div>
-        {% endfor %}
-    </div>
-    <p class="small text-muted mb-4">
-        Each WTG is counted once under its highest recurrence risk tier for the selected filters.
-    </p>
-    {% else %}
-    <!-- KPI CARDS -->
-    <div class="row g-4 mb-3">
-
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="icon-wrapper blue">
-                    <i class="fa-solid fa-bell"></i>
-                </div>
-                <h3>{{ total_alerts }}</h3>
-                <p>{% if btype == "extended" %}Extended Events{% elif btype == "recurrence" %}Events Analyzed{% else %}Total Alerts{% endif %}</p>
+  {% if btype == "recurrence" %}
+    <!-- RECURRENCE RISK CARDS -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+      {% for card in risk_cards %}
+      <div class="col">
+        <div class="risk-card risk-card-{{ card.style }}">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <span class="risk-card-label">{{ card.label }}</span>
+              <div class="risk-card-count">{{ card.count }}</div>
             </div>
+            <div class="risk-card-icon-pill">
+              {% if card.style == "critical" %}
+                <i class="fas fa-triangle-exclamation"></i>
+              {% elif card.style == "high" %}
+                <i class="fas fa-arrow-trend-up"></i>
+              {% elif card.style == "moderate" %}
+                <i class="fas fa-gauge-high"></i>
+              {% else %}
+                <i class="fas fa-circle-check"></i>
+              {% endif %}
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="risk-pill-badge">{{ card.pct }}% of fleet</span>
+            <span class="text-muted small fw-semibold">{{ card.threshold }}</span>
+          </div>
+          <div class="risk-card-action">
+            <i class="fas fa-wrench me-1 text-muted"></i> <span>{{ card.action }}</span>
+          </div>
         </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <!-- MODERN KPI SUMMARY CARDS -->
+    <div class="row g-3 mb-4">
+      <!-- Total Alerts / Events -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card tot-alerts">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="kpi-title">
+                {% if btype == "extended" %}Extended Events{% elif btype == "recurrence" %}Events Analyzed{% else %}Total Breakdown Alerts{% endif %}
+              </div>
+              <div class="kpi-value text-primary">
+                {{ total_alerts|default:0|intcomma }}
+              </div>
+              <div class="kpi-subtext">
+                <i class="fas fa-chart-line text-primary me-1"></i> Cumulative failure occurrences
+              </div>
+            </div>
+            <div class="p-2 bg-blue-50 text-primary rounded-3">
+              <i class="fas fa-bell fa-lg"></i>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="icon-wrapper red">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                </div>
+      <!-- Severity Focus -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card sev-scope">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="kpi-title">Active Severity Scope</div>
+              <div class="kpi-value text-warning">
                 {% if btype == "extended" %}
-                    <h3>P90</h3>
-                    <p>Component Duration Threshold</p>
+                  P90
                 {% elif btype == "recurrence" %}
-                    <h3>{{ risk_counts.CRITICAL_RECURRENCE|default:0 }}</h3>
-                    <p>Critical Recurrences</p>
+                  {{ risk_counts.CRITICAL_RECURRENCE|default:0 }}
                 {% else %}
-                    <h3>{{ severity_filter|default:"All" }}</h3>
-                    <p>Selected Severity</p>
+                  {{ severity_filter|default:"All Severity" }}
                 {% endif %}
+              </div>
+              <div class="kpi-subtext">
+                <i class="fas fa-triangle-exclamation text-warning me-1"></i>
+                {% if btype == "extended" %}Component P90 Duration{% elif btype == "recurrence" %}Critical Recurrences{% else %}Active priority tier{% endif %}
+              </div>
             </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="kpi-card">
-                <div class="icon-wrapper green">
-                    <i class="fa-solid fa-wind"></i>
-                </div>
-                <h3>{{ affected_wtgs }}</h3>
-                <p>WTGs Affected</p>
+            <div class="p-2 bg-amber-50 text-warning rounded-3">
+              <i class="fas fa-triangle-exclamation fa-lg"></i>
             </div>
+          </div>
         </div>
+      </div>
 
-        {% if chart_data %}
-            {% with chart_data|dictsort:"1" as sorted_wtgs %}
-                {% with top=sorted_wtgs|last %}
-                    <div class="col-md-3">
-                        <div class="kpi-card">
-                            <div class="icon-wrapper purple">
-                                <i class="fa-solid fa-tower-broadcast"></i>
-                            </div>
-                            {% if most_repetitive_wtg %}
-                                <h3>WTG {{ most_repetitive_wtg }}</h3>
-                                <p>{% if btype == "extended" %}Extended events{% elif btype == "recurrence" %}Events{% else %}Repetitions{% endif %}: {{ most_repetitions }}</p>
-                            {% else %}
-                                <h3>–</h3>
-                                <p>{% if btype == "extended" %}No Extended Events{% else %}No Repetitive Alerts{% endif %}</p>
-                            {% endif %}
-                        </div>
+      <!-- WTGs Affected -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card wtg-impacted">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="kpi-title">Turbines Affected</div>
+              <div class="kpi-value text-success">
+                {{ affected_wtgs|default:0|intcomma }}
+              </div>
+              <div class="kpi-subtext">
+                <i class="fas fa-fan text-success me-1"></i> Outage-impacted WTG units
+              </div>
+            </div>
+            <div class="p-2 bg-emerald-50 text-success rounded-3">
+              <i class="fas fa-wind fa-lg"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Repetitive WTG -->
+      <div class="col-xl-3 col-md-6">
+        <div class="kpi-card top-wtg">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="kpi-title">Top Outage Turbine</div>
+              <div class="kpi-value text-purple" style="font-size: 1.45rem;">
+                {% if most_repetitive_wtg %}
+                  WTG {{ most_repetitive_wtg }}
+                {% else %}
+                  &ndash;
+                {% endif %}
+              </div>
+              <div class="kpi-subtext">
+                <i class="fas fa-tower-broadcast text-purple me-1"></i>
+                {% if most_repetitive_wtg %}
+                  {{ most_repetitions|intcomma }} Incident Events
+                {% else %}
+                  No repetitive alerts
+                {% endif %}
+              </div>
+            </div>
+            <div class="p-2 bg-purple-50 text-purple rounded-3">
+              <i class="fas fa-tower-broadcast fa-lg"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- MAIN BREAKDOWN CHART SECTION -->
+  {% if btype == "recurrence" %}
+    <div class="row g-4 mb-4">
+      <div class="col-lg-5">
+        <div class="chart-card h-100 mb-0">
+          <div class="chart-header">
+            <div>
+              <h5 class="chart-title"><i class="fas fa-chart-pie text-primary"></i> WTG Distribution by Recurrence Risk</h5>
+              <div class="chart-subtitle">Fleet classification by 90-day incident trip frequency</div>
+            </div>
+          </div>
+          <div class="p-3">
+            <div id="riskTierChart" style="min-height: 360px;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="chart-card h-100 mb-0">
+          <div class="chart-header">
+            <div>
+              <h5 class="chart-title"><i class="fas fa-layer-group text-primary"></i> WTG Risk Distribution by Subsystem</h5>
+              <div class="chart-subtitle">Incident trip clustering across major turbine subsystems</div>
+            </div>
+          </div>
+          <div class="p-3">
+            <div id="riskGroupChart" style="min-height: 360px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-7">
+        <div class="chart-card h-100 mb-0 d-flex flex-column">
+          <div class="chart-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <h5 class="chart-title"><i class="fas fa-table-list text-danger"></i> WTGs at Recurrence Risk</h5>
+              <div class="chart-subtitle">90-day breakdown counts through {{ recurrence_reference_date|default:"the latest available event" }}.</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 rounded-pill">
+                {{ top_wtgs|length }} Units
+              </span>
+              <div class="d-flex align-items-center gap-1">
+                <span class="small text-muted fw-bold">Page:</span>
+                <select id="riskTablePageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
+                  <option value="5">5 / page</option>
+                  <option value="8">8 / page</option>
+                  <option value="10" selected>10 / page</option>
+                  <option value="15">15 / page</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="table-responsive flex-grow-1">
+            <table class="table table-hover align-middle mb-0" id="riskWtgsTable">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Turbine WTG</th>
+                  <th>Site Location</th>
+                  <th class="text-center">Breakdowns (90d)</th>
+                  <th>Vulnerable Subsystem</th>
+                  <th class="text-end pe-3">Risk Tier</th>
+                </tr>
+              </thead>
+              <tbody id="riskTableBody">
+                {% for turbine in top_wtgs %}
+                <tr class="risk-table-row" data-idx="{{ forloop.counter0 }}">
+                  <td class="ps-3">
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="p-1 rounded bg-light text-primary">
+                        <i class="fas fa-fan"></i>
+                      </div>
+                      <span class="fw-bold text-dark">{{ turbine.wtg }}</span>
                     </div>
-                {% endwith %}
-            {% endwith %}
-        {% else %}
-            <div class="col-md-3">
-                <div class="kpi-card">
-                    <div class="icon-wrapper purple">
-                        <i class="fa-solid fa-tower-broadcast"></i>
-                    </div>
-                    <h3>0</h3>
-                    <p>{% if btype == "extended" %}No Extended Events{% else %}No Repetitive Alerts{% endif %}</p>
-                </div>
+                  </td>
+                  <td><span class="badge bg-light text-secondary border">{{ turbine.site }}</span></td>
+                  <td class="text-center">
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold font-monospace px-2 py-1">
+                      {{ turbine.breakdowns_90d }} trips
+                    </span>
+                  </td>
+                  <td>
+                    <span class="small text-muted d-flex align-items-center gap-1">
+                      <i class="fas fa-cog text-secondary"></i> {{ turbine.component }}
+                    </span>
+                  </td>
+                  <td class="text-end pe-3">
+                    {% if turbine.risk_tier == "CRITICAL_RECURRENCE" %}
+                      <span class="sev-badge badge-sev-critical"><i class="fas fa-triangle-exclamation me-1"></i>Critical</span>
+                    {% elif turbine.risk_tier == "HIGH_RECURRENCE_RISK" %}
+                      <span class="sev-badge badge-sev-high"><i class="fas fa-arrow-trend-up me-1"></i>High</span>
+                    {% elif turbine.risk_tier == "MODERATE_RECURRENCE" %}
+                      <span class="sev-badge badge-sev-medium"><i class="fas fa-gauge-high me-1"></i>Moderate</span>
+                    {% else %}
+                      <span class="sev-badge badge-sev-low"><i class="fas fa-circle-check me-1"></i>Normal</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4">
+                    <i class="fas fa-circle-check text-success fa-2x mb-2 d-block"></i>
+                    No at-risk WTGs match these filters.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <!-- Table Pagination Footer -->
+          <div class="d-flex justify-content-between align-items-center p-3 border-top flex-wrap gap-2 text-muted small bg-white mt-auto">
+            <span id="riskTablePaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
+            <nav aria-label="Risk Table Pagination">
+              <ul class="pagination pagination-sm mb-0" id="riskTablePaginationNav"></ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="chart-card h-100 mb-0 d-flex flex-column">
+          <div class="chart-header d-flex justify-content-between align-items-center">
+            <div>
+              <h5 class="chart-title"><i class="fas fa-chart-bar text-warning"></i> Top WTGs by 90-Day Outages</h5>
+              <div class="chart-subtitle">Direct comparison of incident trip volume</div>
             </div>
-        {% endif %}
+            <span class="badge bg-light text-secondary border px-2 py-1">Top 15 Units</span>
+          </div>
+          <div class="p-3 flex-grow-1 d-flex flex-column justify-content-center">
+            <div id="topWtgChart" style="min-height: 560px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    </div>
-    {% endif %}
-
-    <!-- CHART -->
-    {% if btype == "recurrence" %}
-    <div class="row g-4 mb-5">
-        <div class="col-lg-5">
-            <section class="card shadow-lg rounded-4 chart-card h-100">
-                <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0">WTG Distribution by Recurrence Risk</h5>
-                </div>
-                <div class="card-body" style="height:360px;">
-                    <canvas id="riskTierChart"></canvas>
-                </div>
-            </section>
-        </div>
-        <div class="col-lg-7">
-            <section class="card shadow-lg rounded-4 chart-card h-100">
-                <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0">WTG Risk Distribution by OEM / Provider</h5>
-                </div>
-                <div class="card-body" style="height:360px;">
-                    <canvas id="riskGroupChart"></canvas>
-                </div>
-            </section>
-        </div>
-    </div>
-    <div class="row g-4 mb-5">
-        <div class="col-lg-7">
-            <section class="card shadow-lg rounded-4 chart-card h-100">
-                <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0">Top 15 WTGs at Risk</h5>
-                    <small>
-                        90-day breakdown counts through {{ recurrence_reference_date|default:"the latest available event" }}.
-                    </small>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>WTG / Name</th>
-                                <th>Site</th>
-                                <th>Breakdowns<br>in past 90 days</th>
-                                <th>Component at risk</th>
-                                <th>Risk level</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for turbine in top_wtgs %}
-                            <tr>
-                                <td class="fw-semibold">{{ turbine.wtg }}</td>
-                                <td>{{ turbine.site }}</td>
-                                <td>{{ turbine.breakdowns_90d }}</td>
-                                <td>{{ turbine.component }}</td>
-                                <td>{{ turbine.risk_tier|cut:"_RECURRENCE"|cut:"_RISK" }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="5" class="text-center text-muted py-4">No at-risk WTGs match these filters.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </div>
-        <div class="col-lg-5">
-            <section class="card shadow-lg rounded-4 chart-card h-100">
-                <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0">Top WTGs by 90-Day Breakdowns</h5>
-                </div>
-                <div class="card-body" style="height:520px;">
-                    <canvas id="topWtgChart"></canvas>
-                </div>
-            </section>
-        </div>
-    </div>
-    <div class="row g-4 mb-5">
-        <div class="col-lg-7">
-            <section class="card shadow-lg rounded-4 chart-card h-100">
-                <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0">Subsystem Vulnerability by Risk Level</h5>
-                    <small>Distinct at-risk WTGs per subsystem; falls back to system taxonomy when subsystem is unavailable.</small>
-                </div>
-                <div class="card-body" style="height:400px;">
-                    <canvas id="subsystemRiskChart"></canvas>
-                </div>
-            </section>
-        </div>
-        <div class="col-lg-5">
-            <section class="card shadow-lg rounded-4 chart-card h-100">
-                <div class="card-header bg-primary text-white rounded-top-4">
-                    <h5 class="mb-0">Recurrence Risk Profile by Rolling Window</h5>
-                </div>
-                <div class="card-body" style="height:400px;">
-                    <canvas id="recurrenceProfileChart"></canvas>
-                </div>
-            </section>
-        </div>
-    </div>
     {{ risk_cards|json_script:"risk-tier-data" }}
     {{ risk_group_data|json_script:"risk-group-data" }}
     {{ top_wtgs|json_script:"top-wtg-data" }}
     {{ subsystem_risk_data|json_script:"subsystem-risk-data" }}
     {{ recurrence_profile_data|json_script:"recurrence-profile-data" }}
-    {% else %}
-    <div class="card shadow-lg rounded-4 mb-5 chart-card">
-        <div class="card-header bg-primary text-white rounded-top-4 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">{% if btype == "extended" %}Extended Breakdown Events by WTG{% elif btype == "recurrence" %}Recurrence Risk Events by WTG{% else %}Repetitive Breakdown Chart{% endif %}</h5>
+
+  {% else %}
+    <!-- MODERN REPETITIVE BREAKDOWN CHART -->
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <h5 class="chart-title">
+            <i class="fas fa-chart-column text-danger"></i>
+            {% if btype == "extended" %}
+              Extended Breakdown Outage Events by WTG
+            {% elif btype == "recurrence" %}
+              Recurrence Risk Events by WTG
+            {% else %}
+              Turbine Repetitive Breakdown Frequency Ranking
+            {% endif %}
+          </h5>
+          <div class="chart-subtitle">
+            Clean ranking isolating high-frequency recurring outage units across fleet
+          </div>
         </div>
-        <div class="card-body" style="height:360px;">
-            <canvas id="breakChart"></canvas>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <!-- Slicing Switcher -->
+          <div class="d-flex gap-1" id="chartSliceSwitcher">
+            <button type="button" class="btn-filter-toggle active" data-slice="top10">Top 10</button>
+            <button type="button" class="btn-filter-toggle" data-slice="bottom10">Bottom 10</button>
+            <button type="button" class="btn-filter-toggle" data-slice="top25">Top 25</button>
+            <button type="button" class="btn-filter-toggle" data-slice="all">All WTGs</button>
+          </div>
+
+          <!-- Orientation Toggle -->
+          <div class="d-flex gap-1 ms-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary px-2 py-1" id="btnToggleChartType" title="Toggle Horizontal / Vertical View">
+              <i class="fas fa-arrows-rotate me-1"></i> <span id="chartTypeLabel">Horizontal</span>
+            </button>
+          </div>
+
+          <!-- Page Size -->
+          <div class="d-flex align-items-center gap-1 ms-1">
+            <span class="small text-muted fw-bold">Page Size:</span>
+            <select id="chartPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
+              <option value="10" selected>10 WTGs</option>
+              <option value="15">15 WTGs</option>
+              <option value="25">25 WTGs</option>
+              <option value="all">All WTGs</option>
+            </select>
+          </div>
         </div>
+      </div>
+
+      <div class="p-3">
+        <div id="breakApexChart" style="min-height: 480px;"></div>
+        <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
+          <span id="chartPaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
+          <nav aria-label="Chart Pagination">
+            <ul class="pagination pagination-sm mb-0" id="chartPaginationNav"></ul>
+          </nav>
+        </div>
+      </div>
     </div>
-    {% endif %}
+  {% endif %}
 
-    {% if btype != "recurrence" %}
-    <!-- ALERTS -->
-<h3 class="fw-bold mb-3 alerts-title text-center">{% if btype == "recurrence" %}Recurrence Risk Events{% else %}Recent Alerts{% endif %}</h3>
-<script>
-function sendBreakdownEmail() {
-    fetch("/customer/email_breakdown_alerts/", {
-        method: "POST",
-        headers: {
-            "X-CSRFToken": "{{ csrf_token }}"
-        }
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === "success") {
-            alert("Email Sent Successfully!");
-        } else {
-            alert("Error: " + data.message);
-        }
-    });
-}
-</script>
+  {% if btype != "recurrence" %}
+  <!-- RECENT BREAKDOWN INCIDENT FEED -->
+  <div class="table-card mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3">
+      <div>
+        <h5 class="fw-bold text-dark m-0">
+          <i class="fas fa-list-check me-2 text-primary"></i>Recent Breakdown Incident Feed
+        </h5>
+        <small class="text-muted">Detailed event records, classification, duration &amp; mitigation actions</small>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="input-group input-group-sm" style="max-width: 260px;">
+          <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+          <input type="text" id="alertSearchInput" class="form-control border-start-0" placeholder="Filter alerts (WTG, fault...)" style="font-size: 12px;">
+        </div>
+        <button onclick="sendBreakdownEmail()" class="btn btn-sm btn-success px-3 py-1 rounded-pill shadow-sm">
+          <i class="fas fa-envelope me-1"></i> Email Alerts
+        </button>
+      </div>
+    </div>
 
-<div class="text-end mt-2 mb-2">
-    <button onclick="sendBreakdownEmail()" class="btn btn-success px-4 py-2">
-        <i class="fa fa-envelope"></i> Email These Alerts
-    </button>
-</div>
-
-<div class="row g-4" id="alertsContainer">
-
-    {% for a in alerts %}
-    <div class="col-md-4 alert-item alert-box {% if forloop.counter > 6 %}hidden-alert{% endif %}">
-        <div class="alert-card shadow-sm {% if a.is_extended %}sev-high{% else %}sev-{{ a.severity|lower }}{% endif %}">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-bold text-primary">WTG {{ a.machine }}</span>
-
-                {% if btype == "recurrence" %}
-                    <span class="sev-badge {% if a.risk_tier == 'CRITICAL_RECURRENCE' %}sev-critical{% elif a.risk_tier == 'HIGH_RECURRENCE_RISK' %}sev-high{% elif a.risk_tier == 'MODERATE_RECURRENCE' %}sev-medium{% else %}sev-low{% endif %}">
-                        {{ a.risk_label }}
-                    </span>
-                {% elif a.is_extended %}
-                    <span class="sev-badge sev-high">P90 Exceeded</span>
-                {% elif a.severity == "Critical" %}
-                    <span class="sev-badge sev-critical">Critical</span>
-                {% elif a.severity == "High" %}
-                    <span class="sev-badge sev-high">High</span>
-                {% elif a.severity == "Medium" %}
-                    <span class="sev-badge sev-medium">Medium</span>
-                {% else %}
-                    <span class="sev-badge sev-low">Low</span>
-                {% endif %}
-            </div>
+    <div class="row g-3" id="alertsContainer">
+      {% for a in alerts %}
+      <div class="col-md-4 alert-item alert-box {% if forloop.counter > 6 %}hidden-alert{% endif %}" data-wtg="{{ a.machine|lower }}" data-msg="{{ a.message|lower }}">
+        <div class="alert-card shadow-sm border-sev-{% if a.is_extended %}high{% elif a.severity == 'Critical' %}critical{% elif a.severity == 'High' %}high{% elif a.severity == 'Medium' %}medium{% else %}low{% endif %}">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold fs-6 text-dark">
+              <i class="fas fa-fan me-1 text-primary"></i> WTG {{ a.machine }}
+            </span>
 
             {% if btype == "recurrence" %}
-            <div class="small text-muted mb-2">
-                OEM / Provider: {{ a.provider_label }}
-                · Site: {{ a.site_label }}
-                · State: {{ a.state_label }}
-            </div>
+              <span class="sev-badge badge-sev-{% if a.risk_tier == 'CRITICAL_RECURRENCE' %}critical{% elif a.risk_tier == 'HIGH_RECURRENCE_RISK' %}high{% elif a.risk_tier == 'MODERATE_RECURRENCE' %}medium{% else %}low{% endif %}">
+                {{ a.risk_label }}
+              </span>
+            {% elif a.is_extended %}
+              <span class="sev-badge badge-sev-high">P90 Exceeded</span>
+            {% elif a.severity == "Critical" %}
+              <span class="sev-badge badge-sev-critical">Critical</span>
+            {% elif a.severity == "High" %}
+              <span class="sev-badge badge-sev-high">High</span>
+            {% elif a.severity == "Medium" %}
+              <span class="sev-badge badge-sev-medium">Medium</span>
+            {% else %}
+              <span class="sev-badge badge-sev-low">Low</span>
             {% endif %}
-            <div class="alert-msg text-dark">{{ a.message }}</div>
+          </div>
+
+          <div class="alert-msg text-dark fw-bold mb-2" style="font-size: 0.95rem; line-height: 1.35; word-break: break-word;">
+            {{ a.message }}
+          </div>
+
+          {% if a.duration or a.component %}
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            {% if a.duration %}
+            <span class="badge bg-white text-danger border font-monospace py-1 px-2" style="font-size: 0.78rem;">
+              <i class="far fa-clock me-1 text-danger"></i>{{ a.duration|floatformat:1 }} hrs
+            </span>
+            {% endif %}
+            {% if a.component %}
+            <span class="badge bg-white text-secondary border py-1 px-2 text-wrap" style="font-size: 0.78rem; max-width: 100%; word-break: break-word;">
+              <i class="fas fa-cog text-secondary me-1"></i>{{ a.component }}
+            </span>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if a.action %}
+          <div class="alert-action-box mb-2 p-2 rounded-2">
+            <div class="d-flex align-items-start gap-2">
+              <i class="fas fa-wrench text-primary mt-1" style="font-size: 0.8rem; flex-shrink: 0;"></i>
+              <div class="alert-action-text">
+                {{ a.action }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if a.rds_code or a.system_name or a.subsystem_name %}
+          <div class="small text-muted mb-2 d-flex flex-wrap gap-1 align-items-center">
+            {% if a.rds_code %}<span class="badge bg-white text-secondary border font-monospace">{{ a.rds_code }}</span>{% endif %}
+            {% if a.system_name %}<span class="text-secondary fw-semibold">{{ a.system_name }}</span>{% endif %}
+            {% if a.subsystem_name %}<span class="text-muted">/ {{ a.subsystem_name }}</span>{% endif %}
+          </div>
+          {% endif %}
+
+          <div class="alert-footer mt-auto pt-2 border-top d-flex justify-content-between align-items-center text-muted small" style="border-color: rgba(0, 0, 0, 0.08) !important;">
+            <span style="font-size: 0.78rem;"><i class="far fa-calendar-alt me-1 text-primary"></i> {{ a.date }}</span>
             {% if btype == "recurrence" %}
-            <div class="small text-muted mt-2">
-                Failure #{{ a.cumulative_failure_count }}
-                · 30d: {{ a.failures_last_30d }}
-                · 90d: {{ a.failures_last_90d }}
-                · 365d: {{ a.failures_last_365d }}
-                {% if a.tbf_days != None %}· TBF: {{ a.tbf_days }} days{% endif %}
-                {% if a.mtbf_days != None %}· MTBF: {{ a.mtbf_days }} days{% endif %}
-            </div>
+              <span class="badge bg-white text-muted border font-monospace">{{ a.risk_tier }}</span>
+            {% elif not a.is_extended and a.similarity %}
+              <span class="badge bg-white text-muted border font-monospace">sim: {{ a.similarity|floatformat:2 }}</span>
             {% endif %}
-            {% if a.is_extended %}
-            <div class="small text-muted mt-2">
-                Component: {{ a.component }}
-                {% if a.duration_hours %}
-                · Duration: {{ a.duration_hours }} h
-                · Component P90: {{ a.p90_hours }} h
-                · Above threshold: {{ a.excess_hours }} h
-                {% endif %}
-            </div>
-            {% endif %}
-            {% if a.rds_code or a.system_name or a.subsystem_name or a.standard_component %}
-            <div class="small text-muted mt-2">
-                {% if a.rds_code %}<span>{{ a.rds_code }}</span>{% endif %}
-                {% if a.system_name %}<span>{{ a.system_name }}</span>{% endif %}
-                {% if a.subsystem_name %}<span> / {{ a.subsystem_name }}</span>{% endif %}
-                {% if a.standard_component %}<span> - {{ a.standard_component }}</span>{% endif %}
-            </div>
-            {% endif %}
-
-            <div class="alert-footer mt-3">
-                <span><i class="fa-solid fa-calendar-day"></i> {{ a.date }}</span>
-                {% if btype == "recurrence" %}
-                <span class="text-muted">{{ a.risk_tier }}</span>
-                {% elif not a.is_extended %}
-                <span class="text-muted">sim: {{ a.similarity|floatformat:2 }}</span>
-                {% endif %}
-            </div>
+          </div>
         </div>
+      </div>
+      {% empty %}
+      <div class="col-12 text-center text-muted py-5">
+        <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+        <h6>No breakdown alerts match the selected criteria.</h6>
+      </div>
+      {% endfor %}
     </div>
-    {% empty %}
-    <p class="text-center text-muted">No alerts for selected filters.</p>
-    {% endfor %}
 
-</div>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    const btn = document.getElementById("toggleAlertsBtn");
-    if (!btn) return;
-
-    let expanded = false;
-
-    btn.addEventListener("click", function () {
-        expanded = !expanded;
-
-        document.querySelectorAll(".hidden-alert").forEach(el => {
-            el.style.display = expanded ? "block" : "none";
-        });
-
-        btn.textContent = expanded ? "Show Less" : "View All";
-    });
-});
-</script>
-
-<!-- Toggle Button -->
-<div class="text-center mt-3">
     {% if alerts|length > 6 %}
-    <button id="toggleAlertsBtn" class="btn btn-outline-primary px-4 py-2" style="border-radius:10px;">
-        View All
-    </button>
+    <div class="text-center mt-4">
+      <button id="toggleAlertsBtn" class="btn btn-outline-primary px-4 py-2 rounded-pill shadow-sm">
+        <i class="fas fa-eye me-1"></i> View All Alerts ({{ alerts|length }})
+      </button>
+    </div>
     {% endif %}
+  </div>
+  {% endif %}
+
 </div>
-    {% endif %}
 
-
-</div>
-
-<!-- ENHANCED STYLING -->
-<style>
-    /* Add Inter font */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-
-    body {
-        background-color: #f8f9fa;
-    }
-
-    /* --- Animations --- */
-    @keyframes fadeInDown {
-        from { opacity: 0; transform: translateY(-15px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes slideInUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to   { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.3); }
-        70% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
-    }
-.hidden-alert {
-    display: none;
-}
-
-    /* Apply Animations */
-    .page-title { animation: fadeInDown 0.6s ease-out; }
-    .page-subtitle { animation: fadeInDown 0.8s ease-out; }
-    .filter-form .filter-item { animation: fadeInDown 1.0s ease-out both; }
-    .kpi-card { animation: slideInUp 0.8s ease-out both; }
-    .chart-card { animation: slideInUp 0.9s ease-out both; }
-    .alerts-title { animation: slideInUp 1.0s ease-out both;text-align: center !important; }
-    .alert-item { animation: slideInUp 1.1s ease-out both; }
-
-    /* Staggered animation delays for filters */
-    .filter-item:nth-child(1) { animation-delay: 0.1s; }
-    .filter-item:nth-child(2) { animation-delay: 0.2s; }
-    .filter-item:nth-child(3) { animation-delay: 0.3s; }
-    .filter-item:nth-child(4) { animation-delay: 0.4s; }
-    .filter-item:nth-child(5) { animation-delay: 0.5s; }
-    .filter-item:nth-child(6) { animation-delay: 0.6s; }
-/* ---------------------------
-   Modern Filter UI Styling
-----------------------------*/
-
-/* FILTER CONTAINER */
-.filter-wrapper {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 18px 22px;
-    border: 1px solid #e3e8ef;
-    box-shadow: 0px 4px 15px rgba(0,0,0,0.05);
-}
-
-/* LABELS */
-.filter-label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 4px;
-    display: block;
-}
-
-/* FIELDS (All Same Size) */
-.filter-field {
-    width: 100%;
-    height: 42px;
-    border: 1px solid #cdd6e1;
-    border-radius: 10px;
-    padding: 8px 12px;
-    background: #fdfdfd;
-    font-size: 0.9rem;
-    transition: 0.25s ease;
-}
-
-/* Hover + Focus */
-.filter-field:hover {
-    border-color: #4ea8de;
-}
-
-.filter-field:focus {
-    outline: none;
-    border-color: #4ea8de;
-    box-shadow: 0 0 0 3px rgba(78, 168, 222, 0.25);
-}
-
-/* Small Screen */
-@media (max-width: 768px) {
-    .filter-wrapper {
-        padding: 14px 16px;
-    }
-    .filter-field {
-        height: 40px;
-    }
-}
-
-
-    /* Staggered animation delays for KPIs */
-    .col-md-3:nth-child(1) .kpi-card { animation-delay: 0.2s; }
-    .col-md-3:nth-child(2) .kpi-card { animation-delay: 0.3s; }
-    .col-md-3:nth-child(3) .kpi-card { animation-delay: 0.4s; }
-    .col-md-3:nth-child(4) .kpi-card { animation-delay: 0.5s; }
-    
-    /* Staggered animation delays for Alerts */
-    .alert-item:nth-child(1) { animation-delay: 0.3s; }
-    .alert-item:nth-child(2) { animation-delay: 0.4s; }
-    .alert-item:nth-child(3) { animation-delay: 0.5s; }
-    /* Add more if needed */
-    .alert-item:nth-child(4) { animation-delay: 0.6s; }
-    .alert-item:nth-child(5) { animation-delay: 0.7s; }
-    .alert-item:nth-child(6) { animation-delay: 0.8s; }
-
-
-    /* --- Modernized Components --- */
-
-    /* Form Controls */
-    .form-select, .form-control {
-        border-radius: 0.5rem; /* 8px */
-        transition: all 0.3s ease;
-        border-color: #dee2e6;
-    }
-    .form-select:focus, .form-control:focus {
-        border-color: #4ea8de;
-        box-shadow: 0 0 0 3px rgba(78, 168, 222, 0.25);
-    }
-    .btn {
-        border-radius: 0.5rem; /* 8px */
-    }
-
-    /* KPI Cards - Subtle lift */
-  /* --- MICRO / EXTRA-SMALL KPI CARDS --- */
-.kpi-card {
-    background: #ffffff;
-    padding: 8px 10px;
-    border-radius: 10px;
-    text-align: center;
-    min-height: 65px;                     /* SUPER COMPACT */
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-    border: 1px solid #eef2f7;
-    transition: 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-/* -------- MICRO ICON -------- */
-.icon-wrapper {
-    width: 22px;
-    height: 22px;
-    font-size: 5px;                      /* smaller icon size */
-    border-radius: 50%;
-    margin: 0 auto 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.icon-wrapper.blue   { background:#4ea8de; }
-.icon-wrapper.red    { background:#e63946; }
-.icon-wrapper.green  { background:#2a9d8f; }
-.icon-wrapper.purple { background:#6a4c93; }
-
-/* -------- MICRO NUMBER -------- */
-.kpi-card h3 {
-    font-size: 1rem;                      /* number small */
-    font-weight: 700;
-    margin-bottom: 2px;
-    color: #2c3e50;
-}
-
-/* -------- MICRO LABEL -------- */
-.kpi-card p {
-    font-size: 0.7rem;                    /* small label */
-    margin: 0;
-    color: #6c757d;
-}
-
-
-    /* Icons */
-    .icon-wrapper {
-        width: 60px; height: 60px;
-        display: flex; align-items: center; justify-content: center;
-        border-radius: 50%; /* Make it circular */
-        font-size: 22px;
-        margin: auto auto 16px;
-        color: #fff;
-        animation: pulse 2s infinite;
-        box-shadow: 0 0 0 0 rgba(0,0,0,0.1);
-    }
-    .icon-wrapper.blue   { background: #4ea8de; animation-name: pulse-blue; }
-    .icon-wrapper.red    { background: #e63946; animation-name: pulse-red; }
-    .icon-wrapper.green  { background: #2a9d8f; animation-name: pulse-green; }
-    .icon-wrapper.purple { background: #6a4c93; animation-name: pulse-purple; }
-
-    /* Pulsing keyframes for icons */
-    @keyframes pulse-blue   { 0% { box-shadow: 0 0 0 0 rgba(78, 168, 222, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(78, 168, 222, 0); } 100% { box-shadow: 0 0 0 0 rgba(78, 168, 222, 0); } }
-    @keyframes pulse-red    { 0% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(230, 57, 70, 0); } 100% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0); } }
-    @keyframes pulse-green  { 0% { box-shadow: 0 0 0 0 rgba(42, 157, 143, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(42, 157, 143, 0); } 100% { box-shadow: 0 0 0 0 rgba(42, 157, 143, 0); } }
-    @keyframes pulse-purple { 0% { box-shadow: 0 0 0 0 rgba(106, 76, 147, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(106, 76, 147, 0); } 100% { box-shadow: 0 0 0 0 rgba(106, 76, 147, 0); } }
-
-    /* Alert Cards - Clean hover */
-    .alert-card {
-        background: #fff;
-        padding: 18px 22px;
-        border-radius: 14px;
-        transition: all 0.25s ease;
-        border-left: 5px solid #eef2f7; /* Default border */
-    }
-    .alert-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.07);
-    }
-    
-    /* Severity-based borders for Alert Cards */
-    .alert-card.sev-critical { border-left-color: #e63946; }
-    .alert-card.sev-high    { border-left-color: #ff6b35; }
-    .alert-card.sev-medium  { border-left-color: #ffba08; }
-    .alert-card.sev-low     { border-left-color: #90be6d; }
-
-    /* Severity Badges */
-    .sev-badge {
-        padding: 5px 12px;
-        border-radius: 20px; /* Pill shape */
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .sev-critical { background-color: rgba(230, 57, 70, 0.1); color:#e63946; }
-    .sev-high     { background-color: rgba(255, 107, 53, 0.1); color:#ff6b35; }
-    .sev-medium   { background-color: rgba(255, 186, 8, 0.15); color:#ffba08; }
-    .sev-low      { background-color: rgba(144, 190, 109, 0.15); color:#90be6d; }
-
-    /* Alert Footer */
-    .alert-footer {
-        display:flex;
-        justify-content:space-between;
-        font-size: 13px;
-        color:#6c757d;
-        border-top: 1px solid #eef2f7;
-        padding-top: 12px;
-        margin-top: 12px;
-    }
-    .alert-card .alert-footer { margin-top: 16px; }
-
-    .risk-tier-card {
-        height: 100%;
-        min-height: 170px;
-        padding: 22px 18px;
-        border: 1px solid transparent;
-        border-radius: 16px;
-        background: #fff;
-        box-shadow: 0 4px 16px rgba(0,0,0,.06);
-        text-align: center;
-    }
-    .risk-tier-icon { font-size: 1.35rem; margin-bottom: 8px; }
-    .risk-tier-label { font-size: .9rem; font-weight: 700; }
-    .risk-tier-count { font-size: 2rem; line-height: 1.2; font-weight: 800; margin-top: 6px; }
-    .risk-tier-caption { font-size: .8rem; color: #6c757d; }
-    .risk-critical { color: #b42318; background: #fff5f4; border-color: #fecdca; }
-    .risk-high { color: #c4320a; background: #fff6ed; border-color: #fedf89; }
-    .risk-moderate { color: #9a6700; background: #fffaeb; border-color: #fedf89; }
-    .risk-normal { color: #067647; background: #ecfdf3; border-color: #abefc6; }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .kpi-card, .alert-card { margin-bottom: 1rem; }
-        .col-md-2, .col-md-1 { margin-bottom: 0.5rem; }
-        .filter-form {
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 1rem;
-        }
-    }
-</style>
-
-<!-- CHART SCRIPT (Cleaner + Gradient Fill) -->
+<!-- SCRIPT LOGIC -->
 <script>
+// Auto submit filter on change
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".auto-submit").forEach(el => {
+    el.addEventListener("change", function () {
+      document.getElementById("filtersForm").submit();
+    });
+  });
+
+  // Alert search live filter
+  const alertSearch = document.getElementById("alertSearchInput");
+  if (alertSearch) {
+    alertSearch.addEventListener("input", function() {
+      const q = this.value.toLowerCase().trim();
+      document.querySelectorAll("#alertsContainer .alert-item").forEach(item => {
+        const wtg = item.getAttribute("data-wtg") || "";
+        const msg = item.getAttribute("data-msg") || "";
+        if (!q || wtg.includes(q) || msg.includes(q)) {
+          item.style.display = "";
+        } else {
+          item.style.display = "none";
+        }
+      });
+    });
+  }
+
+  // Toggle alerts
+  const btn = document.getElementById("toggleAlertsBtn");
+  if (btn) {
+    let expanded = false;
+    btn.addEventListener("click", function () {
+      expanded = !expanded;
+      document.querySelectorAll(".hidden-alert").forEach(el => {
+        el.style.display = expanded ? "block" : "none";
+      });
+      btn.innerHTML = expanded ? '<i class="fas fa-chevron-up me-1"></i> Show Less' : '<i class="fas fa-eye me-1"></i> View All Alerts ({{ alerts|length }})';
+    });
+  }
+});
+
+// Email alerts AJAX
+function sendBreakdownEmail() {
+  fetch("/customer/email_breakdown_alerts/", {
+    method: "POST",
+    headers: {
+      "X-CSRFToken": "{{ csrf_token }}"
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === "success") {
+      alert("Breakdown Alerts Email Sent Successfully!");
+    } else {
+      alert("Error sending email: " + (data.message || "Unknown error"));
+    }
+  })
+  .catch(err => {
+    alert("Request failed: " + err);
+  });
+}
+
 {% if btype == "recurrence" %}
-    const riskTierData = JSON.parse(document.getElementById("risk-tier-data").textContent) || [];
-    const riskGroupData = JSON.parse(document.getElementById("risk-group-data").textContent) || [];
-    const topWtgData = JSON.parse(document.getElementById("top-wtg-data").textContent) || [];
-    const subsystemRiskData = JSON.parse(document.getElementById("subsystem-risk-data").textContent) || [];
-    const recurrenceProfileData = JSON.parse(document.getElementById("recurrence-profile-data").textContent) || [];
-    const riskColors = {
-        CRITICAL_RECURRENCE: "#d92d20",
-        HIGH_RECURRENCE_RISK: "#f79009",
-        MODERATE_RECURRENCE: "#fdb022",
-        NORMAL: "#12b76a"
+  // ApexCharts initialization for Recurrence Risk Diagnostics
+  let riskTierData = [];
+  let riskGroupData = [];
+  let topWtgData = [];
+
+  try {
+    riskTierData = JSON.parse(document.getElementById("risk-tier-data").textContent) || [];
+  } catch(e) {}
+  try {
+    riskGroupData = JSON.parse(document.getElementById("risk-group-data").textContent) || [];
+  } catch(e) {}
+  try {
+    topWtgData = JSON.parse(document.getElementById("top-wtg-data").textContent) || [];
+  } catch(e) {}
+
+  const tierColors = {
+    CRITICAL_RECURRENCE: "#ef4444",
+    HIGH_RECURRENCE_RISK: "#f97316",
+    MODERATE_RECURRENCE: "#f59e0b",
+    NORMAL: "#10b981"
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    // 1. Donut Chart: WTG Distribution by Recurrence Risk
+    const tierDonutEl = document.querySelector("#riskTierChart");
+    if (tierDonutEl && riskTierData.length) {
+      const tierLabels = riskTierData.map(d => d.label);
+      const tierCounts = riskTierData.map(d => Number(d.count) || 0);
+      const tierSeriesColors = riskTierData.map(d => tierColors[d.key] || "#94a3b8");
+
+      const tierDonutOptions = {
+        series: tierCounts,
+        labels: tierLabels,
+        chart: {
+          type: "donut",
+          height: 360,
+          fontFamily: "inherit"
+        },
+        colors: tierSeriesColors,
+        plotOptions: {
+          pie: {
+            donut: {
+              size: "72%",
+              labels: {
+                show: true,
+                name: { show: true, fontSize: "13px", fontWeight: 600, color: "#64748b" },
+                value: {
+                  show: true,
+                  fontSize: "24px",
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  formatter: (val) => Number(val).toLocaleString() + " WTGs"
+                },
+                total: {
+                  show: true,
+                  label: "Fleet Total",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "#64748b",
+                  formatter: (w) => {
+                    const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                    return sum.toLocaleString() + " WTGs";
+                  }
+                }
+              }
+            }
+          }
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: (val) => val > 3 ? val.toFixed(1) + "%" : ""
+        },
+        legend: {
+          position: "bottom",
+          fontSize: "12px",
+          fontWeight: 600,
+          markers: { radius: 12 },
+          itemMargin: { horizontal: 8, vertical: 4 }
+        },
+        stroke: { width: 2, colors: ["#ffffff"] },
+        tooltip: {
+          y: {
+            formatter: (val) => `${Number(val).toLocaleString()} WTGs`
+          }
+        }
+      };
+      new ApexCharts(tierDonutEl, tierDonutOptions).render();
+    }
+
+    // 2. Stacked Bar Chart: Subsystem Risk Distribution
+    const groupEl = document.querySelector("#riskGroupChart");
+    if (groupEl && riskGroupData.length) {
+      const groupCategories = riskGroupData.map(d => d.label);
+      const groupSeries = [
+        {
+          name: "Critical Risk",
+          data: riskGroupData.map(d => Number(d.CRITICAL_RECURRENCE) || 0)
+        },
+        {
+          name: "High Risk",
+          data: riskGroupData.map(d => Number(d.HIGH_RECURRENCE_RISK) || 0)
+        },
+        {
+          name: "Moderate Risk",
+          data: riskGroupData.map(d => Number(d.MODERATE_RECURRENCE) || 0)
+        },
+        {
+          name: "Normal / Low",
+          data: riskGroupData.map(d => Number(d.NORMAL) || 0)
+        }
+      ];
+
+      const groupOptions = {
+        series: groupSeries,
+        chart: {
+          type: "bar",
+          height: 360,
+          stacked: true,
+          fontFamily: "inherit",
+          toolbar: { show: false }
+        },
+        colors: ["#ef4444", "#f97316", "#f59e0b", "#10b981"],
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: "46%",
+            borderRadius: 4
+          }
+        },
+        xaxis: {
+          categories: groupCategories,
+          labels: {
+            style: { fontSize: "12px", fontWeight: 600 }
+          }
+        },
+        yaxis: {
+          title: { text: "Turbine Count (WTGs)", style: { fontSize: "11px", fontWeight: 600 } },
+          labels: {
+            style: { fontSize: "11px", fontWeight: 600 }
+          }
+        },
+        legend: {
+          position: "top",
+          horizontalAlign: "right",
+          fontSize: "12px",
+          fontWeight: 600
+        },
+        grid: { borderColor: "#f1f5f9" },
+        tooltip: {
+          y: {
+            formatter: (val) => `${Number(val).toLocaleString()} WTGs`
+          }
+        }
+      };
+      new ApexCharts(groupEl, groupOptions).render();
+    }
+
+    // 3. Horizontal Bar Chart: Top WTGs at Risk
+    const topWtgEl = document.querySelector("#topWtgChart");
+    if (topWtgEl && topWtgData.length) {
+      const topWtgSubset = topWtgData.slice(0, 15);
+      const topCategories = topWtgSubset.map(d => d.wtg);
+      const topCounts = topWtgSubset.map(d => Number(d.breakdowns_90d) || 0);
+      const topColors = topWtgSubset.map(d => tierColors[d.risk_tier] || "#ef4444");
+      const maxCount = topCounts.length ? Math.max(...topCounts) : 1000;
+
+      const topOptions = {
+        series: [{
+          name: "Incident Events (90d)",
+          data: topCounts
+        }],
+        chart: {
+          type: "bar",
+          height: 560,
+          fontFamily: "inherit",
+          toolbar: { show: true, tools: { download: true, zoom: false } }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: true,
+            barHeight: "68%",
+            borderRadius: 5,
+            distributed: true,
+            dataLabels: { position: "top" }
+          }
+        },
+        colors: topColors,
+        dataLabels: {
+          enabled: true,
+          formatter: (val) => `${Number(val).toLocaleString()} trips`,
+          offsetX: 24,
+          style: { fontSize: "11px", fontWeight: 700, colors: ["#334155"] }
+        },
+        xaxis: {
+          categories: topCategories,
+          max: maxCount > 0 ? Math.ceil(maxCount * 1.15) : undefined,
+          labels: {
+            formatter: (val) => val != null ? Number(val).toLocaleString() : "",
+            style: { fontSize: "11px", fontWeight: 600 }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: { fontSize: "12px", fontWeight: 700 }
+          }
+        },
+        legend: { show: false },
+        grid: { borderColor: "#f1f5f9" },
+        tooltip: {
+          y: {
+            formatter: (val, opts) => {
+              const item = topWtgSubset[opts.dataPointIndex];
+              const tierName = item && item.risk_tier ? item.risk_tier.replace('_RECURRENCE', '').replace('_RISK', '') : '';
+              return `${Number(val).toLocaleString()} trips (${tierName})`;
+            }
+          }
+        }
+      };
+      new ApexCharts(topWtgEl, topOptions).render();
+    }
+
+    // 4. Client-side Pagination for WTGs at Recurrence Risk Table
+    const riskRows = Array.from(document.querySelectorAll("#riskTableBody .risk-table-row"));
+    let riskTablePageSize = 10;
+    let riskTableCurrentPage = 1;
+
+    function updateRiskTablePagination() {
+      const totalRows = riskRows.length;
+      const totalPages = riskTablePageSize === "all" ? 1 : Math.max(1, Math.ceil(totalRows / riskTablePageSize));
+      if (riskTableCurrentPage > totalPages) riskTableCurrentPage = totalPages;
+
+      const startIdx = riskTablePageSize === "all" ? 0 : (riskTableCurrentPage - 1) * riskTablePageSize;
+      const endIdx = riskTablePageSize === "all" ? totalRows : Math.min(startIdx + riskTablePageSize, totalRows);
+
+      riskRows.forEach((row, idx) => {
+        if (idx >= startIdx && idx < endIdx) {
+          row.style.display = "";
+        } else {
+          row.style.display = "none";
+        }
+      });
+
+      const info = document.getElementById("riskTablePaginationInfo");
+      if (info) {
+        if (totalRows === 0) {
+          info.textContent = "0 WTGs";
+        } else if (riskTablePageSize === "all") {
+          info.textContent = `Showing all ${totalRows} WTGs`;
+        } else {
+          info.textContent = `Showing WTGs ${startIdx + 1} - ${endIdx} of ${totalRows} (Page ${riskTableCurrentPage}/${totalPages})`;
+        }
+      }
+
+      const nav = document.getElementById("riskTablePaginationNav");
+      if (nav) {
+        if (totalPages <= 1 || riskTablePageSize === "all") {
+          nav.innerHTML = "";
+          return;
+        }
+        let html = `<li class="page-item ${riskTableCurrentPage === 1 ? 'disabled' : ''}">
+          <button type="button" class="page-link" onclick="goToRiskTablePage(${riskTableCurrentPage - 1})">&laquo; Prev</button>
+        </li>`;
+
+        for (let p = 1; p <= totalPages; p++) {
+          if (totalPages > 5 && Math.abs(p - riskTableCurrentPage) > 2 && p !== 1 && p !== totalPages) {
+            if (p === 2 || p === totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            continue;
+          }
+          html += `<li class="page-item ${p === riskTableCurrentPage ? 'active' : ''}">
+            <button type="button" class="page-link" onclick="goToRiskTablePage(${p})">${p}</button>
+          </li>`;
+        }
+
+        html += `<li class="page-item ${riskTableCurrentPage === totalPages ? 'disabled' : ''}">
+          <button type="button" class="page-link" onclick="goToRiskTablePage(${riskTableCurrentPage + 1})">Next &raquo;</button>
+        </li>`;
+        nav.innerHTML = html;
+      }
+    }
+
+    window.goToRiskTablePage = function(page) {
+      const totalPages = riskTablePageSize === "all" ? 1 : Math.max(1, Math.ceil(riskRows.length / riskTablePageSize));
+      if (page < 1 || page > totalPages) return;
+      riskTableCurrentPage = page;
+      updateRiskTablePagination();
     };
 
-    new Chart(document.getElementById("riskTierChart"), {
-        type: "doughnut",
-        data: {
-            labels: riskTierData.map(item => item.label),
-            datasets: [{
-                data: riskTierData.map(item => item.count),
-                backgroundColor: riskTierData.map(item => riskColors[item.key]),
-                borderWidth: 2,
-                borderColor: "#fff"
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: "bottom" },
-                tooltip: {
-                    callbacks: {
-                        label: context => `${context.label}: ${context.parsed} WTGs`
-                    }
-                }
-            }
-        }
-    });
+    const riskPageSizeSelect = document.getElementById("riskTablePageSize");
+    if (riskPageSizeSelect) {
+      riskPageSizeSelect.addEventListener("change", function() {
+        riskTablePageSize = this.value === "all" ? "all" : parseInt(this.value);
+        riskTableCurrentPage = 1;
+        updateRiskTablePagination();
+      });
+    }
 
-    new Chart(document.getElementById("riskGroupChart"), {
-        type: "bar",
-        data: {
-            labels: riskGroupData.map(item => item.label),
-            datasets: riskTierData.map(tier => ({
-                label: tier.label,
-                data: riskGroupData.map(item => item[tier.key]),
-                backgroundColor: riskColors[tier.key],
-                borderRadius: 4
-            }))
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: "bottom" },
-                tooltip: {
-                    callbacks: {
-                        label: context => `${context.dataset.label}: ${context.parsed.y} WTGs`
-                    }
-                }
-            },
-            scales: {
-                x: { stacked: true, grid: { display: false } },
-                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
-            }
-        }
-    });
+    if (riskRows.length > 0) {
+      updateRiskTablePagination();
+    }
+  });
 
-    new Chart(document.getElementById("topWtgChart"), {
-        type: "bar",
-        data: {
-            labels: topWtgData.map(item => `${item.site} / ${item.wtg}`),
-            datasets: [{
-                label: "Breakdowns in past 90 days",
-                data: topWtgData.map(item => item.breakdowns_90d),
-                backgroundColor: topWtgData.map(item => riskColors[item.risk_tier]),
-                borderRadius: 4
-            }]
-        },
-        options: {
-            indexAxis: "y",
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { beginAtZero: true, ticks: { precision: 0 } },
-                y: { grid: { display: false } }
-            }
-        }
-    });
-
-    new Chart(document.getElementById("subsystemRiskChart"), {
-        type: "bar",
-        data: {
-            labels: subsystemRiskData.map(item => item.label),
-            datasets: [
-                ["CRITICAL_RECURRENCE", "Critical"],
-                ["HIGH_RECURRENCE_RISK", "High"],
-                ["MODERATE_RECURRENCE", "Moderate"]
-            ].map(([key, label]) => ({
-                label,
-                data: subsystemRiskData.map(item => item[key]),
-                backgroundColor: riskColors[key],
-                borderRadius: 3
-            }))
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: "bottom" } },
-            scales: {
-                x: { stacked: true, grid: { display: false } },
-                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
-            }
-        }
-    });
-
-    new Chart(document.getElementById("recurrenceProfileChart"), {
-        type: "bar",
-        data: {
-            labels: recurrenceProfileData.map(item => item.label),
-            datasets: [{
-                label: "Distinct WTGs",
-                data: recurrenceProfileData.map(item => item.count),
-                backgroundColor: ["#f79009", "#d92d20", "#fdb022", "#6941c6"],
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: "y",
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { beginAtZero: true, ticks: { precision: 0 } },
-                y: { grid: { display: false } }
-            }
-        }
-    });
 {% else %}
-    const chartData = {{ chart_data|safe }};
-    const ctx = document.getElementById("breakChart").getContext("2d");
+  // APEXCHARTS MODERN RANKING CHART
+  let rawChartData = {};
+  try {
+    rawChartData = {{ chart_data|safe }};
+  } catch(e) {
+    console.error("Error reading chart_data:", e);
+  }
 
-    // Create Gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, 360);
-    gradient.addColorStop(0, 'rgba(78, 168, 222, 0.8)');   // #4ea8de
-    gradient.addColorStop(1, 'rgba(78, 168, 222, 0.2)');
+  // Parse dictionary into sorted list
+  const fullWtgItems = Object.entries(rawChartData).map(([wtg, cnt]) => ({
+    wtg: String(wtg).trim(),
+    count: Number(cnt) || 0
+  })).sort((a, b) => b.count - a.count);
 
-    new Chart(ctx, {
+  let breakChartInstance = null;
+  let chartSourceData = [...fullWtgItems];
+  let chartPageSize = 10;
+  let chartCurrentPage = 1;
+  let chartIsHorizontal = true;
+
+  function getChartTotalPages() {
+    if (chartPageSize === "all") return 1;
+    return Math.max(1, Math.ceil(chartSourceData.length / chartPageSize));
+  }
+
+  function updateChartPaginationNav() {
+    const nav = document.getElementById("chartPaginationNav");
+    const info = document.getElementById("chartPaginationInfo");
+    if (!nav) return;
+    const totalPages = getChartTotalPages();
+
+    if (chartPageSize === "all" || totalPages <= 1) {
+      nav.innerHTML = "";
+      if (info) info.textContent = `Showing All ${chartSourceData.length} Turbines`;
+      return;
+    }
+
+    const startIdx = (chartCurrentPage - 1) * chartPageSize + 1;
+    const endIdx = Math.min(chartCurrentPage * chartPageSize, chartSourceData.length);
+    if (info) info.textContent = `Showing WTGs ${startIdx}-${endIdx} of ${chartSourceData.length} (Page ${chartCurrentPage}/${totalPages})`;
+
+    let html = `<li class="page-item ${chartCurrentPage === 1 ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToChartPage(${chartCurrentPage - 1})">&laquo; Prev</button>
+    </li>`;
+
+    for (let p = 1; p <= totalPages; p++) {
+      if (totalPages > 6 && Math.abs(p - chartCurrentPage) > 2 && p !== 1 && p !== totalPages) {
+        if (p === 2 || p === totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        continue;
+      }
+      html += `<li class="page-item ${p === chartCurrentPage ? 'active' : ''}">
+        <button type="button" class="page-link" onclick="goToChartPage(${p})">${p}</button>
+      </li>`;
+    }
+
+    html += `<li class="page-item ${chartCurrentPage === totalPages ? 'disabled' : ''}">
+      <button type="button" class="page-link" onclick="goToChartPage(${chartCurrentPage + 1})">Next &raquo;</button>
+    </li>`;
+    nav.innerHTML = html;
+  }
+
+  function renderBreakdownApexChart() {
+    const chartEl = document.querySelector("#breakApexChart");
+    if (!chartEl) return;
+
+    let subset;
+    if (chartPageSize === "all") {
+      subset = [...chartSourceData];
+    } else {
+      const start = (chartCurrentPage - 1) * chartPageSize;
+      subset = chartSourceData.slice(start, start + chartPageSize);
+    }
+
+    // Clean categories (truncate if excessively long)
+    const rawCategories = subset.map(d => d.wtg);
+    const displayCategories = subset.map(d => d.wtg.length > 22 ? d.wtg.slice(0, 20) + "..." : d.wtg);
+    const seriesData = subset.map(d => Number(d.count));
+
+    const options = {
+      series: [{
+        name: {% if btype == "extended" %}"Extended Events"{% else %}"Repetitive Breakdowns"{% endif %},
+        data: seriesData
+      }],
+      chart: {
         type: "bar",
-        data: {
-            labels: Object.keys(chartData),
-            datasets: [{
-                label: {% if btype == "extended" %}"Extended events"{% elif btype == "recurrence" %}"Recurrence risk events"{% else %}"Repetitions"{% endif %},
-                data: Object.values(chartData),
-                backgroundColor: gradient, // Use gradient
-                borderColor: "#3a8cc7",
-                borderWidth: 2,
-                borderRadius: 6,
-                hoverBackgroundColor: "#3a8cc7"
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: "#2c3e50",
-                    titleColor: "#ffffff",
-                    bodyColor: "#ffffff",
-                    cornerRadius: 6,
-                    displayColors: false,
-                    callbacks: {
-                        label: ctx => {% if btype == "extended" %}`Extended events: ${ctx.parsed.y}`{% elif btype == "recurrence" %}`Recurrence risk events: ${ctx.parsed.y}`{% else %}`Repetitions: ${ctx.parsed.y}`{% endif %}
-                    }
-                }
-            },
-            scales: {
-                y: { 
-                    beginAtZero: true, 
-                    grid: { color: "#eef2f7" },
-                    ticks: {
-                        stepSize: 1,
-                        color: "#6c757d"
-                    }
-                },
-                x: { 
-                    grid: { display: false },
-                    ticks: {
-                        color: "#6c757d"
-                    }
-                }
-            },
-            animation: { 
-                duration: 1200, 
-                easing: "easeOutQuart" 
-            },
-            interaction: {
-                mode: 'index',
-                intersect: false
-            }
+        height: chartIsHorizontal ? Math.max(450, subset.length * 36) : 450,
+        toolbar: { show: true, tools: { download: true, zoom: false } }
+      },
+      plotOptions: {
+        bar: {
+          horizontal: chartIsHorizontal,
+          barHeight: chartIsHorizontal ? "68%" : "55%",
+          columnWidth: chartIsHorizontal ? undefined : "55%",
+          borderRadius: 5,
+          distributed: true,
+          dataLabels: { position: "top" }
         }
+      },
+      colors: subset.map(d => {
+        if (d.count >= 1000) return "#ef4444";
+        if (d.count >= 300)  return "#f97316";
+        if (d.count >= 50)   return "#3b82f6";
+        return "#10b981";
+      }),
+      dataLabels: {
+        enabled: true,
+        formatter: (val) => val > 0 ? Number(val).toLocaleString() + " events" : "",
+        offsetX: chartIsHorizontal ? 26 : 0,
+        offsetY: chartIsHorizontal ? 0 : -20,
+        style: { fontSize: "11px", colors: ["#334155"], fontWeight: 700 }
+      },
+      xaxis: {
+        categories: chartIsHorizontal ? displayCategories : rawCategories,
+        title: { text: chartIsHorizontal ? "Incident Trip Frequency" : "" },
+        labels: {
+          formatter: (val) => chartIsHorizontal ? (val != null ? Number(val).toLocaleString() : "") : String(val),
+          rotate: chartIsHorizontal ? 0 : -35,
+          rotateAlways: !chartIsHorizontal,
+          trim: true,
+          style: { fontSize: "11px", fontWeight: 600 }
+        }
+      },
+      yaxis: {
+        labels: {
+          style: { fontWeight: 600, fontSize: "11px" },
+          formatter: (val) => chartIsHorizontal ? String(val) : (val != null ? Number(val).toLocaleString() : "")
+        }
+      },
+      legend: { show: false },
+      tooltip: {
+        y: {
+          formatter: (val, opts) => {
+            const rawWtg = rawCategories[opts.dataPointIndex] || "";
+            return `${Number(val).toLocaleString()} occurrences (${rawWtg})`;
+          }
+        }
+      },
+      grid: { borderColor: "#f1f5f9" },
+      noData: {
+        text: "No breakdown events found matching current criteria",
+        style: { color: "#64748b", fontSize: "14px" }
+      }
+    };
+
+    if (breakChartInstance) {
+      breakChartInstance.destroy();
+    }
+    breakChartInstance = new ApexCharts(chartEl, options);
+    breakChartInstance.render();
+    updateChartPaginationNav();
+  }
+
+  window.goToChartPage = function(p) {
+    const total = getChartTotalPages();
+    if (p < 1 || p > total) return;
+    chartCurrentPage = p;
+    renderBreakdownApexChart();
+  };
+
+  document.addEventListener("DOMContentLoaded", function() {
+    renderBreakdownApexChart();
+
+    // Page size dropdown listener
+    const pageSizeSelect = document.getElementById("chartPageSize");
+    if (pageSizeSelect) {
+      pageSizeSelect.addEventListener("change", function () {
+        chartPageSize = this.value === "all" ? "all" : parseInt(this.value);
+        chartCurrentPage = 1;
+        renderBreakdownApexChart();
+      });
+    }
+
+    // Slice switcher buttons (Top 10 / Bottom 10 / Top 25 / All)
+    $("#chartSliceSwitcher button").on("click", function() {
+      $("#chartSliceSwitcher button").removeClass("active");
+      $(this).addClass("active");
+      const slice = $(this).data("slice");
+      if (slice === "top10") {
+        chartSourceData = [...fullWtgItems];
+        chartPageSize = 10;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "10";
+      } else if (slice === "bottom10") {
+        chartSourceData = [...fullWtgItems].reverse();
+        chartPageSize = 10;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "10";
+      } else if (slice === "top25") {
+        chartSourceData = [...fullWtgItems];
+        chartPageSize = 25;
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "25";
+      } else if (slice === "all") {
+        chartSourceData = [...fullWtgItems];
+        chartPageSize = "all";
+        chartCurrentPage = 1;
+        if (pageSizeSelect) pageSizeSelect.value = "all";
+      }
+      renderBreakdownApexChart();
     });
+
+    // Toggle orientation (Horizontal / Vertical)
+    $("#btnToggleChartType").on("click", function() {
+      chartIsHorizontal = !chartIsHorizontal;
+      $("#chartTypeLabel").text(chartIsHorizontal ? "Horizontal" : "Vertical");
+      renderBreakdownApexChart();
+    });
+  });
 {% endif %}
 </script>
-{% include 'fotter.html' %}
 
+{% include 'fotter.html' %}
 {% endblock %}

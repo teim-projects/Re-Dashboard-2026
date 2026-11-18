@@ -526,6 +526,11 @@ class BreakdownDashboardSchemaTests(SimpleTestCase):
 
     def test_duration_hours_parse_as_numeric_hours(self):
         self.assertEqual(parse_time_to_hours("2.5"), 2.5)
+        self.assertEqual(parse_time_to_hours("02:30"), 2.5)
+        self.assertAlmostEqual(parse_time_to_hours("1 day 02:30:00"), 26.5)
+        self.assertIsNone(parse_time_to_hours(None))
+        self.assertIsNone(parse_time_to_hours(""))
+        self.assertIsNone(parse_time_to_hours("-"))
 
     def test_missing_duration_can_be_derived_from_start_and_end(self):
         self.assertEqual(
@@ -535,3 +540,71 @@ class BreakdownDashboardSchemaTests(SimpleTestCase):
             ),
             2.5,
         )
+
+    def test_parse_date_like_parses_various_formats(self):
+        from customer_dashboard.data_service import parse_date_like
+        from datetime import date
+        self.assertEqual(parse_date_like("2025-01-15"), date(2025, 1, 15))
+        self.assertEqual(parse_date_like("15-01-2025"), date(2025, 1, 15))
+        self.assertIsNone(parse_date_like(None))
+        self.assertIsNone(parse_date_like(""))
+
+    def test_breakdown_log_ajax_response_structure(self):
+        from unittest.mock import patch
+        from django.http import JsonResponse
+        from customer_dashboard.views import wind_breakdown_log
+
+        factory = RequestFactory()
+        request = factory.get("/wind_breakdown_log/?draw=1&start=0&length=10")
+        request.user = User(username="test_user", is_staff=False)
+        request.session = {}
+
+        mock_result = {
+            "records": [
+                {
+                    "date": "15-01-2025",
+                    "sort_date": pd.Timestamp("2025-01-15"),
+                    "state": "Gujarat",
+                    "site": "Site A",
+                    "wtg": "WTG01",
+                    "provider": "Suzlon",
+                    "uploaded_by": "admin",
+                    "customer": "Test Customer",
+                    "remark": "Grid Trip",
+                    "breakdown_hours": 3.5,
+                }
+            ],
+            "total_records": 1,
+            "total_hours": 3.5,
+            "total_wtgs_affected": 1,
+            "total_sites_count": 1,
+            "total_states_count": 1,
+        }
+
+        mock_ctx = {
+            "providers": ["Suzlon"],
+            "customers": ["Test Customer"],
+            "states": ["Gujarat"],
+            "sites": ["Site A"],
+            "wtgs": ["WTG01"],
+            "selected_providers": [],
+            "selected_customers": [],
+            "selected_states": [],
+            "selected_sites": [],
+            "selected_wtgs": [],
+            "date_from": "",
+            "date_to": "",
+        }
+
+        with patch("customer_dashboard.data_service.get_filter_context", return_value=mock_ctx), \
+             patch("customer_dashboard.data_service.get_breakdown_log_data", return_value=mock_result):
+            response = wind_breakdown_log(request)
+            self.assertIsInstance(response, JsonResponse)
+            import json
+            data = json.loads(response.content)
+            self.assertEqual(data["draw"], 1)
+            self.assertEqual(data["recordsTotal"], 1)
+            self.assertEqual(data["recordsFiltered"], 1)
+            self.assertEqual(len(data["data"]), 1)
+            self.assertEqual(data["data"][0]["wtg"], "WTG01")
+            self.assertEqual(data["data"][0]["breakdown_hours"], 3.5)

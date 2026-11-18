@@ -128,7 +128,7 @@
 <div class="container-fluid px-4 py-3" style="margin-top: 85px;">
 
   <!-- PAGE HEADER & BREADCRUMB -->
-  <div class="page-header-card">
+  <div class="page-header-card mb-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
       <div>
         <div class="d-flex align-items-center gap-2">
@@ -140,60 +140,11 @@
         <h3 class="fw-bold text-dark mt-1 mb-0">Energy Generation (kWh)</h3>
         <p class="text-muted small mb-0">Fleet energy yield, monthly trend trajectory, and Top 10 / Bottom 10 turbine ranking</p>
       </div>
-
-      <!-- FILTER TRIGGER BUTTONS -->
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
-          <i class="fa-regular fa-calendar-days text-primary me-1"></i> Date Range
-        </button>
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#providerModal">
-          <i class="fa-solid fa-industry text-info me-1"></i> OEM Provider
-        </button>
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#customerModal">
-          <i class="fa-solid fa-user text-success me-1"></i> Customer
-        </button>
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#stateModal">
-          <i class="fa-solid fa-map-location-dot text-warning me-1"></i> State
-        </button>
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#siteModal">
-          <i class="fa-solid fa-map-pin text-danger me-1"></i> Site
-        </button>
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#wtgModal">
-          <i class="fa-solid fa-bolt text-purple me-1"></i> Turbine WTG
-        </button>
-      </div>
     </div>
-
-    <!-- ACTIVE APPLIED FILTER CHIPS -->
-    {% if date_from or date_to or selected_providers or selected_customers or selected_states or selected_sites or selected_wtgs %}
-    <div class="d-flex flex-wrap align-items-center gap-2 pt-3 mt-3 border-top">
-      <span class="small text-muted fw-bold"><i class="fa-solid fa-filter me-1"></i>Active:</span>
-      {% if date_from and date_to %}
-      <span class="badge rounded-pill bg-primary-subtle text-primary px-3 py-1">
-        <i class="fa-regular fa-calendar me-1"></i>{{ date_from }} → {{ date_to }}
-      </span>
-      {% endif %}
-      {% for p in selected_providers %}
-      <span class="badge rounded-pill bg-info-subtle text-info px-3 py-1"><i class="fa-solid fa-industry me-1"></i>{{ p }}</span>
-      {% endfor %}
-      {% for c in selected_customers %}
-      <span class="badge rounded-pill bg-success-subtle text-success px-3 py-1"><i class="fa-solid fa-user me-1"></i>{{ c }}</span>
-      {% endfor %}
-      {% for s in selected_states %}
-      <span class="badge rounded-pill bg-warning-subtle text-warning px-3 py-1"><i class="fa-solid fa-location-dot me-1"></i>{{ s }}</span>
-      {% endfor %}
-      {% for s in selected_sites %}
-      <span class="badge rounded-pill bg-danger-subtle text-danger px-3 py-1"><i class="fa-solid fa-map-pin me-1"></i>{{ s }}</span>
-      {% endfor %}
-      {% for w in selected_wtgs %}
-      <span class="badge rounded-pill bg-secondary-subtle text-secondary px-3 py-1"><i class="fa-solid fa-bolt me-1"></i>{{ w }}</span>
-      {% endfor %}
-      <a href="?clear_filters=1" class="btn btn-sm btn-link text-danger p-0 ms-2 small text-decoration-none">
-        <i class="fa-solid fa-xmark me-1"></i>Reset All
-      </a>
-    </div>
-    {% endif %}
   </div>
+
+  <!-- UNIFIED 6-PILL FILTER BAR -->
+  {% include "includes/wind_filter_bar.html" %}
 
   <!-- VISUAL #1: FLEET SUMMARY KPI CARDS (5-METRIC DECK) -->
   <div class="row g-3 mb-4">
@@ -315,7 +266,7 @@
 
         <div class="card-body p-3 flex-grow-1">
           <!-- Main Chart Container -->
-          <div id="wtgRankingChart" style="min-height: 480px; width: 100%;"></div>
+          <div id="wtgRankingChart" style="min-height: 520px; width: 100%;"></div>
 
           <!-- Chart Pagination & Footer Bar -->
           <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
@@ -355,7 +306,7 @@
 
         <div class="card-body p-3 flex-grow-1">
           <!-- Trend Chart Container -->
-          <div id="monthlyTrendChart" style="min-height: 480px; width: 100%;"></div>
+          <div id="monthlyTrendChart" style="min-height: 520px; width: 100%;"></div>
 
           <!-- Trend Footer Info -->
           <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top text-muted small">
@@ -459,206 +410,6 @@
 
 </div>
 
-<!-- FILTER MODALS (Preserved and Styled) -->
-<!-- Date Range Modal -->
-<div class="modal fade" id="dateRangeModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="fa-regular fa-calendar-days text-primary me-2"></i>Select Date Range</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-4">
-        <div class="row g-3">
-          <div class="col-6">
-            <label class="form-label small fw-bold">From Date</label>
-            <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
-          </div>
-          <div class="col-6">
-            <label class="form-label small fw-bold">To Date</label>
-            <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
-          </div>
-        </div>
-      </div>
-      {% for key,vals in request.GET.lists %}
-        {% if key not in "date_from,date_to" %}
-          {% for v in vals %}
-            <input type="hidden" name="{{ key }}" value="{{ v }}">
-          {% endfor %}
-        {% endif %}
-      {% endfor %}
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Range</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- OEM Provider Modal -->
-<div class="modal fade" id="providerModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="fa-solid fa-industry text-info me-2"></i>Select OEM Provider(s)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
-        {% for p in providers %}
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" name="provider" value="{{ p }}" id="prov_{{ forloop.counter }}"
-              {% if not selected_providers or p in selected_providers %}checked{% endif %}>
-            <label class="form-check-label fw-semibold" for="prov_{{ forloop.counter }}">{{ p }}</label>
-          </div>
-        {% empty %}
-          <p class="text-muted mb-0">No OEM providers found in database.</p>
-        {% endfor %}
-      </div>
-      {% for key,vals in request.GET.lists %}
-        {% if key != "provider" %}
-          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
-        {% endif %}
-      {% endfor %}
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Customer Modal -->
-<div class="modal fade" id="customerModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="fa-solid fa-user text-success me-2"></i>Select Customer(s)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
-        {% for c in customers %}
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" name="customer" value="{{ c }}" id="cust_{{ forloop.counter }}"
-              {% if not selected_customers or c in selected_customers %}checked{% endif %}>
-            <label class="form-check-label fw-semibold" for="cust_{{ forloop.counter }}">{{ c }}</label>
-          </div>
-        {% empty %}
-          <p class="text-muted mb-0">No customers found.</p>
-        {% endfor %}
-      </div>
-      {% for key,vals in request.GET.lists %}
-        {% if key != "customer" %}
-          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
-        {% endif %}
-      {% endfor %}
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- State Modal -->
-<div class="modal fade" id="stateModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="fa-solid fa-map-location-dot text-warning me-2"></i>Select State(s)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
-        {% for s in states %}
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" name="state" value="{{ s }}" id="st_{{ forloop.counter }}"
-              {% if not selected_states or s in selected_states %}checked{% endif %}>
-            <label class="form-check-label fw-semibold" for="st_{{ forloop.counter }}">{{ s }}</label>
-          </div>
-        {% empty %}
-          <p class="text-muted mb-0">No states found.</p>
-        {% endfor %}
-      </div>
-      {% for key,vals in request.GET.lists %}
-        {% if key != "state" %}
-          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
-        {% endif %}
-      {% endfor %}
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Site Modal -->
-<div class="modal fade" id="siteModal" tabindex="-1">
-  <div class="modal-dialog">
-    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="fa-solid fa-map-pin text-danger me-2"></i>Select Site(s)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
-        {% for s in sites %}
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" name="site" value="{{ s }}" id="site_{{ forloop.counter }}"
-              {% if not selected_sites or s in selected_sites %}checked{% endif %}>
-            <label class="form-check-label fw-semibold" for="site_{{ forloop.counter }}">{{ s }}</label>
-          </div>
-        {% empty %}
-          <p class="text-muted mb-0">No sites found.</p>
-        {% endfor %}
-      </div>
-      {% for key,vals in request.GET.lists %}
-        {% if key != "site" %}
-          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
-        {% endif %}
-      {% endfor %}
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- WTG Modal -->
-<div class="modal fade" id="wtgModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <form method="get" class="modal-content shadow-lg border-0" style="border-radius: 16px;">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="fa-solid fa-bolt text-purple me-2"></i>Select Turbine WTG(s)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
-        <div class="row">
-          {% for w in wtgs %}
-            <div class="col-md-4 col-sm-6 mb-2">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="wtg" value="{{ w }}" id="wtg_{{ forloop.counter }}"
-                  {% if not selected_wtgs or w in selected_wtgs %}checked{% endif %}>
-                <label class="form-check-label font-monospace fw-semibold" for="wtg_{{ forloop.counter }}">{{ w }}</label>
-              </div>
-            </div>
-          {% empty %}
-            <p class="text-muted mb-0">No WTGs found.</p>
-          {% endfor %}
-        </div>
-      </div>
-      {% for key,vals in request.GET.lists %}
-        {% if key != "wtg" %}
-          {% for v in vals %}<input type="hidden" name="{{ key }}" value="{{ v }}">{% endfor %}
-        {% endif %}
-      {% endfor %}
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4">Apply Filter</button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <!-- Scripts: jQuery, DataTables, ApexCharts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -716,7 +467,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }],
       chart: {
         type: 'bar',
-        height: Math.max(450, dataItems.length * 36),
+        height: Math.max(500, dataItems.length * 40),
         toolbar: { show: true, tools: { download: true } },
         fontFamily: 'Inter, system-ui, sans-serif'
       },
@@ -920,7 +671,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }],
       chart: {
         type: 'area',
-        height: 480,
+        height: 520,
         toolbar: { show: true, tools: { download: true, zoom: true, reset: true } },
         fontFamily: 'Inter, system-ui, sans-serif'
       },

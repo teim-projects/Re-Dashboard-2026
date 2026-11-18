@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-=g-)w+jcwgms&&*m-_so+*7f2z+g*o2n#m890lf%-!%t((k(bl
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["re-dashboard.teimsafety.com","127.0.0.1"]
+ALLOWED_HOSTS = ["re-dashboard.teimsafety.com", "127.0.0.1", "localhost", "testserver"]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://re-dashboard.teimsafety.com",

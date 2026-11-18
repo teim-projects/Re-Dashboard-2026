@@ -1,195 +1,858 @@
 {% extends "basewind.html" %}
 {% load static %}
 
+{% block style_css %}
+<!-- DataTables & Modern Dashboard Styling -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<style>
+  :root {
+    --pastel-bg: #f8fafc;
+    --pastel-indigo-bg: #eef2ff;
+    --pastel-indigo-border: #c7d2fe;
+    --pastel-indigo-text: #4338ca;
+    --pastel-mint-bg: #f0fdf4;
+    --pastel-mint-border: #bbf7d0;
+    --pastel-mint-text: #15803d;
+    --pastel-amber-bg: #fffbeb;
+    --pastel-amber-border: #fde68a;
+    --pastel-amber-text: #b45309;
+    --pastel-teal-bg: #f0fdfa;
+    --pastel-teal-border: #99f6e4;
+    --pastel-teal-text: #0f766e;
+    --pastel-rose-bg: #fdf2f8;
+    --pastel-rose-border: #fbcfe8;
+    --pastel-rose-text: #be185d;
+    --pastel-purple-bg: #faf5ff;
+    --pastel-purple-border: #e9d5ff;
+    --pastel-purple-text: #7e22ce;
+
+    --card-shadow-soft: 0 8px 24px -4px rgba(100, 116, 139, 0.06), 0 2px 6px -1px rgba(100, 116, 139, 0.02);
+    --card-hover-soft: 0 16px 32px -4px rgba(99, 102, 241, 0.09), 0 4px 10px -2px rgba(100, 116, 139, 0.03);
+  }
+
+  body {
+    background-color: var(--pastel-bg);
+    color: #334155;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Pastel Hero Header */
+  .hero-pastel-card {
+    background: linear-gradient(135deg, #f0f4ff 0%, #fbf5ff 45%, #fff7ed 100%);
+    border: 1px solid rgba(199, 210, 254, 0.6);
+    border-radius: 24px;
+    padding: 30px 36px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 28px -6px rgba(99, 102, 241, 0.08);
+  }
+
+  .hero-pastel-card::before {
+    content: "";
+    position: absolute;
+    top: -60px;
+    right: -40px;
+    width: 260px;
+    height: 260px;
+    background: radial-gradient(circle, rgba(167, 139, 250, 0.22) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .hero-pastel-card::after {
+    content: "";
+    position: absolute;
+    bottom: -60px;
+    left: 20%;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(110, 231, 183, 0.2) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .pastel-badge-pill {
+    background: #ffffff;
+    border: 1px solid #e0e7ff;
+    padding: 6px 14px;
+    border-radius: 30px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #4338ca;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.08);
+  }
+
+  /* KPI Pastel Cards */
+  .kpi-card-pastel {
+    background: #ffffff;
+    border: 1px solid #f1f5f9;
+    border-radius: 20px;
+    padding: 22px 24px;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--card-shadow-soft);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  .kpi-card-pastel:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--card-hover-soft);
+  }
+
+  .kpi-card-pastel.kpi-theme-indigo { border-top: 4px solid #818cf8; }
+  .kpi-card-pastel.kpi-theme-mint { border-top: 4px solid #34d399; }
+  .kpi-card-pastel.kpi-theme-amber { border-top: 4px solid #fbbf24; }
+  .kpi-card-pastel.kpi-theme-teal { border-top: 4px solid #2dd4bf; }
+  .kpi-card-pastel.kpi-theme-purple { border-top: 4px solid #c084fc; }
+
+  .kpi-icon-pastel {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  /* Modern Card Containers */
+  .detail-card-pastel {
+    background: #ffffff;
+    border: 1px solid #f1f5f9;
+    border-radius: 20px;
+    box-shadow: var(--card-shadow-soft);
+    overflow: hidden;
+    transition: all 0.25s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-card-pastel:hover {
+    box-shadow: var(--card-hover-soft);
+    border-color: #e2e8f0;
+  }
+
+  .detail-card-header-pastel {
+    background: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .detail-card-body-pastel {
+    padding: 22px;
+    flex: 1;
+  }
+
+  /* Modern Pastel Table */
+  .table-pastel {
+    margin-bottom: 0;
+    vertical-align: middle;
+  }
+
+  .table-pastel thead th {
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 13px 18px;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+  }
+
+  .table-pastel tbody td {
+    padding: 14px 18px;
+    color: #334155;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .table-pastel tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .table-pastel tbody tr:hover {
+    background-color: #fafbfd;
+  }
+
+  /* Pastel Pill Badges */
+  .badge-pastel-indigo {
+    background-color: var(--pastel-indigo-bg);
+    color: var(--pastel-indigo-text);
+    border: 1px solid var(--pastel-indigo-border);
+  }
+
+  .badge-pastel-mint {
+    background-color: var(--pastel-mint-bg);
+    color: var(--pastel-mint-text);
+    border: 1px solid var(--pastel-mint-border);
+  }
+
+  .badge-pastel-amber {
+    background-color: var(--pastel-amber-bg);
+    color: var(--pastel-amber-text);
+    border: 1px solid var(--pastel-amber-border);
+  }
+
+  .badge-pastel-teal {
+    background-color: var(--pastel-teal-bg);
+    color: var(--pastel-teal-text);
+    border: 1px solid var(--pastel-teal-border);
+  }
+
+  .badge-pastel-rose {
+    background-color: var(--pastel-rose-bg);
+    color: var(--pastel-rose-text);
+    border: 1px solid var(--pastel-rose-border);
+  }
+
+  .badge-pastel-purple {
+    background-color: var(--pastel-purple-bg);
+    color: var(--pastel-purple-text);
+    border: 1px solid var(--pastel-purple-border);
+  }
+
+  /* Progress Bars in Pastel */
+  .progress-pastel-track {
+    height: 8px;
+    border-radius: 12px;
+    background-color: #f1f5f9;
+    overflow: hidden;
+  }
+
+  .progress-bar-indigo {
+    background: linear-gradient(90deg, #a5b4fc 0%, #818cf8 100%);
+    border-radius: 12px;
+  }
+
+  .progress-bar-mint {
+    background: linear-gradient(90deg, #86efac 0%, #34d399 100%);
+    border-radius: 12px;
+  }
+
+  .progress-bar-amber {
+    background: linear-gradient(90deg, #fde68a 0%, #fbbf24 100%);
+    border-radius: 12px;
+  }
+
+  .progress-bar-teal {
+    background: linear-gradient(90deg, #99f6e4 0%, #2dd4bf 100%);
+    border-radius: 12px;
+  }
+
+  .progress-bar-rose {
+    background: linear-gradient(90deg, #fbcfe8 0%, #f472b6 100%);
+    border-radius: 12px;
+  }
+
+  .progress-bar-purple {
+    background: linear-gradient(90deg, #d8b4fe 0%, #a855f7 100%);
+    border-radius: 12px;
+  }
+
+  /* DataTables Styling */
+  .dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: 5px 12px !important;
+    margin: 2px !important;
+    border-radius: 10px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    color: #64748b !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease;
+  }
+
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+  .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: #818cf8 !important;
+    color: #ffffff !important;
+    border-color: #818cf8 !important;
+    box-shadow: 0 4px 10px rgba(129, 140, 248, 0.25);
+  }
+
+  .dataTables_wrapper .dataTables_info {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    padding-top: 10px;
+  }
+
+  .dataTables_wrapper .dataTables_filter input {
+    border-radius: 20px !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 6px 14px !important;
+    font-size: 0.85rem !important;
+    outline: none !important;
+    background-color: #fafbfd !important;
+  }
+
+  .dataTables_wrapper .dataTables_filter input:focus {
+    border-color: #a5b4fc !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(165, 180, 252, 0.25) !important;
+  }
+
+  /* Medal Badges */
+  .medal-pill {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 0.78rem;
+  }
+  .medal-1 { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+  .medal-2 { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+  .medal-3 { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+  .medal-other { background: #f8fafc; color: #94a3b8; border: 1px solid #e2e8f0; }
+
+  /* Pill Tag Filter Chips */
+  .summary-stat-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container my-4">
-  <h3 class="text-center mb-4 fw-bold text-primary">⚡ Installation Summary 2</h3>
-  <hr class="mb-5">
+<div class="container-fluid px-4 py-3" style="margin-top: 75px;">
 
-  <div class="row">
-    <!-- Chart 1 -->
-    <div class="col-md-6 mb-4">
-      <div class="card shadow-lg border-0 h-100 chart-card">
-        <div class="card-header form-heading">
-          <strong>WTG Loc No. Count By Power Sale</strong>
+  <!-- ==================== HERO HEADER (PASTEL LIGHT GRADIENT) ==================== -->
+  <div class="hero-pastel-card mb-4 position-relative">
+    <div class="row align-items-center">
+      <div class="col-lg-8">
+        <div class="d-inline-flex align-items-center gap-2 mb-3">
+          <span class="pastel-badge-pill">
+            <i class="fa-solid fa-chart-column text-primary"></i>
+            <span>Capacity View & Offtake Analysis</span>
+          </span>
+          <span class="badge bg-white text-secondary border rounded-pill px-3 py-1 shadow-sm small">
+            <i class="fa-solid fa-check-circle text-success me-1"></i> Verified Master Fleet Data
+          </span>
         </div>
-        <div class="card-body">
-          <canvas id="powerSaleChart" style="height:250px; width:100%"></canvas>
+        <h2 class="fw-bold text-dark mb-2" style="letter-spacing: -0.5px;">
+          Wind Fleet Capacity & Offtake View
+        </h2>
+        <p class="text-secondary mb-0" style="max-width: 720px; font-size: 0.95rem; line-height: 1.6;">
+          Strategic overview of turbine installations, commercial Power Purchase Agreements (PPA / Captive), land parcel tenure distributions, and OEM rating architecture.
+        </p>
+      </div>
+      <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+        <div class="d-flex flex-wrap justify-content-lg-end gap-2">
+          <div class="summary-stat-tag badge-pastel-indigo">
+            <i class="fa-solid fa-fan"></i>
+            <span>{{ total_wtgs }} WTG Locations</span>
+          </div>
+          <div class="summary-stat-tag badge-pastel-mint">
+            <i class="fa-solid fa-bolt-lightning"></i>
+            <span>{{ total_capacity }} MW Capacity</span>
+          </div>
+          <div class="summary-stat-tag badge-pastel-amber">
+            <i class="fa-solid fa-industry"></i>
+            <span>3 OEM Providers</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 4 PASTEL KPI STAT CARDS ==================== -->
+  <div class="row g-4 mb-4">
+    <!-- Card 1: Installed Fleet Size -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card-pastel kpi-theme-indigo">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Total Installed Units</span>
+            <h3 class="fw-bold text-dark mt-1 mb-0 font-monospace">{{ total_wtgs }} <span style="font-size: 1.1rem; color: #4338ca;">WTGs</span></h3>
+          </div>
+          <div class="kpi-icon-pastel" style="background: #e0e7ff; color: #4338ca; box-shadow: 0 4px 12px rgba(67, 56, 202, 0.12);">
+            <i class="fa-solid fa-fan"></i>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge badge-pastel-indigo rounded-pill px-2 py-1 small">
+            <i class="fa-solid fa-shield-halved me-1"></i> Active Fleet
+          </span>
+          <span class="text-muted small">Regen, Inox & Senvion</span>
         </div>
       </div>
     </div>
 
-    <!-- Chart 2 -->
-    <div class="col-md-6 mb-4">
-      <div class="card shadow-lg border-0 h-100 chart-card">
-        <div class="card-header form-heading">
-          <strong>Count of WTG Loc No. By Land</strong>
+    <!-- Card 2: Total Portfolio Capacity -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card-pastel kpi-theme-mint">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Total Fleet Capacity</span>
+            <h3 class="fw-bold text-dark mt-1 mb-0 font-monospace">{{ total_capacity }} <span style="font-size: 1.1rem; color: #059669;">MW</span></h3>
+          </div>
+          <div class="kpi-icon-pastel" style="background: #dcfce7; color: #059669; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.12);">
+            <i class="fa-solid fa-bolt-lightning"></i>
+          </div>
         </div>
-        <div class="card-body">
-          <canvas id="landChart" style="height:250px; width:100%"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- ✅ Table 1: WTG Locations -->
-    <div class="col-md-6 mb-4">
-      <div class="card shadow-lg border-0 h-100">
-        <div class="card-header form-heading">
-          <strong>WTG Locations</strong>
-        </div>
-        <div class="card-body">
-          <table id="wtgTable" class="table table-bordered table-striped table-hover text-center">
-            <thead class="table-light">
-              <tr>
-                <th>WTG Loc No.</th>
-                <th>Avg. Estimate Generation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in wtg_locations %}
-              <tr>
-                <td>{{ row.0 }}</td>
-                <td>{{ row.1 }}</td>
-              </tr>
-              {% empty %}
-              <tr><td colspan="2">No Data Available</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge badge-pastel-mint rounded-pill px-2 py-1 small">
+            30.0 / 16.0 / 6.3 MW
+          </span>
+          <span class="text-muted small">MH, KL & GJ Hubs</span>
         </div>
       </div>
     </div>
 
-    <!-- ✅ Table 2: OEM Wise -->
-    <div class="col-md-6 mb-4">
-      <div class="card shadow-lg border-0 h-100 ">
-        <div class="card-header  form-heading">
-          <strong>OEM WTG Wise Breakup</strong>
+    <!-- Card 3: Dominant Offtake Model -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card-pastel kpi-theme-amber">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Dominant Offtake Model</span>
+            <h3 class="fw-bold text-dark mt-1 mb-0">{{ dominant_offtake }}</h3>
+          </div>
+          <div class="kpi-icon-pastel" style="background: #fef3c7; color: #d97706; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.12);">
+            <i class="fa-solid fa-handshake-angle"></i>
+          </div>
         </div>
-        <div class="card-body">
-          <table id="oemTable" class="table table-bordered table-striped table-hover text-center">
-            <thead class="table-light">
-              <tr>
-                <th>Capacity (MW)</th>
-                <th>Firm</th>
-                <th>Make</th>
-                <th>WTG Loc. Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in oem_breakup %}
-              <tr>
-                <td>{{ row.0 }}</td>
-                <td>{{ row.1 }}</td>
-                <td>{{ row.2 }}</td>
-                <td>{{ row.3 }}</td>
-              </tr>
-              {% empty %}
-              <tr><td colspan="4">No Data Available</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge badge-pastel-amber rounded-pill px-2 py-1 small">
+            {{ dominant_offtake_count }} WTGs ({{ dominant_offtake_pct }}%)
+          </span>
+          <span class="text-muted small">Commercial PPA Yield</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: Primary Land Tenure -->
+    <div class="col-xl-3 col-md-6">
+      <div class="kpi-card-pastel kpi-theme-teal">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.75rem;">Primary Land Tenure</span>
+            <h3 class="fw-bold text-dark mt-1 mb-0">{{ dominant_land }}</h3>
+          </div>
+          <div class="kpi-icon-pastel" style="background: #ccfbf1; color: #0d9488; box-shadow: 0 4px 12px rgba(13, 148, 136, 0.12);">
+            <i class="fa-solid fa-mountain-sun"></i>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge badge-pastel-teal rounded-pill px-2 py-1 small">
+            {{ dominant_land_count }} Parcels ({{ dominant_land_pct }}%)
+          </span>
+          <span class="text-muted small">Freehold & Leasehold</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PASTEL APEXCHARTS ROW (HEIGHT 380PX) ==================== -->
+  <div class="row g-4 mb-4">
+    <!-- Visual 1: Power Sale Offtake Donut Chart (Pastel Palette) -->
+    <div class="col-lg-6">
+      <div class="detail-card-pastel">
+        <div class="detail-card-header-pastel">
+          <div class="d-flex align-items-center gap-2">
+            <div class="p-2 rounded-3" style="background-color: var(--pastel-indigo-bg); color: var(--pastel-indigo-text);">
+              <i class="fa-solid fa-file-contract"></i>
+            </div>
+            <div>
+              <h6 class="fw-bold text-dark mb-0">WTG Count by Power Sale Offtake</h6>
+              <small class="text-muted">Captive / PPA, State Grid & Third Party distribution</small>
+            </div>
+          </div>
+          <span class="badge badge-pastel-indigo rounded-pill px-3 py-1">Total: {{ total_wtgs }} WTGs</span>
+        </div>
+        <div class="detail-card-body-pastel d-flex align-items-center justify-content-center">
+          <div id="powerSaleDonutChart" style="width: 100%; min-height: 420px;"></div>
+        </div>
+        <!-- Summary chips underneath -->
+        <div class="px-4 py-3 border-top bg-light d-flex flex-wrap align-items-center justify-content-around gap-2">
+          {% for ps in power_sale_rows %}
+          <div class="d-flex align-items-center gap-2">
+            <span class="d-inline-block rounded-circle" style="width: 10px; height: 10px; background-color: {% if forloop.counter == 1 %}#818cf8{% elif forloop.counter == 2 %}#34d399{% else %}#fbbf24{% endif %};"></span>
+            <span class="small fw-semibold text-dark">{{ ps.label }}:</span>
+            <span class="badge bg-white text-dark border px-2 py-1 shadow-sm font-monospace">{{ ps.count }} Units ({{ ps.pct }}%)</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Visual 2: Land Parcel Tenure Donut Chart (Pastel Palette) -->
+    <div class="col-lg-6">
+      <div class="detail-card-pastel">
+        <div class="detail-card-header-pastel">
+          <div class="d-flex align-items-center gap-2">
+            <div class="p-2 rounded-3" style="background-color: var(--pastel-purple-bg); color: var(--pastel-purple-text);">
+              <i class="fa-solid fa-map-location-dot"></i>
+            </div>
+            <div>
+              <h6 class="fw-bold text-dark mb-0">Count of WTG Locations by Land Tenure</h6>
+              <small class="text-muted">Allocation across Private Land, Revenue Land & Forest Land</small>
+            </div>
+          </div>
+          <span class="badge badge-pastel-purple rounded-pill px-3 py-1">Total: {{ total_wtgs }} Parcels</span>
+        </div>
+        <div class="detail-card-body-pastel d-flex align-items-center justify-content-center">
+          <div id="landDonutChart" style="width: 100%; min-height: 420px;"></div>
+        </div>
+        <!-- Summary chips underneath -->
+        <div class="px-4 py-3 border-top bg-light d-flex flex-wrap align-items-center justify-content-around gap-2">
+          {% for land in land_rows %}
+          <div class="d-flex align-items-center gap-2">
+            <span class="d-inline-block rounded-circle" style="width: 10px; height: 10px; background-color: {% if forloop.counter == 1 %}#a78bfa{% elif forloop.counter == 2 %}#2dd4bf{% else %}#f472b6{% endif %};"></span>
+            <span class="small fw-semibold text-dark">{{ land.label }}:</span>
+            <span class="badge bg-white text-dark border px-2 py-1 shadow-sm font-monospace">{{ land.count }} Units ({{ land.pct }}%)</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 2 DETAILED PASTEL ANALYTICS CARDS ==================== -->
+  <div class="row g-4 mb-4">
+
+    <!-- Card 1: WTG Locations & Generation Yield Ranking -->
+    <div class="col-lg-6">
+      <div class="detail-card-pastel">
+        <div class="detail-card-header-pastel">
+          <div class="d-flex align-items-center gap-2">
+            <div class="p-2 rounded-3" style="background-color: var(--pastel-mint-bg); color: var(--pastel-mint-text);">
+              <i class="fa-solid fa-ranking-star"></i>
+            </div>
+            <div>
+              <h6 class="fw-bold text-dark mb-0">Turbine Generation Yield Rankings</h6>
+              <small class="text-muted">Top performing WTG locations by average daily output</small>
+            </div>
+          </div>
+          <span class="badge badge-pastel-mint rounded-pill px-3 py-1">Ranked WTGs</span>
+        </div>
+        <div class="detail-card-body-pastel p-0">
+          <div class="table-responsive p-3">
+            <table id="wtgTableModern" class="table table-pastel align-middle w-100">
+              <thead>
+                <tr>
+                  <th style="width: 65px;">Rank</th>
+                  <th>WTG Location</th>
+                  <th>Avg Daily Output</th>
+                  <th style="min-width: 130px;">Yield Intensity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for wtg in wtg_locations_formatted %}
+                <tr>
+                  <td>
+                    <span class="medal-pill {% if wtg.rank == 1 %}medal-1{% elif wtg.rank == 2 %}medal-2{% elif wtg.rank == 3 %}medal-3{% else %}medal-other{% endif %}">
+                      {{ wtg.rank }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge badge-pastel-indigo font-monospace px-3 py-1 rounded-pill fw-bold">
+                      <i class="fa-solid fa-fan me-1"></i> {{ wtg.loc }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="fw-bold text-dark font-monospace">{{ wtg.gen_display }}</span>
+                    <small class="text-muted ms-1">kWh/d</small>
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="progress-pastel-track flex-grow-1">
+                        <div class="progress-bar-mint" style="height: 100%; width: {{ wtg.pct }}%;"></div>
+                      </div>
+                      <span class="small fw-bold text-success font-monospace">{{ wtg.pct }}%</span>
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center py-4 text-muted">No turbine generation records available.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: OEM WTG Wise Breakup -->
+    <div class="col-lg-6">
+      <div class="detail-card-pastel">
+        <div class="detail-card-header-pastel">
+          <div class="d-flex align-items-center gap-2">
+            <div class="p-2 rounded-3" style="background-color: var(--pastel-indigo-bg); color: var(--pastel-indigo-text);">
+              <i class="fa-solid fa-microchip"></i>
+            </div>
+            <div>
+              <h6 class="fw-bold text-dark mb-0">OEM WTG Architecture Breakup</h6>
+              <small class="text-muted">Turbine rated capacities, manufacturers, and fleet distribution</small>
+            </div>
+          </div>
+          <span class="badge badge-pastel-indigo rounded-pill px-3 py-1">{{ total_capacity }} MW Total</span>
+        </div>
+        <div class="detail-card-body-pastel p-0">
+          <div class="table-responsive p-3">
+            <table id="oemTableModern" class="table table-pastel align-middle text-center w-100">
+              <thead>
+                <tr>
+                  <th>Turbine Rating</th>
+                  <th>OEM Firm</th>
+                  <th>Make / Model</th>
+                  <th>WTG Count</th>
+                  <th style="min-width: 130px;">Fleet Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for oem in oem_breakup_formatted %}
+                <tr>
+                  <td>
+                    <span class="badge badge-pastel-indigo font-monospace px-3 py-1 rounded-pill fw-bold">
+                      {{ oem.capacity }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="fw-bold text-dark">{{ oem.firm }}</span>
+                  </td>
+                  <td>
+                    <span class="text-muted font-monospace">{{ oem.make }}</span>
+                  </td>
+                  <td>
+                    <span class="badge bg-white text-dark border px-2 py-1 shadow-sm font-monospace fw-bold">
+                      {{ oem.count }} Units
+                    </span>
+                  </td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2 justify-content-center">
+                      <div class="progress-pastel-track flex-grow-1" style="max-width: 90px;">
+                        <div class="progress-bar-indigo" style="height: 100%; width: {{ oem.pct }}%;"></div>
+                      </div>
+                      <span class="small fw-bold text-primary font-monospace">{{ oem.pct }}%</span>
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center py-4 text-muted">No OEM breakup data available.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
 
   </div>
+
 </div>
-{% if no_data %}
-<script>
-    Swal.fire({
-        icon: 'info',
-        title: 'No Data Available',
-        text: '{{ no_data_msg }}',
-        confirmButtonColor: '#3085d6'
-    });
-</script>
-{% endif %}
 
-<!-- ✅ Styles -->
-<style>
-  .chart-card { border-radius: 15px; }
-  .bg-gradient-primary { background: linear-gradient(90deg, #007bff, #00c6ff); }
-  .bg-gradient-success { background: linear-gradient(90deg, #20c997, #28a745); }
-  .bg-gradient-info { background: linear-gradient(90deg, #17a2b8, #00cfd5); }
-  .bg-gradient-warning { background: linear-gradient(90deg, #ffc107, #ff8c00); }
-  .dataTables_wrapper .dataTables_paginate .paginate_button {
-    padding: 4px 10px;
-    margin: 2px;
-    border-radius: 6px;
-    background: #f8f9fa;
-  }
-  .dataTables_wrapper .dataTables_filter input {
-    border-radius: 8px;
-    padding: 5px 10px;
-    border: 1px solid #ccc;
-  }
-
-    .form-heading {
-    background: linear-gradient(to right, #7b2cbf, #9d4edd);
-    color: #fff;
-    padding: 15px 25px;
-    border-top-left-radius: 15px !important;
-    border-top-right-radius: 15px !important;
-    font-size: 18px;
-    font-weight: 500;
-    text-align: center !important;
-  }
-</style>
-
-<!-- ✅ Scripts -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" />
+<!-- DataTables & ApexCharts CDNs -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
 <script>
-  // Chart.js Config
-  const chartData = JSON.parse('{{ data|escapejs }}');
-  const commonOptions = {
-    plugins: {
-      legend: { position: "bottom", labels: { boxWidth: 15, padding: 15 } },
-      datalabels: {
-        color: "#fff",
-        font: { weight: "bold", size: 12 },
-        formatter: (value) => value
+document.addEventListener("DOMContentLoaded", function () {
+  // 1. Initialize modern DataTables
+  if ($.fn.DataTable) {
+    $('#wtgTableModern').DataTable({
+      "pageLength": 5,
+      "lengthChange": false,
+      "searching": true,
+      "ordering": true,
+      "info": true,
+      "pagingType": "simple_numbers",
+      "language": {
+        "search": "_INPUT_",
+        "searchPlaceholder": "Search WTG ID..."
       }
-    },
-    cutout: "65%",
-    responsive: true,
-    maintainAspectRatio: false
-  };
+    });
 
-  function createDoughnutChart(id, labels, counts, colors) {
-    new Chart(document.getElementById(id), {
-      type: 'doughnut',
-      data: {
-        labels: labels,
-        datasets: [{
-          data: counts,
-          backgroundColor: colors,
-          borderWidth: 2,
-          borderColor: "#fff"
-        }]
-      },
-      options: commonOptions,
-      plugins: [ChartDataLabels]
+    $('#oemTableModern').DataTable({
+      "pageLength": 5,
+      "lengthChange": false,
+      "searching": false,
+      "ordering": false,
+      "info": false,
+      "paging": false
     });
   }
 
-  createDoughnutChart("powerSaleChart", chartData.power_sale_labels, chartData.power_sale_counts, ["#007bff", "#20c997", "#ffc107", "#dc3545"]);
-  createDoughnutChart("landChart", chartData.land_labels, chartData.land_counts, ["#6f42c1", "#17a2b8", "#28a745", "#fd7e14"]);
+  // 2. ApexChart: Power Sale Offtake Donut Chart (Pastel Palette)
+  try {
+    const psLabels = {{ power_sale_labels_json|safe }};
+    const psCounts = {{ power_sale_counts_json|safe }};
 
-  // DataTables Init
-  $(document).ready(function() {
-    $('#wtgTable').DataTable({
-      pageLength: 5,
-      lengthMenu: [5, 10, 25, 50],
-    });
-    $('#oemTable').DataTable({
-      pageLength: 5,
-      lengthMenu: [5, 10, 25, 50],
-    });
-  });
+    const psOptions = {
+      series: psCounts,
+      labels: psLabels,
+      chart: {
+        type: 'donut',
+        height: 420,
+        fontFamily: 'inherit'
+      },
+      colors: ['#818cf8', '#34d399', '#fbbf24', '#f472b6'], // Pastel Indigo, Mint, Amber, Rose
+      plotOptions: {
+        pie: {
+          donut: {
+            size: '70%',
+            labels: {
+              show: true,
+              total: {
+                show: true,
+                label: 'Total Fleet',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#94a3b8',
+                formatter: function (w) {
+                  return '{{ total_wtgs }} WTGs';
+                }
+              },
+              value: {
+                fontSize: '22px',
+                fontWeight: 700,
+                color: '#1e293b',
+                formatter: function (val) {
+                  return val + ' WTGs';
+                }
+              }
+            }
+          }
+        }
+      },
+      dataLabels: {
+        enabled: false
+      },
+      stroke: {
+        width: 3,
+        colors: ['#ffffff']
+      },
+      legend: {
+        position: 'bottom',
+        horizontalAlign: 'center',
+        markers: { radius: 12 },
+        fontSize: '13px',
+        itemMargin: {
+          horizontal: 10,
+          vertical: 6
+        }
+      },
+      tooltip: {
+        y: {
+          formatter: function (val) {
+            return val + " WTG Units";
+          }
+        }
+      }
+    };
+
+    const psEl = document.querySelector("#powerSaleDonutChart");
+    if (psEl) {
+      const psChart = new ApexCharts(psEl, psOptions);
+      psChart.render();
+    }
+  } catch (err) {
+    console.error("Power sale chart error:", err);
+  }
+
+  // 3. ApexChart: Land Parcel Distribution Donut Chart (Pastel Palette)
+  try {
+    const landLabels = {{ land_labels_json|safe }};
+    const landCounts = {{ land_counts_json|safe }};
+
+    const landOptions = {
+      series: landCounts,
+      labels: landLabels,
+      chart: {
+        type: 'donut',
+        height: 420,
+        fontFamily: 'inherit'
+      },
+      colors: ['#a78bfa', '#2dd4bf', '#f472b6', '#fbbf24'], // Pastel Lavender, Aqua, Rose, Amber
+      plotOptions: {
+        pie: {
+          donut: {
+            size: '70%',
+            labels: {
+              show: true,
+              total: {
+                show: true,
+                label: 'Land Parcels',
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#94a3b8',
+                formatter: function (w) {
+                  return '{{ total_wtgs }} Parcels';
+                }
+              },
+              value: {
+                fontSize: '22px',
+                fontWeight: 700,
+                color: '#1e293b',
+                formatter: function (val) {
+                  return val + ' Parcels';
+                }
+              }
+            }
+          }
+        }
+      },
+      dataLabels: {
+        enabled: false
+      },
+      stroke: {
+        width: 3,
+        colors: ['#ffffff']
+      },
+      legend: {
+        position: 'bottom',
+        horizontalAlign: 'center',
+        markers: { radius: 12 },
+        fontSize: '13px',
+        itemMargin: {
+          horizontal: 10,
+          vertical: 6
+        }
+      },
+      tooltip: {
+        y: {
+          formatter: function (val) {
+            return val + " Land Locations";
+          }
+        }
+      }
+    };
+
+    const landEl = document.querySelector("#landDonutChart");
+    if (landEl) {
+      const landChart = new ApexCharts(landEl, landOptions);
+      landChart.render();
+    }
+  } catch (err) {
+    console.error("Land chart error:", err);
+  }
+});
 </script>
+
+{% include 'fotter.html' %}
 {% endblock %}

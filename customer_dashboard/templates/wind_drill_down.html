@@ -114,6 +114,9 @@
     </div>
   </div>
 
+  <!-- UNIFIED 6-PILL FILTER BAR -->
+  {% include "includes/wind_filter_bar.html" %}
+
   <!-- INDIVIDUAL TURBINE KPI DECK (6 METRICS) -->
   <div class="row g-3 mb-4">
     <!-- Metric 1: Total Generation -->
@@ -204,7 +207,7 @@
           <span class="badge bg-light text-muted border">Time Series</span>
         </div>
         <div class="card-body p-3">
-          <div id="wtgTrajectoryChart" style="min-height: 380px;"></div>
+          <div id="wtgTrajectoryChart" style="min-height: 440px;"></div>
         </div>
       </div>
     </div>
@@ -222,7 +225,7 @@
           <span class="badge bg-light text-muted border">Loss Donut</span>
         </div>
         <div class="card-body p-3">
-          <div id="lossDonutChart" style="min-height: 380px;"></div>
+          <div id="lossDonutChart" style="min-height: 440px;"></div>
         </div>
       </div>
     </div>
@@ -302,7 +305,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }],
       chart: {
         type: 'area',
-        height: 380,
+        height: 440,
         toolbar: { show: true },
         fontFamily: 'Inter, system-ui, sans-serif'
       },
@@ -342,7 +345,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const donutOpts = {
       series: lossValues,
       labels: lossCategories,
-      chart: { type: 'donut', height: 380, fontFamily: 'Inter, system-ui, sans-serif' },
+      chart: { type: 'donut', height: 440, fontFamily: 'Inter, system-ui, sans-serif' },
       colors: ['#ef4444', '#06b6d4', '#f59e0b', '#8b5cf6', '#10b981'],
       legend: { position: 'bottom' },
       dataLabels: {

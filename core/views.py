@@ -43,7 +43,7 @@ from django.core.files.storage import FileSystemStorage
 from django.db import connection
 from django.contrib.auth.models import User
 from django.utils.timezone import now
-from accounts.models import Provider, EnergyType, ProviderColumnMapping
+from accounts.models import Provider, EnergyType, ProviderColumnMapping, UserProvider, UserProfile
 from accounts.breakdown_mapping import canonicalize_breakdown_dataframe
 from accounts.breakdown_ingestion import insert_canonical_breakdown_rows
 from .models import UploadMetadata
@@ -1157,6 +1157,8 @@ def dashboard(request):
 
         # --- Provider stats ---
         total_providers = Provider.objects.count()
+        provider_data = list(Provider.objects.values_list("name", flat=True))
+        provider_counts = [UserProvider.objects.filter(provider__name=p).count() for p in provider_data]
 
         # --- User Registrations (last 6 months, grouped by username) ---
         today = now().date()
@@ -1174,6 +1176,8 @@ def dashboard(request):
             if month_label in months:
                 idx = months.index(month_label)
                 user_data[u.username][idx] += 1
+
+        growth_values = [sum(user_data[u.username][i] for u in users) for i in range(len(months))]
 
         colors = [
             "#36A2EB", "#FF6384", "#4BC0C0", "#9966FF", "#FF9F40",
@@ -1200,13 +1204,18 @@ def dashboard(request):
             "energy_labels": json.dumps(energy_labels),
             "energy_values": json.dumps(energy_values),
             "total_providers": total_providers,
+            "provider_labels": json.dumps(provider_data),
+            "provider_values": json.dumps(provider_counts),
+            "customer_growth_labels": json.dumps(months),
+            "customer_growth_values": json.dumps(growth_values),
             "registration_labels": json.dumps(months),
             "registration_datasets": json.dumps(datasets),
         }
         return render(request, "tracking_dashboard.html", context)
 
-    # Normal user dashboard
-    return render(request, "wind_dashboard.html")
+    # Normal user dashboard - populate with real wind analytics
+    from customer_dashboard.views import wind_dashboard as cust_wind_dashboard
+    return cust_wind_dashboard(request)
 
 
 @login_required

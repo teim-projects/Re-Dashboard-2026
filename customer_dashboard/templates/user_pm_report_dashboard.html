@@ -251,7 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const trendChart = new ApexCharts(document.querySelector("#chartLine"), {
     chart: {
       type: "area",
-      height: 320,
+      height: 380,
       foreColor: "#333",
       animations: {
         enabled: true,
@@ -302,7 +302,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const pieChart = new ApexCharts(document.querySelector("#chartPie"), {
     chart: {
       type: "donut",
-      height: 300,
+      height: 380,
       animations: { enabled: true, easing: "easeinout", speed: 1000 },
     },
     labels: ["Completed", "Pending"],
@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const barChart = new ApexCharts(document.querySelector("#chartBar"), {
     chart: {
       type: "bar",
-      height: 320,
+      height: 380,
       stacked: true,
       toolbar: { show: false },
       animations: {
