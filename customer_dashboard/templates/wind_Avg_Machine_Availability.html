@@ -128,6 +128,54 @@
     gap: 6px;
     border: 1px solid #e2e8f0;
   }
+  .chart-view-pill-group {
+    display: inline-flex;
+    background: #f1f5f9;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 3px;
+    border: 1px solid #e2e8f0;
+  }
+  .btn-view-pill {
+    border: none;
+    background: transparent;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-view-pill:hover {
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.6);
+  }
+  .btn-view-pill.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .bg-purple-50 { background-color: #faf5ff; }
+  .text-purple { color: #8b5cf6; }
+  .ma-tile-card {
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .ma-tile-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px -2px rgba(0,0,0,0.06);
+    border-color: #cbd5e1;
+  }
 </style>
 
 <div class="dash-container">
@@ -212,24 +260,39 @@
     </div>
   </div>
 
-  <!-- VISUAL #2: HORIZONTAL MACHINE AVAILABILITY RANKING BAR CHART -->
+  <!-- VISUAL #2: TURBINE MACHINE AVAILABILITY BENCHMARK & RANKING -->
   <div class="chart-card">
-    <div class="chart-header">
+    <div class="chart-header flex-wrap gap-2">
       <div>
         <h5 class="chart-title">
-          <i class="fas fa-chart-bar text-primary"></i>
-          Visual #2: Turbine Machine Availability Ranking (%)
+          <i class="fas fa-chart-column text-primary"></i>
+          Visual #2: Turbine Machine Availability Benchmark &amp; Ranking (%)
         </h5>
-        <div class="chart-subtitle">Clean horizontal ranking with 95% contractual SLA benchmark reference line</div>
+        <div class="chart-subtitle">High-precision reliability benchmarking, SLA variance analysis &amp; WTG ranking</div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="chart-view-pill-group" id="chartTypeSwitcher">
+          <button type="button" class="btn-view-pill active" data-type="columns" title="Modern Vertical Gradient Columns with SLA Benchmark">
+            <i class="fas fa-chart-column text-primary"></i> <span>Columns</span>
+          </button>
+          <button type="button" class="btn-view-pill" data-type="variance" title="SLA Variance (+/- from 95% Contractual Target)">
+            <i class="fas fa-arrows-split-up-and-left text-success"></i> <span>SLA Variance</span>
+          </button>
+          <button type="button" class="btn-view-pill" data-type="horizontal" title="Precision Horizontal Pro with Delta Badges">
+            <i class="fas fa-bars-progress text-warning"></i> <span>Horizontal</span>
+          </button>
+          <button type="button" class="btn-view-pill" data-type="matrix" title="Interactive SCADA Availability Matrix">
+            <i class="fas fa-table-cells text-info"></i> <span>SCADA Matrix</span>
+          </button>
+        </div>
+
         <div class="d-flex gap-1" id="rankingSwitcher">
           <button type="button" class="btn-filter-toggle active" data-view="top10">Top 10</button>
           <button type="button" class="btn-filter-toggle" data-view="bottom10">Bottom 10</button>
           <button type="button" class="btn-filter-toggle" data-view="top25">Top 25</button>
           <button type="button" class="btn-filter-toggle" data-view="all">All WTGs</button>
         </div>
-        <div class="d-flex align-items-center gap-1 ms-2">
+        <div class="d-flex align-items-center gap-1 ms-1">
           <span class="small text-muted fw-bold">Page Size:</span>
           <select id="chartPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
             <option value="10" selected>10 WTGs</option>
@@ -240,8 +303,58 @@
         </div>
       </div>
     </div>
+
+    <!-- EXECUTIVE INSIGHT RIBBON -->
+    <div class="row g-2 px-3 pt-3 pb-2 border-bottom bg-light-subtle" id="chartInsightRibbon">
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100 shadow-sm">
+          <div class="p-2 rounded-circle bg-success-subtle text-success fs-6 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+            <i class="fas fa-crown"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">Top Performer</div>
+            <div class="fw-bold text-dark text-truncate" style="font-size: 12.5px;" id="insightTopWtg">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100 shadow-sm">
+          <div class="p-2 rounded-circle bg-danger-subtle text-danger fs-6 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+            <i class="fas fa-triangle-exclamation"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">Critical Attention</div>
+            <div class="fw-bold text-danger text-truncate" style="font-size: 12.5px;" id="insightLowestWtg">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100 shadow-sm">
+          <div class="p-2 rounded-circle bg-primary-subtle text-primary fs-6 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+            <i class="fas fa-bullseye"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">Contractual SLA</div>
+            <div class="fw-bold text-primary text-truncate" style="font-size: 12.5px;">95.00% Baseline</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100 shadow-sm">
+          <div class="p-2 rounded-circle bg-purple-50 text-purple fs-6 d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: #faf5ff;">
+            <i class="fas fa-clipboard-check"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">Fleet SLA Compliance</div>
+            <div class="fw-bold text-purple text-truncate" style="font-size: 12.5px;" id="insightComplianceRate">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="p-3">
       <div id="maRankingChart" style="min-height: 480px;"></div>
+      <div id="maMatrixContainer" style="display: none; min-height: 480px;" class="py-2"></div>
       <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top flex-wrap gap-2 text-muted small">
         <span id="chartPaginationInfo" class="badge bg-light text-dark border px-2 py-1 font-monospace">Loading...</span>
         <nav aria-label="Chart Pagination">
@@ -352,135 +465,112 @@
   const monthlyMa = {{ monthly_ma_json|safe|default:"[]" }};
 
   let rankingChartInstance = null;
-
-  function renderRankingChart(sliceMode) {
-    let subset = [...fullWtgData];
-    if (sliceMode === "top10") {
-      subset = subset.slice(0, 10);
-    } else if (sliceMode === "bottom10") {
-      subset = [...fullWtgData].reverse().slice(0, 10);
-    } else if (sliceMode === "top25") {
-      subset = subset.slice(0, 25);
-    }
-
-    const categories = subset.map(d => d.wtg);
-    const seriesData = subset.map(d => d.ma);
-
-    const options = {
-      series: [{ name: "Machine Availability (%)", data: seriesData }],
-      chart: {
-        type: "bar",
-        height: Math.max(450, subset.length * 34),
-        toolbar: { show: true, tools: { download: true } }
-      },
-      plotOptions: {
-        bar: {
-          horizontal: true,
-          barHeight: "68%",
-          borderRadius: 4,
-          distributed: true,
-          dataLabels: { position: "top" }
-        }
-      },
-      colors: subset.map(d => d.ma >= 98.0 ? "#10b981" : (d.ma >= 95.0 ? "#3b82f6" : "#ef4444")),
-      dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? val + "%" : "",
-        offsetX: 24,
-        style: { fontSize: "11px", colors: ["#334155"], fontWeight: 700 }
-      },
-      xaxis: {
-        categories: categories,
-        min: 80,
-        max: 100,
-        labels: { formatter: (v) => v + "%" },
-        title: { text: "Machine Availability (%)" }
-      },
-      yaxis: {
-        labels: { style: { fontWeight: 600, fontSize: "11px" } }
-      },
-      legend: { show: false },
-      annotations: {
-        xaxis: [{
-          x: 95.0,
-          borderColor: "#ef4444",
-          strokeDashArray: 4,
-          label: {
-            borderColor: "#ef4444",
-            style: { color: "#fff", background: "#ef4444", fontSize: "10px", fontWeight: 700 },
-            text: "95% SLA Target"
-          }
-        }]
-      },
-      tooltip: {
-        y: { formatter: (v) => v + "% Availability" }
-      },
-      grid: { borderColor: "#f1f5f9" }
-    };
-
-    if (rankingChartInstance) {
-      rankingChartInstance.destroy();
-    }
-    rankingChartInstance = new ApexCharts(document.querySelector("#maRankingChart"), options);
-    rankingChartInstance.render();
-  }
-
-  // Monthly Spline Chart
-  function renderMonthlyTrend() {
-    const options = {
-      series: [{ name: "Fleet Machine Availability (%)", data: monthlyMa }],
-      chart: {
-        type: "area",
-        height: 400,
-        toolbar: { show: false }
-      },
-      colors: ["#3b82f6"],
-      fill: {
-        type: "gradient",
-        gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] }
-      },
-      dataLabels: { enabled: false },
-      stroke: { curve: "smooth", width: 2.5 },
-      xaxis: { categories: monthlyCats },
-      yaxis: { min: 85, max: 100, labels: { formatter: v => v + "%" } },
-      annotations: {
-        yaxis: [{
-          y: 95.0,
-          borderColor: "#ef4444",
-          strokeDashArray: 4,
-          label: {
-            borderColor: "#ef4444",
-            style: { color: "#fff", background: "#ef4444", fontSize: "10px", fontWeight: 600 },
-            text: "95% Target"
-          }
-        }]
-      },
-      tooltip: { y: { formatter: v => v + "%" } },
-      grid: { borderColor: "#f1f5f9" }
-    };
-    new ApexCharts(document.querySelector("#monthlyMaTrendChart"), options).render();
-  }
-
-  // SLA Donut Chart
-  function renderHealthDonut() {
-    let tier1 = fullWtgData.filter(d => d.ma >= 98).length;
-    let tier2 = fullWtgData.filter(d => d.ma >= 95 && d.ma < 98).length;
-    let tier3 = fullWtgData.filter(d => d.ma < 95).length;
-
-    const options = {
-      series: [tier1, tier2, tier3],
-      labels: ["Exceeding Target (>=98%)", "Meeting SLA (95-98%)", "Below Target (<95%)"],
-      chart: { type: "donut", height: 400 },
-      colors: ["#10b981", "#3b82f6", "#ef4444"],
-      legend: { position: "bottom" },
-      dataLabels: { enabled: true }
-    };
-    new ApexCharts(document.querySelector("#maHealthDonutChart"), options).render();
-  }
-
+  let currentChartType = "columns";
   let chartSourceData = [...fullWtgData];
   let chartPageSize = 10;
   let chartCurrentPage = 1;
+
+  function updateInsightRibbon() {
+    if (!fullWtgData.length) return;
+    const sorted = [...fullWtgData].sort((a,b) => Number(b.ma) - Number(a.ma));
+    const top = sorted[0];
+    const lowest = sorted[sorted.length - 1];
+    const meetingCount = fullWtgData.filter(d => Number(d.ma) >= 95.0).length;
+    const compliancePct = ((meetingCount / fullWtgData.length) * 100).toFixed(1);
+
+    const elTop = document.getElementById("insightTopWtg");
+    const elLowest = document.getElementById("insightLowestWtg");
+    const elComp = document.getElementById("insightComplianceRate");
+
+    if (elTop && top) elTop.innerHTML = `${top.wtg} <span class="badge bg-success-subtle text-success ms-1">${Number(top.ma).toFixed(2)}%</span>`;
+    if (elLowest && lowest) elLowest.innerHTML = `${lowest.wtg} <span class="badge bg-danger-subtle text-danger ms-1">${Number(lowest.ma).toFixed(2)}%</span>`;
+    if (elComp) elComp.innerHTML = `${meetingCount} / ${fullWtgData.length} <span class="text-muted fw-normal ms-1">(${compliancePct}%)</span>`;
+  }
+
+  function getCustomTooltip(subset) {
+    return {
+      custom: function({ series, seriesIndex, dataPointIndex, w }) {
+        const item = subset[dataPointIndex];
+        if (!item) return '';
+        const maVal = Number(item.ma).toFixed(2);
+        const delta = (Number(item.ma) - 95.0).toFixed(2);
+        const isMet = Number(item.ma) >= 95.0;
+        const statusBg = isMet ? '#dcfce7' : '#fee2e2';
+        const statusColor = isMet ? '#15803d' : '#b91c1c';
+        const statusText = Number(item.ma) >= 98.0 ? 'Optimal (>=98%)' : (isMet ? 'SLA Compliant' : 'SLA Breach (<95%)');
+
+        return `
+          <div style="background: rgba(255,255,255,0.98); backdrop-filter: blur(8px); border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); font-family: inherit; min-width: 210px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+              <span style="font-weight: 800; font-size: 13px; color: #0f172a;">${item.wtg}</span>
+              <span style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 12px; background: ${statusBg}; color: ${statusColor};">${statusText}</span>
+            </div>
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 3px;">OEM: <span style="font-weight: 600; color: #1e293b;">${item.oem || 'N/A'}</span> · Site: <span style="font-weight: 600; color: #1e293b;">${item.site || 'N/A'}</span></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
+              <span style="font-size: 11px; color: #64748b;">Machine Availability:</span>
+              <span style="font-weight: 800; font-size: 14px; color: #0f172a;">${maVal}%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
+              <span style="font-size: 11px; color: #64748b;">Contract SLA Target:</span>
+              <span style="font-weight: 600; font-size: 11px; color: #475569;">95.00%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
+              <span style="font-size: 11px; color: #64748b;">SLA Variance:</span>
+              <span style="font-weight: 700; font-size: 11px; color: ${isMet ? '#15803d' : '#b91c1c'};">${delta >= 0 ? '+' : ''}${delta}%</span>
+            </div>
+          </div>
+        `;
+      }
+    };
+  }
+
+  function renderMatrixView(subset) {
+    const matrixEl = document.getElementById("maMatrixContainer");
+    if (!matrixEl) return;
+    if (!subset.length) {
+      matrixEl.innerHTML = '<div class="alert alert-light text-center py-4 text-muted">No turbine data available</div>';
+      return;
+    }
+
+    let html = '<div class="row g-3">';
+    subset.forEach(d => {
+      const ma = Number(d.ma);
+      const isOptimal = ma >= 98.0;
+      const isMet = ma >= 95.0;
+      const delta = (ma - 95.0).toFixed(2);
+      const statusBadge = isOptimal 
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fas fa-check-circle me-1"></i>Optimal</span>'
+        : (isMet 
+          ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1"><i class="fas fa-check me-1"></i>Compliant</span>'
+          : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="fas fa-exclamation-triangle me-1"></i>Breach</span>');
+      
+      const barColor = isOptimal ? '#34d399' : (isMet ? '#818cf8' : '#fda4af');
+
+      html += `
+        <div class="col-12 col-sm-6 col-md-4 col-xl-3">
+          <div class="ma-tile-card h-100 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-bold text-dark fs-6"><i class="fas fa-fan text-muted me-1 small"></i>${d.wtg}</span>
+              <span class="badge bg-light text-muted border" style="font-size: 10px;">${d.oem || 'WTG'}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-baseline mb-2">
+              <span class="display-6 fw-bold" style="color: ${barColor}; font-size: 1.6rem;">${ma.toFixed(2)}%</span>
+              ${statusBadge}
+            </div>
+            <div class="progress mb-2" style="height: 6px; background-color: #f1f5f9; border-radius: 999px;">
+              <div class="progress-bar" style="width: ${Math.min(100, Math.max(0, ma))}%; background-color: ${barColor}; border-radius: 999px;"></div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center pt-2 mt-auto border-top text-muted" style="font-size: 11px;">
+              <span>SLA Target: 95.0%</span>
+              <span class="fw-bold ${isMet ? 'text-success' : 'text-danger'}">${delta >= 0 ? '+' : ''}${delta}%</span>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    matrixEl.innerHTML = html;
+  }
 
   function getChartTotalPages() {
     if (chartPageSize === "all") return 1;
@@ -532,67 +622,291 @@
       subset = chartSourceData.slice(start, start + chartPageSize);
     }
 
-    const categories = subset.map(d => d.wtg);
-    const seriesData = subset.map(d => d.ma);
+    updateInsightRibbon();
+    updateChartPaginationNav();
 
-    const options = {
-      series: [{ name: "Machine Availability (%)", data: seriesData }],
-      chart: {
-        type: "bar",
-        height: Math.max(380, subset.length * 30),
-        toolbar: { show: true, tools: { download: true } }
-      },
-      plotOptions: {
-        bar: {
-          horizontal: true,
-          barHeight: "68%",
-          borderRadius: 4,
-          distributed: true,
-          dataLabels: { position: "top" }
-        }
-      },
-      colors: subset.map(d => d.ma >= 98.0 ? "#10b981" : (d.ma >= 95.0 ? "#3b82f6" : "#ef4444")),
-      dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? val + "%" : "",
-        offsetX: 24,
-        style: { fontSize: "11px", colors: ["#334155"], fontWeight: 700 }
-      },
-      xaxis: {
-        categories: categories,
-        min: 80,
-        max: 100,
-        labels: { formatter: (v) => v + "%" },
-        title: { text: "Machine Availability (%)" }
-      },
-      yaxis: {
-        labels: { style: { fontWeight: 600, fontSize: "11px" } }
-      },
-      legend: { show: false },
-      annotations: {
-        xaxis: [{
-          x: 95.0,
-          borderColor: "#ef4444",
-          strokeDashArray: 4,
-          label: {
-            borderColor: "#ef4444",
-            style: { color: "#fff", background: "#ef4444", fontSize: "10px", fontWeight: 700 },
-            text: "95% SLA Target"
+    const chartEl = document.querySelector("#maRankingChart");
+    const matrixEl = document.querySelector("#maMatrixContainer");
+
+    if (currentChartType === "matrix") {
+      if (chartEl) chartEl.style.display = "none";
+      if (matrixEl) {
+        matrixEl.style.display = "block";
+        renderMatrixView(subset);
+      }
+      return;
+    }
+
+    if (matrixEl) matrixEl.style.display = "none";
+    if (chartEl) chartEl.style.display = "block";
+
+    const categories = subset.map(d => d.wtg);
+    const seriesMa = subset.map(d => Number(d.ma));
+    const minMa = seriesMa.length ? Math.min(...seriesMa) : 80;
+    const dynamicMin = Math.max(0, Math.floor((minMa - 5) / 5) * 5);
+
+    let options = {};
+
+    if (currentChartType === "columns") {
+      // 1. Modern Vertical Columns with Rounded Caps and Floating Values
+      const barColors = subset.map(d => Number(d.ma) >= 98.0 ? "#34d399" : (Number(d.ma) >= 95.0 ? "#818cf8" : "#fda4af"));
+      const colWidth = Math.min(52, Math.max(26, Math.floor(420 / Math.max(1, subset.length)))) + "%";
+
+      options = {
+        series: [{ name: "Machine Availability (%)", data: seriesMa }],
+        chart: {
+          type: "bar",
+          height: 480,
+          fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          toolbar: { show: true, tools: { download: true, zoom: false } },
+          animations: { enabled: true, easing: "easeinout", speed: 600 }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: colWidth,
+            borderRadius: 8,
+            borderRadiusApplication: 'end',
+            distributed: true,
+            dataLabels: { position: "top" }
           }
-        }]
-      },
-      tooltip: {
-        y: { formatter: (v) => v + "% Availability" }
-      },
-      grid: { borderColor: "#f1f5f9" }
-    };
+        },
+        colors: barColors,
+        dataLabels: {
+          enabled: true,
+          formatter: (val) => Number(val).toFixed(1) + "%",
+          offsetY: -22,
+          style: { fontSize: "11px", fontWeight: 700, colors: ["#334155"] }
+        },
+        xaxis: {
+          categories: categories,
+          labels: {
+            rotate: subset.length > 12 ? -35 : 0,
+            style: { fontSize: "11.5px", fontWeight: 600, colors: "#475569" }
+          },
+          axisBorder: { color: "#e2e8f0" }
+        },
+        yaxis: {
+          min: dynamicMin,
+          max: 100,
+          labels: {
+            formatter: (v) => v.toFixed(0) + "%",
+            style: { fontSize: "11px", fontWeight: 600, colors: "#64748b" }
+          },
+          title: { text: "Machine Availability (%)", style: { fontSize: "11px", fontWeight: 700, color: "#64748b" } }
+        },
+        legend: { show: false },
+        annotations: {
+          yaxis: [{
+            y: 95.0,
+            borderColor: "#fb7185",
+            strokeDashArray: 5,
+            borderWidth: 2,
+            label: {
+              borderColor: "#fda4af",
+              style: { color: "#9f1239", background: "#ffe4e6", fontSize: "10.5px", fontWeight: 700 },
+              text: "95.0% SLA Target Benchmark"
+            }
+          }]
+        },
+        grid: { borderColor: "#f1f5f9", strokeDashArray: 3 },
+        tooltip: getCustomTooltip(subset)
+      };
+
+    } else if (currentChartType === "variance") {
+      // 2. SLA Variance (+/- % points vs 95.0% contractual target)
+      const varianceData = subset.map(d => Number((Number(d.ma) - 95.0).toFixed(2)));
+      const varColors = varianceData.map(v => v >= 0 ? "#34d399" : "#fda4af");
+      const colWidth = Math.min(52, Math.max(26, Math.floor(420 / Math.max(1, subset.length)))) + "%";
+
+      options = {
+        series: [{ name: "SLA Variance (% pts)", data: varianceData }],
+        chart: {
+          type: "bar",
+          height: 480,
+          fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          toolbar: { show: true, tools: { download: true, zoom: false } },
+          animations: { enabled: true, easing: "easeinout", speed: 600 }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: colWidth,
+            borderRadius: 6,
+            distributed: true,
+            dataLabels: { position: "top" }
+          }
+        },
+        colors: varColors,
+        dataLabels: {
+          enabled: true,
+          formatter: (val) => (val >= 0 ? "+" : "") + Number(val).toFixed(2) + "%",
+          offsetY: -20,
+          style: { fontSize: "11px", fontWeight: 700, colors: ["#334155"] }
+        },
+        xaxis: {
+          categories: categories,
+          labels: {
+            rotate: subset.length > 12 ? -35 : 0,
+            style: { fontSize: "11.5px", fontWeight: 600, colors: "#475569" }
+          },
+          axisBorder: { color: "#e2e8f0" }
+        },
+        yaxis: {
+          labels: {
+            formatter: (v) => (v >= 0 ? "+" : "") + Number(v).toFixed(1) + "%",
+            style: { fontSize: "11px", fontWeight: 600, colors: "#64748b" }
+          },
+          title: { text: "Variance from 95.0% SLA Benchmark (% pts)", style: { fontSize: "11px", fontWeight: 700, color: "#64748b" } }
+        },
+        legend: { show: false },
+        annotations: {
+          yaxis: [{
+            y: 0,
+            borderColor: "#94a3b8",
+            strokeDashArray: 2,
+            borderWidth: 1.5,
+            label: {
+              borderColor: "#cbd5e1",
+              style: { color: "#475569", background: "#f8fafc", fontSize: "10px", fontWeight: 700 },
+              text: "95.0% SLA Parity"
+            }
+          }]
+        },
+        grid: { borderColor: "#f1f5f9", strokeDashArray: 3 },
+        tooltip: getCustomTooltip(subset)
+      };
+
+    } else {
+      // 3. Precision Horizontal Pro with Pastel Palette
+      const barColors = subset.map(d => Number(d.ma) >= 98.0 ? "#34d399" : (Number(d.ma) >= 95.0 ? "#818cf8" : "#fda4af"));
+
+      options = {
+        series: [{ name: "Machine Availability (%)", data: seriesMa }],
+        chart: {
+          type: "bar",
+          height: Math.max(440, subset.length * 36),
+          fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+          toolbar: { show: true, tools: { download: true } },
+          animations: { enabled: true, easing: "easeinout", speed: 600 }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: true,
+            barHeight: "64%",
+            borderRadius: 8,
+            borderRadiusApplication: 'end',
+            distributed: true,
+            dataLabels: { position: "top" }
+          }
+        },
+        colors: barColors,
+        dataLabels: {
+          enabled: true,
+          formatter: (val) => Number(val).toFixed(1) + "%",
+          offsetX: 24,
+          style: { fontSize: "11px", colors: ["#334155"], fontWeight: 700 }
+        },
+        xaxis: {
+          categories: categories,
+          min: dynamicMin,
+          max: 100,
+          labels: { formatter: (v) => v.toFixed(0) + "%", style: { fontSize: "11px", fontWeight: 600 } },
+          title: { text: "Machine Availability (%)", style: { fontSize: "11px", fontWeight: 700, color: "#64748b" } }
+        },
+        yaxis: {
+          labels: { style: { fontWeight: 700, fontSize: "11.5px", colors: "#334155" } }
+        },
+        legend: { show: false },
+        annotations: {
+          xaxis: [{
+            x: 95.0,
+            borderColor: "#fb7185",
+            strokeDashArray: 5,
+            borderWidth: 2,
+            label: {
+              borderColor: "#fda4af",
+              style: { color: "#9f1239", background: "#ffe4e6", fontSize: "10.5px", fontWeight: 700 },
+              text: "95% SLA Target"
+            }
+          }]
+        },
+        grid: { borderColor: "#f1f5f9", strokeDashArray: 3 },
+        tooltip: getCustomTooltip(subset)
+      };
+    }
 
     if (rankingChartInstance) {
       rankingChartInstance.destroy();
     }
-    rankingChartInstance = new ApexCharts(document.querySelector("#maRankingChart"), options);
+    rankingChartInstance = new ApexCharts(chartEl, options);
     rankingChartInstance.render();
-    updateChartPaginationNav();
+  }
+
+  // Monthly Spline Chart
+  function renderMonthlyTrend() {
+    const allMonthly = (monthlyMa || []).filter(v => v != null && !isNaN(v) && v > 0);
+    const minM = allMonthly.length ? Math.min(...allMonthly) : 80;
+    const dynamicMMin = Math.max(0, Math.floor((minM - 5) / 5) * 5);
+
+    const options = {
+      series: [{ name: "Fleet Machine Availability (%)", data: monthlyMa }],
+      chart: {
+        type: "area",
+        height: 400,
+        toolbar: { show: false }
+      },
+      colors: ["#818cf8"],
+      fill: {
+        type: "gradient",
+        gradient: { shadeIntensity: 1, opacityFrom: 0.38, opacityTo: 0.04, stops: [0, 90, 100] }
+      },
+      dataLabels: { enabled: false },
+      stroke: { curve: "smooth", width: 2.5 },
+      xaxis: { categories: monthlyCats },
+      yaxis: { min: dynamicMMin, max: 100, labels: { formatter: v => v + "%" } },
+      annotations: {
+        yaxis: [{
+          y: 95.0,
+          borderColor: "#fb7185",
+          strokeDashArray: 4,
+          borderWidth: 1.5,
+          label: {
+            borderColor: "#fda4af",
+            style: { color: "#9f1239", background: "#ffe4e6", fontSize: "10px", fontWeight: 600 },
+            text: "95% Target"
+          }
+        }]
+      },
+      tooltip: { y: { formatter: v => v + "%" } },
+      grid: { borderColor: "#f1f5f9" }
+    };
+    new ApexCharts(document.querySelector("#monthlyMaTrendChart"), options).render();
+  }
+
+  // SLA Donut Chart
+  function renderHealthDonut() {
+    const el = document.querySelector("#maHealthDonutChart");
+    if (!el) return;
+
+    let tier1 = fullWtgData.filter(d => Number(d.ma) >= 98).length;
+    let tier2 = fullWtgData.filter(d => Number(d.ma) >= 95 && Number(d.ma) < 98).length;
+    let tier3 = fullWtgData.filter(d => Number(d.ma) < 95).length;
+
+    if (tier1 === 0 && tier2 === 0 && tier3 === 0) {
+      el.innerHTML = '<div class="d-flex align-items-center justify-content-center text-muted small h-100 p-4" style="min-height:300px;"><i class="fas fa-info-circle me-2"></i>No machine availability data available for selected filter</div>';
+      return;
+    }
+
+    const options = {
+      series: [tier1, tier2, tier3],
+      labels: ["Exceeding Target (>=98%)", "Meeting SLA (95-98%)", "Below Target (<95%)"],
+      chart: { type: "donut", height: 400 },
+      colors: ["#34d399", "#818cf8", "#fda4af"],
+      legend: { position: "bottom" },
+      dataLabels: { enabled: true }
+    };
+    new ApexCharts(el, options).render();
   }
 
   window.goToChartPage = function(p) {
@@ -615,6 +929,13 @@
         renderPaginatedChart();
       });
     }
+
+    $("#chartTypeSwitcher button").on("click", function() {
+      $("#chartTypeSwitcher button").removeClass("active");
+      $(this).addClass("active");
+      currentChartType = $(this).data("type");
+      renderPaginatedChart();
+    });
 
     $("#rankingSwitcher button").on("click", function() {
       $("#rankingSwitcher button").removeClass("active");

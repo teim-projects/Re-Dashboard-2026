@@ -188,7 +188,7 @@ const API = "{% url 'api_generation_operating' %}";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const colorForYear = (y, idx) =>
-  ["#0b69a3", "#e66726", "#2ca02c", "#8b5cf6", "#ef476f"][idx % 5];
+  ["#818cf8", "#34d399", "#fbbf24", "#f472b6", "#38bdf8", "#c084fc"][idx % 6];
 
 /* ---------------------------
    GLOBAL STATE
@@ -416,8 +416,8 @@ function drawComparison(comparison){
   const x = d3.scaleLinear().domain([0,max]).range([0, w-160]);
 
   const data = [
-    {label:"Generation", value:gen, color:"#1f6fb6"},
-    {label:"Operating",  value:op,  color:"#002f6c"}
+    {label:"Generation", value:gen, color:"#818cf8"},
+    {label:"Operating",  value:op,  color:"#38bdf8"}
   ];
 
   g.selectAll("rect")

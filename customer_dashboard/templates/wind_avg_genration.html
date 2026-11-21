@@ -416,12 +416,12 @@
         bar: {
           horizontal: true,
           barHeight: "68%",
-          borderRadius: 4,
+          borderRadius: 6,
           distributed: true,
           dataLabels: { position: "top" }
         }
       },
-      colors: subset.map(d => d.daily_avg >= 10000 ? "#10b981" : (d.daily_avg >= 6000 ? "#3b82f6" : "#f59e0b")),
+      colors: subset.map(d => d.daily_avg >= 10000 ? "#34d399" : (d.daily_avg >= 6000 ? "#818cf8" : "#fbbf24")),
       dataLabels: {
         enabled: true,
         formatter: (val) => val > 0 ? Math.round(val).toLocaleString() + " kWh" : "",
@@ -467,10 +467,10 @@
         height: 400,
         toolbar: { show: false }
       },
-      colors: ["#3b82f6"],
+      colors: ["#818cf8"],
       fill: {
         type: "gradient",
-        gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] }
+        gradient: { shadeIntensity: 1, opacityFrom: 0.38, opacityTo: 0.04, stops: [0, 90, 100] }
       },
       dataLabels: { enabled: false },
       stroke: { curve: "smooth", width: 2.5 },
@@ -492,7 +492,7 @@
       series: [high, mid, low],
       labels: ["High Yield (>=10k kWh/d)", "Medium Yield (6k-10k kWh/d)", "Low Yield (<6k kWh/d)"],
       chart: { type: "donut", height: 400 },
-      colors: ["#10b981", "#3b82f6", "#f59e0b"],
+      colors: ["#34d399", "#818cf8", "#fbbf24"],
       legend: { position: "bottom", fontSize: "11px" },
       dataLabels: { enabled: true }
     };

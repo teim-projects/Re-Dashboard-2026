@@ -414,12 +414,15 @@
         bar: {
           horizontal: true,
           barHeight: "68%",
-          borderRadius: 4,
+          borderRadius: 6,
           distributed: true,
           dataLabels: { position: "top" }
         }
       },
-      colors: subset.map(d => d.daily_avg >= 20.0 ? "#10b981" : (d.daily_avg >= 15.0 ? "#3b82f6" : "#f59e0b")),
+      colors: subset.map(d => {
+        const avg = (d.daily_avg !== undefined && d.daily_avg !== null) ? Number(d.daily_avg) : (d.total_hrs > 0 ? d.total_hrs / 30 : 0);
+        return avg >= 18.0 ? "#34d399" : (avg >= 12.0 ? "#818cf8" : "#fbbf24");
+      }),
       dataLabels: {
         enabled: true,
         formatter: (val) => val > 0 ? Math.round(val).toLocaleString() + " hrs" : "",
@@ -465,10 +468,10 @@
         height: 400,
         toolbar: { show: false }
       },
-      colors: ["#3b82f6"],
+      colors: ["#818cf8"],
       fill: {
         type: "gradient",
-        gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] }
+        gradient: { shadeIntensity: 1, opacityFrom: 0.38, opacityTo: 0.04, stops: [0, 90, 100] }
       },
       dataLabels: { enabled: false },
       stroke: { curve: "smooth", width: 2.5 },
@@ -482,19 +485,33 @@
 
   // Utilization Donut Chart
   function renderHealthDonut() {
-    let high = fullWtgData.filter(d => d.daily_avg >= 20.0).length;
-    let mid = fullWtgData.filter(d => d.daily_avg >= 15.0 && d.daily_avg < 20.0).length;
-    let low = fullWtgData.filter(d => d.daily_avg < 15.0).length;
+    const el = document.querySelector("#genHealthDonutChart");
+    if (!el) return;
+
+    let high = 0, mid = 0, low = 0;
+    if (Array.isArray(fullWtgData) && fullWtgData.length > 0) {
+      fullWtgData.forEach(d => {
+        const avg = (d.daily_avg !== undefined && d.daily_avg !== null) ? Number(d.daily_avg) : (d.total_hrs > 0 ? d.total_hrs / 30 : 0);
+        if (avg >= 18.0) high++;
+        else if (avg >= 12.0) mid++;
+        else low++;
+      });
+    }
+
+    if (high === 0 && mid === 0 && low === 0) {
+      el.innerHTML = '<div class="d-flex align-items-center justify-content-center text-muted small h-100 p-4" style="min-height:300px;"><i class="fas fa-info-circle me-2"></i>No utilization data available for selected filter</div>';
+      return;
+    }
 
     const options = {
       series: [high, mid, low],
-      labels: ["Optimal (>=20 hrs/day)", "Moderate (15-20 hrs/day)", "Underutilized (<15 hrs/day)"],
+      labels: ["Optimal (>=18 hrs/day)", "Moderate (12-18 hrs/day)", "Underutilized (<12 hrs/day)"],
       chart: { type: "donut", height: 400 },
-      colors: ["#10b981", "#3b82f6", "#f59e0b"],
+      colors: ["#34d399", "#818cf8", "#fbbf24"],
       legend: { position: "bottom", fontSize: "11px" },
       dataLabels: { enabled: true }
     };
-    new ApexCharts(document.querySelector("#genHealthDonutChart"), options).render();
+    new ApexCharts(el, options).render();
   }
 
   document.addEventListener("DOMContentLoaded", function() {

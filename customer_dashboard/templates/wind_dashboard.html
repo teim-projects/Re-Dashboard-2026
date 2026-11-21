@@ -542,14 +542,14 @@ document.addEventListener("DOMContentLoaded", function () {
           dataLabels: { position: 'top' }
         }
       },
-      colors: [isBottomMode ? '#ef4444' : '#0ea5e9'],
+      colors: [isBottomMode ? '#fda4af' : '#818cf8'],
       fill: {
         type: 'gradient',
         gradient: {
           shade: 'light',
           type: 'horizontal',
           shadeIntensity: 0.25,
-          gradientToColors: [isBottomMode ? '#f59e0b' : '#10b981'],
+          gradientToColors: [isBottomMode ? '#fcd34d' : '#a78bfa'],
           stops: [0, 100]
         }
       },
@@ -653,10 +653,10 @@ document.addEventListener("DOMContentLoaded", function () {
         fontFamily: 'Inter, system-ui, sans-serif'
       },
       stroke: { curve: 'smooth', width: 3 },
-      colors: ['#10b981'],
+      colors: ['#34d399'],
       fill: {
         type: 'gradient',
-        gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 95, 100] }
+        gradient: { shadeIntensity: 1, opacityFrom: 0.38, opacityTo: 0.04, stops: [0, 95, 100] }
       },
       dataLabels: { enabled: false },
       xaxis: {
@@ -691,7 +691,7 @@ document.addEventListener("DOMContentLoaded", function () {
       plotOptions: {
         bar: { borderRadius: 8, columnWidth: '45%', distributed: true }
       },
-      colors: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'],
+      colors: ['#818cf8', '#38bdf8', '#34d399', '#fbbf24', '#f472b6'],
       dataLabels: {
         enabled: true,
         formatter: function(val) {
@@ -728,13 +728,13 @@ document.addEventListener("DOMContentLoaded", function () {
       plotOptions: {
         heatmap: {
           shadeIntensity: 0.5,
-          radius: 4,
+          radius: 6,
           useWarmShades: false,
           colorScale: {
             ranges: [
-              { from: 0, to: 89.9, name: '<90% Low', color: '#fee2e2' },
+              { from: 0, to: 89.9, name: '<90% Low', color: '#fecdd3' },
               { from: 90, to: 95.9, name: '90-95% Normal', color: '#fef08a' },
-              { from: 96, to: 100, name: '>=96% Optimal', color: '#bbf7d0' }
+              { from: 96, to: 100, name: '>=96% Optimal', color: '#a7f3d0' }
             ]
           }
         }

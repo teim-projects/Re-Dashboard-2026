@@ -688,12 +688,32 @@ def get_generation_hours_data(user, date_from=None, date_to=None, providers=None
                     if ym and len(str(ym)) >= 7:
                         monthly_hrs[str(ym)[:7]] += float(mh or 0.0)
 
+    sorted_months = sorted(monthly_hrs.keys())
+    if len(sorted_months) > 36 and not date_from:
+        sorted_months = sorted_months[-36:]
+
+    days_count = 1
+    if date_from and date_to:
+        try:
+            d1 = datetime.strptime(str(date_from)[:10], "%Y-%m-%d").date()
+            d2 = datetime.strptime(str(date_to)[:10], "%Y-%m-%d").date()
+            days_count = max(1, (d2 - d1).days + 1)
+        except Exception:
+            days_count = 1
+    elif len(sorted_months) > 0:
+        days_count = max(1, len(sorted_months) * 30)
+
     all_wtgs = []
     total_hours = 0.0
     for w, d in wtg_hrs.items():
+        h = round(d["hrs"], 1)
+        daily_avg = round(h / days_count, 1) if days_count > 0 else 0.0
+        util_pct = min(100.0, round((daily_avg / 24.0) * 100, 1))
         all_wtgs.append({
             "wtg": w,
-            "total_hrs": round(d["hrs"], 1),
+            "total_hrs": h,
+            "daily_avg": daily_avg,
+            "util_pct": util_pct,
             "oem": d["oem"],
             "site": d["site"],
         })
@@ -714,20 +734,21 @@ def get_generation_hours_data(user, date_from=None, date_to=None, providers=None
             "oem": item["oem"],
             "site": item["site"],
             "total_hrs": h,
+            "daily_avg": item["daily_avg"],
+            "util_pct": item["util_pct"],
             "share": share,
             "diff_avg": diff_avg,
             "status_class": "success" if h >= avg_hours else "warning",
             "status_text": "High" if h >= avg_hours else "Moderate",
         })
 
-    sorted_months = sorted(monthly_hrs.keys())
-    if len(sorted_months) > 36 and not date_from:
-        sorted_months = sorted_months[-36:]
-
     monthly_cats = [format_month_label(m) for m in sorted_months]
     monthly_gen = [round(monthly_hrs[m], 1) for m in sorted_months]
 
     peak_item = all_wtgs[0] if all_wtgs else {"wtg": "--", "total_hrs": 0}
+
+    fleet_daily_avg = round(avg_hours / days_count, 1) if days_count > 0 else 0.0
+    fleet_util_pct = min(100.0, round((fleet_daily_avg / 24.0) * 100, 1))
 
     return {
         "all_wtgs_json": json.dumps(all_wtgs),
@@ -736,8 +757,12 @@ def get_generation_hours_data(user, date_from=None, date_to=None, providers=None
         "table_data": table_data,
         "kpi_total_hrs": round(total_hours, 1),
         "kpi_avg_hrs": avg_hours,
+        "kpi_daily_avg": fleet_daily_avg,
+        "kpi_util_factor": fleet_util_pct,
         "kpi_peak_val": peak_item["total_hrs"],
         "kpi_peak_wtg": peak_item["wtg"],
+        "kpi_max_val": peak_item["total_hrs"],
+        "kpi_max_wtg": peak_item["wtg"],
         "kpi_total_wtgs": wtg_count,
         "total_hours": round(total_hours, 1),
     }

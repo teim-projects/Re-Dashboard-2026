@@ -109,6 +109,38 @@
     color: #ffffff;
     border-color: #1e293b;
   }
+  .chart-view-pill-group {
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: 8px;
+    display: inline-flex;
+    gap: 2px;
+    border: 1px solid #e2e8f0;
+  }
+  .btn-view-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-view-pill:hover {
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.6);
+  }
+  .btn-view-pill.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-weight: 700;
+  }
   .table-card {
     background: #ffffff;
     border-radius: var(--card-radius);
@@ -216,7 +248,7 @@
 
   <!-- CLUSTERED AVAILABILITY MATRIX CHART -->
   <div class="chart-card">
-    <div class="chart-header">
+    <div class="chart-header flex-wrap gap-2">
       <div>
         <h5 class="chart-title">
           <i class="fas fa-chart-column text-primary"></i>
@@ -225,13 +257,25 @@
         <div class="chart-subtitle">Direct comparison isolating whether machine or grid is the primary driver of downtime</div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="chart-view-pill-group" id="chartTypeSwitcher">
+          <button type="button" class="btn-view-pill active" data-type="combo" title="Modern Clustered Columns with Net Combined Spline Curve">
+            <i class="fas fa-chart-column text-primary"></i> <span>Clustered &amp; Net Line</span>
+          </button>
+          <button type="button" class="btn-view-pill" data-type="heatmap" title="SCADA Diagnostic Heatmap Matrix">
+            <i class="fas fa-table-cells text-success"></i> <span>Heatmap Matrix</span>
+          </button>
+          <button type="button" class="btn-view-pill" data-type="bar" title="Modern Horizontal Grouped Bars">
+            <i class="fas fa-bars-progress text-warning"></i> <span>Horizontal</span>
+          </button>
+        </div>
+
         <div class="d-flex gap-1" id="rankingSwitcher">
           <button type="button" class="btn-filter-toggle active" data-view="top10">Top 10</button>
           <button type="button" class="btn-filter-toggle" data-view="bottom10">Bottom 10</button>
           <button type="button" class="btn-filter-toggle" data-view="top25">Top 25</button>
           <button type="button" class="btn-filter-toggle" data-view="all">All WTGs</button>
         </div>
-        <div class="d-flex align-items-center gap-1 ms-2">
+        <div class="d-flex align-items-center gap-1 ms-1">
           <span class="small text-muted fw-bold">Page Size:</span>
           <select id="chartPageSize" class="form-select form-select-sm" style="width: auto; font-size: 11px; padding: 2px 24px 2px 8px;">
             <option value="10" selected>10 WTGs</option>
@@ -239,6 +283,54 @@
             <option value="25">25 WTGs</option>
             <option value="all">All WTGs</option>
           </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXECUTIVE INSIGHT RIBBON -->
+    <div class="row g-2 px-3 pt-3 pb-2 border-bottom bg-light-subtle" id="chartInsightRibbon">
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100">
+          <div class="p-2 rounded-circle bg-success-subtle text-success fs-6 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="fas fa-crown"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">Top Performer</div>
+            <div class="fw-bold text-dark text-truncate" style="font-size: 12.5px;" id="insightTopWtg">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100">
+          <div class="p-2 rounded-circle bg-danger-subtle text-danger fs-6 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="fas fa-triangle-exclamation"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">Critical Attention</div>
+            <div class="fw-bold text-danger text-truncate" style="font-size: 12.5px;" id="insightLowestWtg">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100">
+          <div class="p-2 rounded-circle bg-amber-50 text-warning fs-6 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background-color: #fffbeb;">
+            <i class="fas fa-bolt"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">Primary Loss Driver</div>
+            <div class="fw-bold text-dark text-truncate" style="font-size: 12.5px;" id="insightPrimaryDriver">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="d-flex align-items-center gap-2 p-2 rounded-2 bg-white border h-100">
+          <div class="p-2 rounded-circle bg-primary-subtle text-primary fs-6 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+            <i class="fas fa-bullseye"></i>
+          </div>
+          <div class="text-truncate">
+            <div class="text-muted text-uppercase" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.04em;">SLA Compliance (≥95%)</div>
+            <div class="fw-bold text-primary text-truncate" style="font-size: 12.5px;" id="insightSlaRate">--</div>
+          </div>
         </div>
       </div>
     </div>
@@ -353,10 +445,139 @@
   let chartSourceData = [...fullWtgData];
   let chartPageSize = 10;
   let chartCurrentPage = 1;
+  let currentChartType = "combo"; // "combo" | "heatmap" | "bar"
 
   function getChartTotalPages() {
     if (chartPageSize === "all") return 1;
     return Math.max(1, Math.ceil(chartSourceData.length / chartPageSize));
+  }
+
+  function updateInsightRibbon(subset) {
+    if (!subset || subset.length === 0) {
+      document.getElementById("insightTopWtg").textContent = "N/A";
+      document.getElementById("insightLowestWtg").textContent = "N/A";
+      document.getElementById("insightPrimaryDriver").textContent = "N/A";
+      document.getElementById("insightSlaRate").textContent = "N/A";
+      return;
+    }
+
+    const sorted = [...subset].sort((a, b) => (Number(b.comb_ga) || 0) - (Number(a.comb_ga) || 0));
+    const top = sorted[0];
+    const lowest = sorted[sorted.length - 1];
+
+    const topVal = Number(top.comb_ga) || 0;
+    const lowVal = Number(lowest.comb_ga) || 0;
+    document.getElementById("insightTopWtg").innerHTML = `${top.wtg} <span class="badge bg-success-subtle text-success ms-1">${topVal.toFixed(1)}%</span>`;
+    document.getElementById("insightLowestWtg").innerHTML = `${lowest.wtg} <span class="badge bg-danger-subtle text-danger ms-1">${lowVal.toFixed(1)}%</span>`;
+
+    let sumMa = 0, sumInt = 0, sumExt = 0, slaCount = 0;
+    subset.forEach(d => {
+      sumMa += Number(d.ma) || 0;
+      sumInt += Number(d.int_ga) || 0;
+      sumExt += Number(d.ext_ga) || 0;
+      if ((Number(d.comb_ga) || 0) >= 95.0) slaCount++;
+    });
+
+    const avgMa = sumMa / subset.length;
+    const avgInt = sumInt / subset.length;
+    const avgExt = sumExt / subset.length;
+
+    let driverName = "Machine Downtime";
+    let driverVal = avgMa;
+    if (avgExt <= avgInt && avgExt <= avgMa) {
+      driverName = "External Grid Loss";
+      driverVal = avgExt;
+    } else if (avgInt <= avgExt && avgInt <= avgMa) {
+      driverName = "Internal Substation Loss";
+      driverVal = avgInt;
+    }
+    document.getElementById("insightPrimaryDriver").innerHTML = `${driverName} <span class="badge bg-light text-muted border ms-1">${driverVal.toFixed(1)}%</span>`;
+
+    const slaPct = ((slaCount / subset.length) * 100).toFixed(0);
+    document.getElementById("insightSlaRate").innerHTML = `${slaPct}% <span class="small text-muted fw-normal">(${slaCount}/${subset.length})</span>`;
+  }
+
+  function generateCustomTooltip(item) {
+    if (!item) return '';
+    const ma = item.ma != null ? Number(item.ma).toFixed(2) : '0.00';
+    const intGa = item.int_ga != null ? Number(item.int_ga).toFixed(2) : '0.00';
+    const extGa = item.ext_ga != null ? Number(item.ext_ga).toFixed(2) : '0.00';
+    const combGa = item.comb_ga != null ? Number(item.comb_ga).toFixed(2) : '0.00';
+
+    const numMa = Number(item.ma) || 0;
+    const numInt = Number(item.int_ga) || 0;
+    const numExt = Number(item.ext_ga) || 0;
+
+    let bottleneck = "Balanced Performance";
+    let badgeStyle = "background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;";
+    let badgeIcon = "fa-circle-check";
+
+    const minMetric = Math.min(numMa, numInt, numExt);
+    if (minMetric < 95.0) {
+      if (minMetric === numExt) {
+        bottleneck = "Primary Bottleneck: External Evacuation Grid (DISCOM/EB)";
+        badgeStyle = "background:#fef3c7; color:#92400e; border:1px solid #fde68a;";
+        badgeIcon = "fa-tower-broadcast";
+      } else if (minMetric === numInt) {
+        bottleneck = "Primary Bottleneck: In-Park Substation & Feeder Line";
+        badgeStyle = "background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;";
+        badgeIcon = "fa-network-wired";
+      } else {
+        bottleneck = "Primary Bottleneck: Turbine Machine Mechanical Downtime";
+        badgeStyle = "background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;";
+        badgeIcon = "fa-gears";
+      }
+    } else {
+      bottleneck = "Optimal Health: All Availability Metrics Exceed 95%";
+    }
+
+    return `
+      <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 12px 28px -4px rgba(15,23,42,0.18); padding: 14px 16px; font-family: inherit; min-width: 250px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 10px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-fan text-primary" style="font-size: 14px;"></i>
+            <span style="font-weight: 800; font-size: 14px; color: #0f172a;">${item.wtg}</span>
+          </div>
+          <span style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">${item.oem || 'WTG'}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 7px; font-size: 11.5px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #64748b; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #818cf8; display: inline-block;"></span>
+              Machine Availability
+            </span>
+            <span style="font-weight: 700; color: #0f172a;">${ma}%</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #64748b; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #34d399; display: inline-block;"></span>
+              Internal Grid GA
+            </span>
+            <span style="font-weight: 700; color: #0f172a;">${intGa}%</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #64748b; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; display: inline-block;"></span>
+              External Grid GA
+            </span>
+            <span style="font-weight: 700; color: #0f172a;">${extGa}%</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px dashed #e2e8f0;">
+            <span style="font-weight: 700; color: #7c3aed; display: flex; align-items: center; gap: 6px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #a78bfa; display: inline-block;"></span>
+              Net Combined GA
+            </span>
+            <span style="font-weight: 800; color: #7c3aed; font-size: 13px;">${combGa}%</span>
+          </div>
+        </div>
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #f1f5f9;">
+          <div style="${badgeStyle} padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <i class="fas ${badgeIcon}"></i>
+            <span>${bottleneck}</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function updateChartPaginationNav() {
@@ -404,56 +625,281 @@
       subset = chartSourceData.slice(start, start + chartPageSize);
     }
 
-    const categories = subset.map(d => d.wtg);
-    const maSeries = subset.map(d => d.ma);
-    const intSeries = subset.map(d => d.int_ga);
-    const extSeries = subset.map(d => d.ext_ga);
+    updateInsightRibbon(subset);
 
-    const options = {
-      series: [
-        { name: "Machine Availability (%)", data: maSeries },
-        { name: "Internal Grid GA (%)", data: intSeries },
-        { name: "External Grid GA (%)", data: extSeries }
-      ],
-      chart: {
-        type: "bar",
-        height: Math.max(450, subset.length * 40),
-        toolbar: { show: true, tools: { download: true } }
-      },
-      plotOptions: {
-        bar: {
-          horizontal: true,
-          barHeight: "75%",
-          borderRadius: 4,
-          dataLabels: { position: "top" }
+    const categories = subset.map(d => d.wtg);
+    const maSeries = subset.map(d => Number(d.ma) || 0);
+    const intSeries = subset.map(d => Number(d.int_ga) || 0);
+    const extSeries = subset.map(d => Number(d.ext_ga) || 0);
+    const combSeries = subset.map(d => Number(d.comb_ga) || 0);
+
+    const allVals = subset.flatMap(d => [d.ma, d.int_ga, d.ext_ga, d.comb_ga].filter(v => v !== null && !isNaN(v) && v > 0));
+    const lowestVal = allVals.length ? Math.min(...allVals) : 80;
+    const dynamicMin = Math.max(0, Math.floor((lowestVal - 5) / 5) * 5);
+
+    let options;
+
+    if (currentChartType === "combo") {
+      // FLAGSHIP COMBO CHART: Clustered Columns with Net Combined Spline Line and SLA annotation
+      options = {
+        series: [
+          { name: "Machine Availability (%)", type: "column", data: maSeries },
+          { name: "Internal Grid GA (%)", type: "column", data: intSeries },
+          { name: "External Grid GA (%)", type: "column", data: extSeries },
+          { name: "Net Combined GA (%)", type: "line", data: combSeries }
+        ],
+        chart: {
+          type: "line",
+          height: 480,
+          fontFamily: "inherit",
+          toolbar: {
+            show: true,
+            tools: { download: true, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: false }
+          },
+          animations: { enabled: true, easing: "easeinout", speed: 600 }
+        },
+        colors: ["#818cf8", "#34d399", "#fbbf24", "#c084fc"],
+        plotOptions: {
+          bar: {
+            columnWidth: subset.length <= 10 ? "52%" : "68%",
+            borderRadius: 6,
+            borderRadiusApplication: "end",
+            dataLabels: { position: "top" }
+          }
+        },
+        stroke: {
+          width: [0, 0, 0, 3],
+          curve: "smooth",
+          lineCap: "round"
+        },
+        markers: {
+          size: [0, 0, 0, 5],
+          strokeColors: "#ffffff",
+          strokeWidth: 2,
+          hover: { size: 7 }
+        },
+        fill: {
+          opacity: [0.90, 0.90, 0.90, 1],
+          type: ["gradient", "gradient", "gradient", "solid"],
+          gradient: {
+            shade: "light",
+            type: "vertical",
+            shadeIntensity: 0.2,
+            opacityFrom: 0.95,
+            opacityTo: 0.70,
+            stops: [0, 100]
+          }
+        },
+        dataLabels: {
+          enabled: true,
+          enabledOnSeries: [3],
+          formatter: (val) => val > 0 ? val.toFixed(1) + "%" : "",
+          offsetY: -8,
+          style: { fontSize: "11px", fontWeight: 700, colors: ["#6b21a8"] },
+          background: {
+            enabled: true,
+            foreColor: "#6b21a8",
+            padding: 4,
+            borderRadius: 4,
+            borderWidth: 1,
+            borderColor: "#e9d5ff",
+            opacity: 0.95
+          }
+        },
+        xaxis: {
+          categories: categories,
+          labels: {
+            style: { fontWeight: 600, fontSize: "11px", colors: "#475569" },
+            rotate: subset.length > 12 ? -45 : 0
+          },
+          axisBorder: { show: true, color: "#cbd5e1" },
+          axisTicks: { show: true, color: "#cbd5e1" }
+        },
+        yaxis: {
+          min: dynamicMin,
+          max: 100,
+          tickAmount: 5,
+          labels: {
+            formatter: (v) => v.toFixed(0) + "%",
+            style: { fontWeight: 600, fontSize: "11px", colors: "#64748b" }
+          },
+          title: { text: "Availability (%)", style: { fontWeight: 600, color: "#64748b", fontSize: "12px" } }
+        },
+        annotations: {
+          yaxis: [
+            {
+              y: 95.0,
+              borderColor: "#fb7185",
+              strokeDashArray: 4,
+              borderWidth: 1.5,
+              label: {
+                borderColor: "#fda4af",
+                style: {
+                  color: "#9f1239",
+                  background: "#ffe4e6",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  padding: { left: 6, right: 6, top: 2, bottom: 2 }
+                },
+                text: "Target SLA: 95%"
+              }
+            }
+          ]
+        },
+        legend: {
+          position: "top",
+          horizontalAlign: "right",
+          fontSize: "12px",
+          fontWeight: 600,
+          markers: { radius: 12 },
+          itemMargin: { horizontal: 10, vertical: 4 }
+        },
+        grid: {
+          borderColor: "#f1f5f9",
+          strokeDashArray: 3,
+          yaxis: { lines: { show: true } },
+          xaxis: { lines: { show: false } }
+        },
+        tooltip: {
+          shared: true,
+          intersect: false,
+          custom: function({ series, seriesIndex, dataPointIndex, w }) {
+            return generateCustomTooltip(subset[dataPointIndex]);
+          }
         }
-      },
-      colors: ["#3b82f6", "#10b981", "#f59e0b"],
-      dataLabels: {
-        enabled: true,
-        formatter: (val) => val > 0 ? val + "%" : "",
-        offsetX: 24,
-        style: { fontSize: "10px", colors: ["#475569"], fontWeight: 600 }
-      },
-      stroke: { show: true, width: 1, colors: ["#fff"] },
-      xaxis: {
-        categories: categories,
-        min: 80,
-        max: 100,
-        labels: { formatter: (v) => v + "%" },
-        title: { text: "Availability (%)" }
-      },
-      yaxis: {
-        labels: { style: { fontWeight: 600, fontSize: "11px" } }
-      },
-      legend: { position: "top", horizontalAlign: "right" },
-      tooltip: {
-        shared: true,
-        intersect: false,
-        y: { formatter: (v) => v + "%" }
-      },
-      grid: { borderColor: "#f1f5f9" }
-    };
+      };
+    } else if (currentChartType === "heatmap") {
+      // SCADA DIAGNOSTIC HEATMAP MATRIX
+      const heatmapSeries = [
+        {
+          name: "Machine Availability",
+          data: subset.map(d => ({ x: d.wtg, y: (Number(d.ma) || 0).toFixed(1) }))
+        },
+        {
+          name: "Internal Grid GA",
+          data: subset.map(d => ({ x: d.wtg, y: (Number(d.int_ga) || 0).toFixed(1) }))
+        },
+        {
+          name: "External Grid GA",
+          data: subset.map(d => ({ x: d.wtg, y: (Number(d.ext_ga) || 0).toFixed(1) }))
+        },
+        {
+          name: "Net Combined GA",
+          data: subset.map(d => ({ x: d.wtg, y: (Number(d.comb_ga) || 0).toFixed(1) }))
+        }
+      ];
+
+      options = {
+        series: heatmapSeries,
+        chart: {
+          type: "heatmap",
+          height: 380,
+          fontFamily: "inherit",
+          toolbar: { show: true, tools: { download: true } }
+        },
+        plotOptions: {
+          heatmap: {
+            radius: 6,
+            enableShades: false,
+            colorScale: {
+              ranges: [
+                { from: 0, to: 89.99, name: "Critical (<90%)", color: "#fecdd3" },
+                { from: 90.0, to: 94.99, name: "Warning (90-95%)", color: "#fef08a" },
+                { from: 95.0, to: 97.99, name: "Compliant (95-98%)", color: "#bae6fd" },
+                { from: 98.0, to: 100.0, name: "Optimal (≥98%)", color: "#a7f3d0" }
+              ]
+            }
+          }
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: (val) => val + "%",
+          style: { fontSize: "11px", fontWeight: 700, colors: ["#1e293b"] }
+        },
+        xaxis: {
+          labels: { style: { fontWeight: 600, fontSize: "11px", colors: "#475569" } }
+        },
+        yaxis: {
+          labels: { style: { fontWeight: 700, fontSize: "11px", colors: "#1e293b" } }
+        },
+        legend: {
+          position: "top",
+          horizontalAlign: "right",
+          fontSize: "12px",
+          fontWeight: 600
+        },
+        grid: { borderColor: "#f1f5f9" },
+        tooltip: {
+          y: { formatter: (v) => v + "%" }
+        }
+      };
+    } else {
+      // MODERN HORIZONTAL BENCHMARK BAR
+      options = {
+        series: [
+          { name: "Machine Availability (%)", data: maSeries },
+          { name: "Internal Grid GA (%)", data: intSeries },
+          { name: "External Grid GA (%)", data: extSeries },
+          { name: "Net Combined GA (%)", data: combSeries }
+        ],
+        chart: {
+          type: "bar",
+          height: Math.max(460, subset.length * 48),
+          fontFamily: "inherit",
+          toolbar: { show: true, tools: { download: true } }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: true,
+            barHeight: "72%",
+            borderRadius: 6,
+            dataLabels: { position: "top" }
+          }
+        },
+        colors: ["#818cf8", "#34d399", "#fbbf24", "#c084fc"],
+        dataLabels: {
+          enabled: true,
+          formatter: (val) => val > 0 ? val.toFixed(1) + "%" : "",
+          offsetX: 24,
+          style: { fontSize: "10px", colors: ["#475569"], fontWeight: 600 }
+        },
+        stroke: { show: true, width: 1, colors: ["#fff"] },
+        xaxis: {
+          categories: categories,
+          min: dynamicMin,
+          max: 100,
+          labels: { formatter: (v) => v.toFixed(0) + "%" },
+          title: { text: "Availability (%)" }
+        },
+        yaxis: {
+          labels: { style: { fontWeight: 600, fontSize: "11px" } }
+        },
+        annotations: {
+          xaxis: [
+            {
+              x: 95.0,
+              borderColor: "#fb7185",
+              strokeDashArray: 4,
+              borderWidth: 1.5,
+              label: {
+                text: "Target SLA: 95%",
+                borderColor: "#fda4af",
+                style: { color: "#9f1239", background: "#ffe4e6", fontSize: "10px", fontWeight: 700 }
+              }
+            }
+          ]
+        },
+        legend: { position: "top", horizontalAlign: "right" },
+        tooltip: {
+          shared: true,
+          intersect: false,
+          custom: function({ series, seriesIndex, dataPointIndex, w }) {
+            return generateCustomTooltip(subset[dataPointIndex]);
+          }
+        },
+        grid: { borderColor: "#f1f5f9" }
+      };
+    }
 
     if (clusteredChartInstance) {
       clusteredChartInstance.destroy();
@@ -472,6 +918,10 @@
 
   // Monthly Spline Chart
   function renderMonthlyTrend() {
+    const allMonthly = [...monthlyMa, ...monthlyInt, ...monthlyExt].filter(v => v != null && !isNaN(v) && v > 0);
+    const minM = allMonthly.length ? Math.min(...allMonthly) : 80;
+    const dynamicMMin = Math.max(0, Math.floor((minM - 5) / 5) * 5);
+
     const options = {
       series: [
         { name: "Machine Availability (%)", data: monthlyMa },
@@ -483,15 +933,15 @@
         height: 400,
         toolbar: { show: false }
       },
-      colors: ["#3b82f6", "#10b981", "#f59e0b"],
+      colors: ["#818cf8", "#34d399", "#fbbf24"],
       fill: {
         type: "gradient",
-        gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 90, 100] }
+        gradient: { shadeIntensity: 1, opacityFrom: 0.38, opacityTo: 0.04, stops: [0, 90, 100] }
       },
       dataLabels: { enabled: false },
       stroke: { curve: "smooth", width: 2.5 },
       xaxis: { categories: monthlyCats },
-      yaxis: { min: 85, max: 100, labels: { formatter: v => v + "%" } },
+      yaxis: { min: dynamicMMin, max: 100, labels: { formatter: v => v + "%" } },
       tooltip: { shared: true, y: { formatter: v => v + "%" } },
       grid: { borderColor: "#f1f5f9" }
     };
@@ -500,19 +950,27 @@
 
   // Health Donut Chart
   function renderHealthDonut() {
-    let optimal = fullWtgData.filter(d => d.comb_ga >= 95).length;
-    let moderate = fullWtgData.filter(d => d.comb_ga >= 90 && d.comb_ga < 95).length;
-    let low = fullWtgData.filter(d => d.comb_ga < 90).length;
+    const el = document.querySelector("#combHealthDonutChart");
+    if (!el) return;
+
+    let optimal = fullWtgData.filter(d => Number(d.comb_ga) >= 95).length;
+    let moderate = fullWtgData.filter(d => Number(d.comb_ga) >= 90 && Number(d.comb_ga) < 95).length;
+    let low = fullWtgData.filter(d => Number(d.comb_ga) < 90).length;
+
+    if (optimal === 0 && moderate === 0 && low === 0) {
+      el.innerHTML = '<div class="d-flex align-items-center justify-content-center text-muted small h-100 p-4" style="min-height:300px;"><i class="fas fa-info-circle me-2"></i>No availability data available for selected filter</div>';
+      return;
+    }
 
     const options = {
       series: [optimal, moderate, low],
       labels: ["Optimal (>=95%)", "Moderate (90-95%)", "Below Target (<90%)"],
       chart: { type: "donut", height: 400 },
-      colors: ["#10b981", "#f59e0b", "#ef4444"],
+      colors: ["#34d399", "#fbbf24", "#fda4af"],
       legend: { position: "bottom", fontSize: "11px" },
       dataLabels: { enabled: true }
     };
-    new ApexCharts(document.querySelector("#combHealthDonutChart"), options).render();
+    new ApexCharts(el, options).render();
   }
 
   document.addEventListener("DOMContentLoaded", function() {
@@ -528,6 +986,13 @@
         renderPaginatedChart();
       });
     }
+
+    $("#chartTypeSwitcher .btn-view-pill").on("click", function() {
+      $("#chartTypeSwitcher .btn-view-pill").removeClass("active");
+      $(this).addClass("active");
+      currentChartType = $(this).data("type");
+      renderPaginatedChart();
+    });
 
     $("#rankingSwitcher button").on("click", function() {
       $("#rankingSwitcher button").removeClass("active");

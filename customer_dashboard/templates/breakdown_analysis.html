@@ -1073,10 +1073,10 @@ function sendBreakdownEmail() {
   } catch(e) {}
 
   const tierColors = {
-    CRITICAL_RECURRENCE: "#ef4444",
-    HIGH_RECURRENCE_RISK: "#f97316",
-    MODERATE_RECURRENCE: "#f59e0b",
-    NORMAL: "#10b981"
+    CRITICAL_RECURRENCE: "#fda4af",
+    HIGH_RECURRENCE_RISK: "#fdba74",
+    MODERATE_RECURRENCE: "#fcd34d",
+    NORMAL: "#34d399"
   };
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -1178,12 +1178,12 @@ function sendBreakdownEmail() {
           fontFamily: "inherit",
           toolbar: { show: false }
         },
-        colors: ["#ef4444", "#f97316", "#f59e0b", "#10b981"],
+        colors: ["#fda4af", "#fdba74", "#fcd34d", "#34d399"],
         plotOptions: {
           bar: {
             horizontal: false,
             columnWidth: "46%",
-            borderRadius: 4
+            borderRadius: 6
           }
         },
         xaxis: {
@@ -1452,16 +1452,16 @@ function sendBreakdownEmail() {
           horizontal: chartIsHorizontal,
           barHeight: chartIsHorizontal ? "68%" : "55%",
           columnWidth: chartIsHorizontal ? undefined : "55%",
-          borderRadius: 5,
+          borderRadius: 6,
           distributed: true,
           dataLabels: { position: "top" }
         }
       },
       colors: subset.map(d => {
-        if (d.count >= 1000) return "#ef4444";
-        if (d.count >= 300)  return "#f97316";
-        if (d.count >= 50)   return "#3b82f6";
-        return "#10b981";
+        if (d.count >= 1000) return "#fda4af";
+        if (d.count >= 300)  return "#fdba74";
+        if (d.count >= 50)   return "#818cf8";
+        return "#34d399";
       }),
       dataLabels: {
         enabled: true,

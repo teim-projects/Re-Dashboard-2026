@@ -200,7 +200,7 @@ const API = "{% url 'api_trend_analysis' %}";
 let chartYearly = null, chartAvail = null, chartRad = null, chartPlf = null;
 let cached = null;
 
-const palette = ["#0b69a3","#e66726","#2ca02c","#8b5cf6","#ef476f","#00a3a3","#ffa600"];
+const palette = ["#818cf8", "#34d399", "#fbbf24", "#f472b6", "#38bdf8", "#c084fc", "#fda4af"];
 
 /* ---------------------------------------------------
    MAIN FUNCTION TO LOAD DATA
@@ -308,10 +308,10 @@ function drawAvailability(data) {
       datasets:[{
         label:"Plant Availability",
         data:data.availability,
-        borderColor:"#0b69a3",
-        backgroundColor:"rgba(11,105,163,0.15)",
+        borderColor:"#818cf8",
+        backgroundColor:"rgba(129, 140, 248, 0.15)",
         fill:true,
-        tension:.25
+        tension:.3
       }]
     },
     options:{ responsive:true, maintainAspectRatio:false }
@@ -337,8 +337,8 @@ function drawRadiation(data) {
             datasets: [{
                 label: "Radiation vs Generation",
                 data: pts,
-                backgroundColor: "rgba(0,110,255,0.55)",
-                borderColor: "rgba(0,110,255,0.8)",
+                backgroundColor: "rgba(56, 189, 248, 0.6)",
+                borderColor: "#38bdf8",
                 pointRadius: 4,
                 pointHoverRadius: 7
             }]

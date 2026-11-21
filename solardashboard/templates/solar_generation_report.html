@@ -405,7 +405,7 @@ function renderYearlyChart(){
         .datum(data)
         .attr("d",genLine)
         .attr("fill","none")
-        .attr("stroke","#4a3aff")
+        .attr("stroke","#818cf8")
         .attr("stroke-width",3);
 
     const plfLine = d3.line()
@@ -416,8 +416,8 @@ function renderYearlyChart(){
         .datum(data)
         .attr("d",plfLine)
         .attr("fill","none")
-        .attr("stroke","#ff7f0e")
-        .attr("stroke-width",2)
+        .attr("stroke","#fbbf24")
+        .attr("stroke-width",2.5)
         .attr("stroke-dasharray","6 4");
 
     g.selectAll(".gen-pt")
@@ -426,7 +426,7 @@ function renderYearlyChart(){
         .attr("cx",d=>x(d.year))
         .attr("cy",d=>yGen(d.yearly_sum))
         .attr("r",5)
-        .attr("fill","#4a3aff")
+        .attr("fill","#818cf8")
         .on("mousemove",(e,d)=>showTooltip(e,
             `<b>${d.year}</b><br>Gen: ${fmtNumber(d.yearly_sum)}<br>PLF: ${d.plf_yearly}%`
         ))
@@ -478,7 +478,8 @@ function renderMonthlyChart(){
         .attr("y",d=>y(d.gen))
         .attr("width",x.bandwidth())
         .attr("height",d=>height-y(d.gen))
-        .attr("fill","#4a3aff")
+        .attr("fill","#818cf8")
+        .attr("rx",6)
         .on("mousemove",(e,d)=>showTooltip(e,
             `<b>${d.month_name}</b><br>Gen: ${fmtNumber(d.gen)}`
         ))

@@ -260,8 +260,8 @@ function updateLineChart(data) {
                 {
                     label: "Sum of Daily Generation",
                     data: grouped.gen,
-                    borderColor: "#0054a6",
-                    backgroundColor: "#0054a6",
+                    borderColor: "#818cf8",
+                    backgroundColor: "#818cf8",
                     borderWidth: 3,
                     tension: 0.35,
                     yAxisID: "y1"
@@ -269,8 +269,8 @@ function updateLineChart(data) {
                 {
                     label: "Sum of Generation Hours",
                     data: grouped.gh,
-                    borderColor: "#29a8ff",
-                    backgroundColor: "#29a8ff",
+                    borderColor: "#38bdf8",
+                    backgroundColor: "#38bdf8",
                     borderWidth: 3,
                     borderDash: [6,3],
                     tension: 0.35,
@@ -282,8 +282,8 @@ function updateLineChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                y1: { position: "left" },
-                y2: { position: "right" }
+                y1: { position: "left", grid: { color: "rgba(15,23,42,0.06)" } },
+                y2: { position: "right", grid: { display: false } }
             }
         }
     });
@@ -291,14 +291,14 @@ function updateLineChart(data) {
 
 function getWeatherColor(label) {
     const colors = {
-        "Good Radiation": "#f4c542",
-        "Cloudy": "#9fa4ad",
-        "Rain": "#3b82f6",
-        "Rainy": "#3b82f6",
-        "Intermittent Radiation": "#ff8c42",
-        "Good Radiation & Rain": "#16a34a",
+        "Good Radiation": "#fcd34d",
+        "Cloudy": "#94a3b8",
+        "Rain": "#60a5fa",
+        "Rainy": "#60a5fa",
+        "Intermittent Radiation": "#fdba74",
+        "Good Radiation & Rain": "#34d399",
     };
-    return colors[label] || "#" + Math.floor(Math.random()*16777215).toString(16);
+    return colors[label] || "#818cf8";
 }
 
 function updateWeatherChart(data) {
@@ -312,7 +312,8 @@ function updateWeatherChart(data) {
             datasets: [{
                 label: "Generation",
                 data: data.map(d => d.generation),
-                backgroundColor: data.map(d => getWeatherColor(d.weather))
+                backgroundColor: data.map(d => getWeatherColor(d.weather)),
+                borderRadius: 8
             }]
         },
         options: {

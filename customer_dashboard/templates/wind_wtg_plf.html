@@ -390,20 +390,22 @@ document.addEventListener("DOMContentLoaded", function () {
       annotations: {
         xaxis: [{
           x: fleetAvgMa,
-          borderColor: '#10b981',
+          borderColor: '#34d399',
           strokeDashArray: 4,
           label: {
             text: `Fleet Avg MA: ${fleetAvgMa}%`,
-            style: { color: '#fff', background: '#10b981', fontSize: '10px' }
+            borderColor: '#a7f3d0',
+            style: { color: '#065f46', background: '#ecfdf5', fontSize: '10px', fontWeight: 600 }
           }
         }],
         yaxis: [{
           y: fleetAvgPlf,
-          borderColor: '#06b6d4',
+          borderColor: '#818cf8',
           strokeDashArray: 4,
           label: {
             text: `Fleet Avg PLF: ${fleetAvgPlf}%`,
-            style: { color: '#fff', background: '#06b6d4', fontSize: '10px' }
+            borderColor: '#c7d2fe',
+            style: { color: '#3730a3', background: '#eef2ff', fontSize: '10px', fontWeight: 600 }
           }
         }]
       },
@@ -426,13 +428,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // 3. VISUAL #7: Internal vs External Grid Availability Clustered Bar
   if (gridComparison.labels && gridComparison.labels.length > 0) {
+    const rawVals = (gridComparison.values || []).map(v => Number(v) || 0).filter(v => v > 0);
+    const minG = rawVals.length ? Math.min(...rawVals) : 80;
+    const dynamicGMin = Math.max(0, Math.floor((minG - 10) / 10) * 10);
+
     const gridOpts = {
       series: [{ name: 'Availability (%)', data: gridComparison.values }],
       chart: { type: 'bar', height: 480, toolbar: { show: false } },
       plotOptions: {
         bar: { borderRadius: 8, columnWidth: '40%', distributed: true }
       },
-      colors: ['#0ea5e9', '#f59e0b'],
+      colors: ['#34d399', '#fbbf24'],
       dataLabels: {
         enabled: true,
         formatter: function(val) { return val.toFixed(2) + '%'; },
@@ -444,8 +450,20 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       yaxis: {
         max: 100,
-        min: 80,
-        labels: { formatter: function(val) { return val + '%'; } }
+        min: dynamicGMin,
+        labels: { formatter: function(val) { return Math.round(val) + '%'; } }
+      },
+      annotations: {
+        yaxis: [{
+          y: 95.0,
+          borderColor: '#fb7185',
+          strokeDashArray: 4,
+          label: {
+            text: 'Target SLA: 95%',
+            borderColor: '#fda4af',
+            style: { color: '#9f1239', background: '#ffe4e6', fontSize: '10px', fontWeight: 700 }
+          }
+        }]
       },
       grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
       legend: { show: false },
@@ -528,9 +546,9 @@ document.addEventListener("DOMContentLoaded", function () {
           useWarmShades: false,
           colorScale: {
             ranges: [
-              { from: 0, to: 89.9, name: '<90% Low', color: '#fee2e2' },
+              { from: 0, to: 89.9, name: '<90% Low', color: '#fecdd3' },
               { from: 90, to: 95.9, name: '90-95% Normal', color: '#fef08a' },
-              { from: 96, to: 100, name: '>=96% Optimal', color: '#bbf7d0' }
+              { from: 96, to: 100, name: '>=96% Optimal', color: '#a7f3d0' }
             ]
           }
         }

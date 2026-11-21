@@ -118,8 +118,8 @@ let chartGh = null;
 
 function createGradient(ctx, area) {
   const g = ctx.createLinearGradient(0, 0, 0, area.height);
-  g.addColorStop(0, "rgba(47,128,237,0.35)");
-  g.addColorStop(1, "rgba(47,128,237,0.05)");
+  g.addColorStop(0, "rgba(129, 140, 248, 0.35)");
+  g.addColorStop(1, "rgba(129, 140, 248, 0.05)");
   return g;
 }
 
@@ -183,21 +183,21 @@ function drawChartGen(data) {
         {
           label: 'Daily Generation',
           data: histPlot,
-          borderColor: '#0b69a3',
-          backgroundColor: '#0b69a3',
-          tension: 0.3,
+          borderColor: '#818cf8',
+          backgroundColor: '#818cf8',
+          tension: 0.35,
           pointRadius: 2,
-          borderWidth: 2,
+          borderWidth: 2.5,
           spanGaps: false
         },
         // forecast line
         {
           label: 'Forecast (SES)',
           data: fcastPlot,
-          borderColor: '#1f8ef0',
-          backgroundColor: '#1f8ef0',
-          borderWidth: 2,
-          tension: 0.3,
+          borderColor: '#34d399',
+          backgroundColor: '#34d399',
+          borderWidth: 2.5,
+          tension: 0.35,
           borderDash: [],     // user requested solid forecast (style B)
           pointRadius: 3,
           pointStyle: 'circle',
@@ -303,19 +303,19 @@ function drawChartGh(data) {
         {
           label: 'Generation Hours (avg)',
           data: histPlot,
-          borderColor: '#0b69a3',
-          backgroundColor: '#0b69a3',
-          tension: 0.25,
-          borderWidth: 2,
+          borderColor: '#818cf8',
+          backgroundColor: '#818cf8',
+          tension: 0.35,
+          borderWidth: 2.5,
           pointRadius: 2
         },
         {
           label: 'Forecast (SES)',
           data: fcastPlot,
-          borderColor: '#46a3ff',
-          backgroundColor: '#46a3ff',
-          borderWidth: 2,
-          tension: 0.25,
+          borderColor: '#38bdf8',
+          backgroundColor: '#38bdf8',
+          borderWidth: 2.5,
+          tension: 0.35,
           pointRadius: 3
         },
         {

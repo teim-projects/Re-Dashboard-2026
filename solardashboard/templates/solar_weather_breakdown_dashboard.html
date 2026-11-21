@@ -360,7 +360,7 @@ function drawWeatherChart(data){
         .attr("y", d => y(d.label))
         .attr("height", y.bandwidth())
         .attr("width", d => x(d.value))
-        .attr("fill", "#1f6fb6")
+        .attr("fill", "#818cf8")
         .attr("rx", 6)
 .on("mousemove", (ev,d)=>{
     const val = Number(d.value).toFixed(2);
@@ -420,7 +420,7 @@ function drawBreakdownChart(data){
         .attr("y", d => y(d.label))
         .attr("height", y.bandwidth())
         .attr("width", d => x(d.count))
-        .attr("fill", "#003366")
+        .attr("fill", (d,i) => ["#fda4af", "#fdba74", "#fcd34d", "#818cf8", "#38bdf8", "#34d399"][i % 6])
         .attr("rx", 6)
 .on("mousemove", (ev,d)=>{
     tooltip

@@ -268,7 +268,7 @@ body { font-family: "Poppins", sans-serif; }
 const apiURL = "{% url 'api_solar_plf' %}";
 
 const googleColors = [
-  "#1a73e8", "#ea4335", "#fbbc05", "#34a853"
+  "#818cf8", "#34d399", "#fbbf24", "#fda4af", "#38bdf8", "#c084fc"
 ];
 
 const tooltip = document.getElementById('tooltip');
@@ -404,7 +404,8 @@ function drawQuarterlyChart(data){
     .attr("y",ch)
     .attr("width",x.bandwidth())
     .attr("height",0)
-    .attr("fill",(d,i)=>googleColors[i%4])
+    .attr("rx",6)
+    .attr("fill",(d,i)=>googleColors[i%googleColors.length])
     .on("mousemove",(e,d)=>showTooltip(`<b>${d.quarter}</b><br>${fmt(d.value)}%`,e.pageX,e.pageY))
     .on("mouseleave",hideTooltip)
     .transition().duration(600)
@@ -430,7 +431,8 @@ function drawYearlyChart(data){
     .attr("y",ch)
     .attr("width",x.bandwidth())
     .attr("height",0)
-    .attr("fill",(d,i)=>googleColors[i%4])
+    .attr("rx",6)
+    .attr("fill",(d,i)=>googleColors[i%googleColors.length])
     .on("mousemove",(e,d)=>showTooltip(`<b>${d.year}</b><br>${fmt(d.value)}%`,e.pageX,e.pageY))
     .on("mouseleave",hideTooltip)
     .on("click",(e,d)=>{
@@ -461,7 +463,8 @@ function drawMonthlyChart(data){
     .attr("y",ch)
     .attr("width",x.bandwidth())
     .attr("height",0)
-    .attr("fill",(d,i)=>googleColors[i%4])
+    .attr("rx",6)
+    .attr("fill",(d,i)=>googleColors[i%googleColors.length])
     .on("mousemove",(e,d)=>showTooltip(`<b>${d.month}</b><br>${fmt(d.value)}%`,e.pageX,e.pageY))
     .on("mouseleave",hideTooltip)
     .transition().duration(600)

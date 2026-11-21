@@ -263,16 +263,16 @@ document.addEventListener("DOMContentLoaded", () => {
       toolbar: { show: false },
       zoom: { enabled: false },
     },
-    colors: ["#00c9a7"],
+    colors: ["#818cf8"],
     dataLabels: { enabled: false },
     stroke: { curve: "smooth", width: 3 },
     fill: {
       type: "gradient",
       gradient: {
         shadeIntensity: 0.5,
-        gradientToColors: ["#007bff"],
-        opacityFrom: 0.6,
-        opacityTo: 0.1,
+        gradientToColors: ["#c084fc"],
+        opacityFrom: 0.5,
+        opacityTo: 0.05,
         stops: [0, 90, 100],
       },
     },
@@ -307,22 +307,23 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     labels: ["Completed", "Pending"],
     series: [{{ completed }}, {{ pending }}],
-    colors: ["#28a745", "#ff9f43"],
+    colors: ["#34d399", "#fbbf24"],
     legend: {
       position: "bottom",
-      fontSize: "14px",
-      labels: { colors: "#555" },
+      fontSize: "13px",
+      labels: { colors: "#64748b" },
+      markers: { radius: 12 }
     },
     plotOptions: {
       pie: {
         donut: {
-          size: "70%",
+          size: "72%",
           labels: {
             show: true,
             total: {
               show: true,
               label: "Overall",
-              color: "#111",
+              color: "#1e293b",
               formatter: function() {
                 return "{{ completion_rate }}%";
               }
@@ -349,11 +350,17 @@ document.addEventListener("DOMContentLoaded", () => {
         speed: 1200,
       },
     },
+    plotOptions: {
+      bar: {
+        borderRadius: 6,
+        columnWidth: "48%"
+      }
+    },
     series: [
       { name: "Completed", data: {{ wtg_completed|safe }} },
       { name: "Pending", data: {{ wtg_pending|safe }} },
     ],
-    colors: ["#00E396", "#FEB019"],
+    colors: ["#34d399", "#fbbf24"],
     xaxis: {
       categories: {{ wtg_labels|safe }},
       title: { text: "WTG Units", style: { fontWeight: 600 } },

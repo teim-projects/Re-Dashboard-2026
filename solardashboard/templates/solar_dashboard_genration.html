@@ -439,7 +439,7 @@
       .attr("width", width)
       .attr("height", height);
 
-    const color = d3.scaleOrdinal(d3.schemeTableau10);
+    const color = d3.scaleOrdinal(["#818cf8", "#34d399", "#fbbf24", "#f472b6", "#38bdf8", "#c084fc", "#fda4af"]);
 
     const node = svg.selectAll("g")
       .data(root.leaves())
@@ -500,8 +500,8 @@
       .attr("y", d=>y(d.value))
       .attr("width", x.bandwidth())
       .attr("height", d=>height - y(d.value))
-      .attr("fill", "#e56a2a")
-      .attr("rx",4);
+      .attr("fill", "#818cf8")
+      .attr("rx",6);
   }
 
   /* -------------------------

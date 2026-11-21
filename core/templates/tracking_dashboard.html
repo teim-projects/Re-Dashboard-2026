@@ -258,9 +258,9 @@ const GROWTH_VALUES = safeParse({{ customer_growth_values|safe|default:"[]" }});
 const PROVIDER_LABELS = safeParse({{ provider_labels|safe|default:"[]" }});
 const PROVIDER_VALUES = safeParse({{ provider_values|safe|default:"[]" }});
 
-/* ===== Color palettes - professional and accessible ===== */
+/* ===== Color palettes - professional executive pastel ===== */
 const COLORS = [
-  '#2f5bea','#1cc88a','#36b9cc','#f6c23e','#e74a3b','#858796','#6f8bff','#3b7bd3'
+  '#818cf8', '#34d399', '#38bdf8', '#fbbf24', '#fda4af', '#a78bfa', '#f472b6', '#94a3b8'
 ];
 
 function pickColors(n){
@@ -307,7 +307,7 @@ const bar = new Chart(barCtx, {
     datasets: [{
       label: 'Customers',
       data: [ACTIVE_COUNT || 0, INACTIVE_COUNT || 0],
-      backgroundColor: ['#1cc88a','#e74a3b'],
+      backgroundColor: ['#34d399','#fda4af'],
       borderRadius: 8,
       barPercentage: 0.5
     }]

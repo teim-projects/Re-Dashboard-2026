@@ -409,8 +409,8 @@ function drawBarChart(){
     data: {
       labels: MONTHS,
       datasets: [
-        { label: "Generation Hours", data: gen, backgroundColor: "#2563eb", borderRadius: 6 },
-        { label: "Operating Hours",  data: op,  backgroundColor: "#38bdf8", borderRadius: 6 }
+        { label: "Generation Hours", data: gen, backgroundColor: "#818cf8", borderRadius: 8 },
+        { label: "Operating Hours",  data: op,  backgroundColor: "#38bdf8", borderRadius: 8 }
       ]
     },
     options: {
@@ -433,7 +433,7 @@ function drawMiniGauges(){
   Object.values(gaugeCharts).forEach(c => c.destroy());
   gaugeCharts = {};
 
-  const colors = { GF:"#1E90FF", FM:"#EF4444", S:"#F59E0B", U:"#10B981" };
+  const colors = { GF:"#818cf8", FM:"#fda4af", S:"#fbbf24", U:"#34d399" };
   const values = {};
   state.pie.forEach(p => values[p.label] = num(p.value));
 
@@ -443,7 +443,7 @@ function drawMiniGauges(){
       data: {
         datasets: [{
           data: [values[label] || 0, 100 - (values[label] || 0)],
-          backgroundColor: [colors[label], "#e5e7eb"],
+          backgroundColor: [colors[label], "#f1f5f9"],
           borderWidth: 0
         }]
       },
@@ -470,9 +470,9 @@ function drawPieChart(){
       datasets: [{
         data: state.pie.map(d => d.value),
         backgroundColor: state.pie.map(d =>
-          d.label==="GF"?"#1E90FF":
-          d.label==="FM"?"#EF4444":
-          d.label==="S" ?"#F59E0B":"#10B981"
+          d.label==="GF"?"#818cf8":
+          d.label==="FM"?"#fda4af":
+          d.label==="S" ?"#fbbf24":"#34d399"
         )
       }]
     },
