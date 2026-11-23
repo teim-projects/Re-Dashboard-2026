@@ -916,7 +916,20 @@ document.addEventListener("DOMContentLoaded", function () {
         toolbar: { show: false },
         fontFamily: 'inherit'
       },
-      colors: ['#34d399'], // Pastel Mint
+      colors: ['#818cf8'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'horizontal',
+          shadeIntensity: 0.25,
+          gradientToColors: ['#34d399'],
+          inverseColors: false,
+          opacityFrom: 0.95,
+          opacityTo: 0.85,
+          stops: [0, 100]
+        }
+      },
       plotOptions: {
         bar: {
           borderRadius: 8,

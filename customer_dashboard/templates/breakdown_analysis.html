@@ -1239,11 +1239,24 @@ function sendBreakdownEmail() {
             horizontal: true,
             barHeight: "68%",
             borderRadius: 5,
-            distributed: true,
+            distributed: false,
             dataLabels: { position: "top" }
           }
         },
-        colors: topColors,
+        colors: ['#818cf8'],
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shade: 'light',
+            type: 'horizontal',
+            shadeIntensity: 0.25,
+            gradientToColors: ['#34d399'],
+            inverseColors: false,
+            opacityFrom: 0.95,
+            opacityTo: 0.85,
+            stops: [0, 100]
+          }
+        },
         dataLabels: {
           enabled: true,
           formatter: (val) => `${Number(val).toLocaleString()} trips`,
@@ -1463,6 +1476,18 @@ function sendBreakdownEmail() {
         if (d.count >= 50)   return "#818cf8";
         return "#34d399";
       }),
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: chartIsHorizontal ? 'horizontal' : 'vertical',
+          shadeIntensity: 0.25,
+          inverseColors: false,
+          opacityFrom: 0.95,
+          opacityTo: 0.80,
+          stops: [0, 100]
+        }
+      },
       dataLabels: {
         enabled: true,
         formatter: (val) => val > 0 ? Number(val).toLocaleString() + " events" : "",

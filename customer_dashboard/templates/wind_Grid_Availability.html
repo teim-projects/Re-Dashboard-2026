@@ -621,7 +621,7 @@
           toolbar: { show: true, tools: { download: true, zoom: false } },
           fontFamily: "Inter, system-ui, -apple-system, sans-serif"
         },
-        colors: ["#34d399", "#fbbf24", "#818cf8"],
+        colors: ["#34d399", "#818cf8", "#6366f1"],
         plotOptions: {
           bar: {
             columnWidth: subset.length <= 10 ? "50%" : "68%",
@@ -815,6 +815,18 @@
           }
         },
         colors: deltaColors,
+        fill: {
+          type: "gradient",
+          gradient: {
+            shade: "light",
+            type: "vertical",
+            shadeIntensity: 0.25,
+            inverseColors: false,
+            opacityFrom: 0.95,
+            opacityTo: 0.75,
+            stops: [0, 100]
+          }
+        },
         dataLabels: {
           enabled: true,
           formatter: (val) => (val >= 0 ? "+" : "") + Number(val).toFixed(1) + "%",
@@ -869,7 +881,20 @@
             dataLabels: { position: "top" }
           }
         },
-        colors: ["#34d399", "#fbbf24", "#818cf8"],
+        colors: ["#818cf8", "#38bdf8", "#34d399"],
+        fill: {
+          type: "gradient",
+          gradient: {
+            shade: "light",
+            type: "horizontal",
+            shadeIntensity: 0.25,
+            gradientToColors: ["#34d399", "#818cf8", "#6ee7b7"],
+            inverseColors: false,
+            opacityFrom: 0.95,
+            opacityTo: 0.85,
+            stops: [0, 100]
+          }
+        },
         dataLabels: {
           enabled: true,
           formatter: (val) => val > 0 ? val.toFixed(1) + "%" : "",

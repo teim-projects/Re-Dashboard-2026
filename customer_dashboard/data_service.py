@@ -48,12 +48,13 @@ def get_user_wind_tables(user):
     ]
 
     # If admin or no tables found for username prefix, check for available wind tables
-    if not gen_tables and (not user or not user.is_authenticated or user.is_superuser or user.is_staff or username == "admin" or not gen_tables):
-        gen_tables = [
-            t for t in all_tables
-            if t.lower().endswith("_wind") and not t.lower().endswith("_breakdowndata")
-        ]
-        bd_tables = [t for t in all_tables if "breakdowndata" in t.lower()]
+    if not user or not user.is_authenticated or user.is_superuser or user.is_staff or username == "admin":
+        if not gen_tables:
+            gen_tables = [
+                t for t in all_tables
+                if t.lower().endswith("_wind") and not t.lower().endswith("_breakdowndata")
+            ]
+            bd_tables = [t for t in all_tables if "breakdowndata" in t.lower()]
 
     return gen_tables, bd_tables
 
@@ -68,15 +69,20 @@ def inspect_gen_table_cols(table_name):
         "wtg": pick_column(col_map, "loc_no", "location_no", "turbine_id", "wtg", "wtg_no", "wec", "turbine"),
         "date": pick_column(col_map, "gen_date", "date", "reading_date", "day_date"),
         "gen": pick_column(col_map, "gen_kwh_day", "daily_generation_kwh", "wtg_production_kwh", "gen_kwh", "generation", "kwh"),
-        "hrs": pick_column(col_map, "production_daily_hrs", "daily_generation_hrs", "production_hours", "gen_hours", "generationhours", "genhrs", "o_hrs"),
-        "ma": pick_column(col_map, "ma_day", "actual_ma", "machine_availability", "wtg_availability", "corrected_ma", "ma"),
+        "hrs": pick_column(col_map, "gen_hrs", "opr_hrs", "production_daily_hrs", "daily_generation_hrs", "production_hours", "gen_hours", "generationhours", "genhrs", "o_hrs"),
+        "ma": pick_column(col_map, "m_c_avail", "mc_avail", "m_c_availability", "mc_availability", "ma_day", "actual_ma", "machine_availability", "wtg_availability", "corrected_ma", "ma"),
         "plf": pick_column(col_map, "plf_day", "plf", "monthly_plf", "plf_wtg_efficiency"),
         "iga": pick_column(col_map, "ga_int", "int_grid_avail", "int_grid_availability"),
         "ega": pick_column(col_map, "ga_ext", "ext_grid_avail", "ext_grid_availability"),
         "comb_ga": pick_column(col_map, "ga_day", "ga", "grid_availability"),
+        "gf": pick_column(col_map, "gf", "grid_fault", "grid_fault_hrs"),
+        "opr_hrs": pick_column(col_map, "opr_hrs", "operating_hours", "total_hrs", "total_hours"),
+        "gen_hrs": pick_column(col_map, "gen_hrs", "generation_hours", "production_hours"),
         "provider": pick_column(col_map, "provider", "oem", "firm", "make"),
         "site": pick_column(col_map, "site", "wind_farm_name", "location"),
         "state": pick_column(col_map, "state"),
+        "customer": pick_column(col_map, "customer_name", "customer", "client", "customername"),
+        "uploaded_by": pick_column(col_map, "uploaded_by", "uploader", "uploaded_user"),
     }
 
 def inspect_bd_table_cols(table_name):
@@ -114,6 +120,8 @@ def inspect_bd_table_cols(table_name):
         "provider": pick_column(col_map, "provider", "provider_id", "oem", "company", "make"),
         "site": pick_column(col_map, "site", "sitename", "plant", "plant_name", "wind_farm_name", "project_name", "park"),
         "state": pick_column(col_map, "state", "statename"),
+        "customer": pick_column(col_map, "customer_name", "customer", "client", "customername"),
+        "uploaded_by": pick_column(col_map, "uploaded_by", "uploader", "uploaded_user"),
     }
 
 def infer_oem_from_table(table_name):
@@ -148,44 +156,75 @@ def canonicalize_provider_name(val):
         return "Gamesa"
     return str(val).strip().title()
 
-def get_filter_options(gen_tables, bd_tables):
-    """Collect distinct dropdown values across all user tables with canonical provider names."""
+def get_filter_options(gen_tables, bd_tables, user=None):
+    """Collect distinct dropdown values across all user tables with canonical provider and customer names."""
     providers = set()
     sites = set()
     states = set()
     wtgs = set()
+    customers = set()
 
     with connection.cursor() as cursor:
-        for t in gen_tables:
+        all_tables = list(gen_tables) + [t for t in bd_tables if t not in gen_tables]
+        for t in all_tables:
             cols = inspect_gen_table_cols(t)
-            p_col = cols["provider"]
-            s_col = cols["site"]
-            st_col = cols["state"]
-            w_col = cols["wtg"]
+            cols_bd = inspect_bd_table_cols(t)
+
+            p_col = cols["provider"] or cols_bd.get("provider")
+            s_col = cols["site"] or cols_bd.get("site")
+            st_col = cols["state"] or cols_bd.get("state")
+            w_col = cols["wtg"] or cols_bd.get("wtg")
+            c_col = cols.get("customer") or cols_bd.get("customer")
 
             oem_def = infer_oem_from_table(t)
             if oem_def:
                 providers.add(canonicalize_provider_name(oem_def))
 
             if p_col:
-                cursor.execute(f"SELECT DISTINCT `{p_col}` FROM `{t}` WHERE `{p_col}` IS NOT NULL AND `{p_col}` != ''")
+                cursor.execute(f"SELECT DISTINCT `{p_col}` FROM `{t}` WHERE `{p_col}` IS NOT NULL AND `{p_col}` != '' AND `{p_col}` != 'None'")
                 for r in cursor.fetchall():
                     if r[0]:
                         c_p = canonicalize_provider_name(r[0])
                         if c_p:
                             providers.add(c_p)
             if s_col:
-                cursor.execute(f"SELECT DISTINCT `{s_col}` FROM `{t}` WHERE `{s_col}` IS NOT NULL AND `{s_col}` != ''")
+                cursor.execute(f"SELECT DISTINCT `{s_col}` FROM `{t}` WHERE `{s_col}` IS NOT NULL AND `{s_col}` != '' AND `{s_col}` != 'None'")
                 for r in cursor.fetchall():
-                    if r[0]: sites.add(str(r[0]))
+                    if r[0] and str(r[0]).strip().lower() != 'none':
+                        sites.add(str(r[0]).strip())
             if st_col:
-                cursor.execute(f"SELECT DISTINCT `{st_col}` FROM `{t}` WHERE `{st_col}` IS NOT NULL AND `{st_col}` != ''")
+                cursor.execute(f"SELECT DISTINCT `{st_col}` FROM `{t}` WHERE `{st_col}` IS NOT NULL AND `{st_col}` != '' AND `{st_col}` != 'None'")
                 for r in cursor.fetchall():
-                    if r[0]: states.add(str(r[0]))
+                    if r[0] and str(r[0]).strip().lower() != 'none':
+                        states.add(str(r[0]).strip())
             if w_col:
                 cursor.execute(f"SELECT DISTINCT `{w_col}` FROM `{t}` WHERE `{w_col}` IS NOT NULL AND `{w_col}` != '' AND `{w_col}` != 'None'")
                 for r in cursor.fetchall():
-                    if r[0]: wtgs.add(str(r[0]))
+                    if r[0] and str(r[0]).strip().lower() != 'none':
+                        wtgs.add(str(r[0]).strip())
+            if c_col:
+                cursor.execute(f"SELECT DISTINCT `{c_col}` FROM `{t}` WHERE `{c_col}` IS NOT NULL AND `{c_col}` != '' AND `{c_col}` != 'None'")
+                for r in cursor.fetchall():
+                    if r[0]:
+                        c_name = str(r[0]).strip()
+                        if c_name and c_name.lower() != 'none':
+                            customers.add(c_name)
+            else:
+                # If table does not have an explicit customer column, check uploaded_by column
+                cursor.execute(f"SHOW COLUMNS FROM `{t}`")
+                t_cols = [r[0].lower() for r in cursor.fetchall()]
+                if "uploaded_by" in t_cols:
+                    cursor.execute(f"SELECT DISTINCT `uploaded_by` FROM `{t}` WHERE `uploaded_by` IS NOT NULL AND `uploaded_by` != '' AND `uploaded_by` != 'None'")
+                    for r in cursor.fetchall():
+                        if r[0]:
+                            u_name = str(r[0]).strip()
+                            if u_name and u_name.lower() != 'none':
+                                customers.add(u_name.title() if u_name.islower() else u_name)
+
+    if not customers:
+        if user and user.is_authenticated and not user.is_superuser:
+            c_name = user.username.strip()
+            customers.add(c_name.title() if c_name.islower() else c_name)
 
     if not sites:
         sites.update(["Site A", "Site B"])
@@ -197,7 +236,7 @@ def get_filter_options(gen_tables, bd_tables):
         "sites": sorted(list(sites)),
         "states": sorted(list(states)),
         "wtgs": sorted(list(wtgs)),
-        "customers": ["Malpani Group"],
+        "customers": sorted(list(customers)),
     }
 
 def get_filter_context(user, request):
@@ -225,6 +264,21 @@ def get_filter_context(user, request):
     sites = get_list("site")
     wtgs = get_list("wtg")
 
+    gen_tables, bd_tables = get_user_wind_tables(user)
+    filter_opts = get_filter_options(gen_tables, bd_tables, user=user)
+
+    # Sanitize selected filters against valid filter options to avoid stale session data across different logins
+    if filter_opts["customers"] and customers:
+        customers = [c for c in customers if c in filter_opts["customers"]]
+    if filter_opts["providers"] and providers:
+        providers = [p for p in providers if p in filter_opts["providers"]]
+    if filter_opts["sites"] and sites:
+        sites = [s for s in sites if s in filter_opts["sites"]]
+    if filter_opts["states"] and states:
+        states = [st for st in states if st in filter_opts["states"]]
+    if filter_opts["wtgs"] and wtgs:
+        wtgs = [w for w in wtgs if w in filter_opts["wtgs"]]
+
     # Persist in session
     request.session["wind_filters"] = {
         "date_from": date_from,
@@ -237,9 +291,6 @@ def get_filter_context(user, request):
     }
     if hasattr(request, "session") and hasattr(request.session, "modified"):
         request.session.modified = True
-
-    gen_tables, bd_tables = get_user_wind_tables(user)
-    filter_opts = get_filter_options(gen_tables, bd_tables)
 
     return {
         "providers": filter_opts["providers"],
@@ -256,8 +307,8 @@ def get_filter_context(user, request):
         "date_to": date_to,
     }
 
-def build_where_clause(cols, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
-    """Construct SQL WHERE clause and params for filtering, with full provider case expansion."""
+def build_where_clause(cols, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
+    """Construct SQL WHERE clause and params for filtering, with full provider and customer support."""
     where_parts = []
     params = []
 
@@ -314,20 +365,19 @@ def build_where_clause(cols, date_from=None, date_to=None, providers=None, sites
         where_parts.append(f"`{state_col}` IN ({placeholders})")
         params.extend(states)
 
-    clause = "WHERE " + " AND ".join(where_parts) if where_parts else ""
-    return clause, params
-
-    site_col = cols["site"]
-    if site_col and sites:
-        placeholders = ",".join(["%s"] * len(sites))
-        where_parts.append(f"`{site_col}` IN ({placeholders})")
-        params.extend(sites)
-
-    state_col = cols["state"]
-    if state_col and states:
-        placeholders = ",".join(["%s"] * len(states))
-        where_parts.append(f"`{state_col}` IN ({placeholders})")
-        params.extend(states)
+    customer_col = cols.get("customer")
+    if customer_col and customers:
+        placeholders = ",".join(["%s"] * len(customers))
+        where_parts.append(f"`{customer_col}` IN ({placeholders})")
+        params.extend(customers)
+    elif not customer_col and customers and cols.get("uploaded_by"):
+        up_col = cols["uploaded_by"]
+        exp_cust = []
+        for c in customers:
+            exp_cust.extend([c, c.lower(), c.upper(), c.title()])
+        placeholders = ",".join(["%s"] * len(exp_cust))
+        where_parts.append(f"`{up_col}` IN ({placeholders})")
+        params.extend(exp_cust)
 
     clause = "WHERE " + " AND ".join(where_parts) if where_parts else ""
     return clause, params
@@ -341,7 +391,7 @@ def format_month_label(ym_str):
     except Exception:
         return str(ym_str)
 
-def get_wind_dashboard_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_wind_dashboard_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute all data and KPI metrics for wind_dashboard.html.
     """
@@ -370,7 +420,7 @@ def get_wind_dashboard_data(user, date_from=None, date_to=None, providers=None, 
             if not wtg_col or not gen_col:
                 continue
 
-            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs)
+            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs, customers)
 
             # 1. WTG totals
             select_parts = [
@@ -579,11 +629,11 @@ def get_wind_dashboard_data(user, date_from=None, date_to=None, providers=None, 
     }
 
 
-def get_generation_kwh_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_generation_kwh_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute data for wind_generation_kwh.html.
     """
-    dash_data = get_wind_dashboard_data(user, date_from, date_to, providers, sites, states, wtgs)
+    dash_data = get_wind_dashboard_data(user, date_from, date_to, providers, sites, states, wtgs, customers)
     all_wtgs = json.loads(dash_data["all_wtgs_json"])
     total_gen = float(dash_data["total_generation"])
     wtg_cnt = len(all_wtgs)
@@ -626,7 +676,7 @@ def get_generation_kwh_data(user, date_from=None, date_to=None, providers=None, 
     }
 
 
-def get_generation_hours_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_generation_hours_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute data for wind_genration_hovers.html.
     """
@@ -646,7 +696,7 @@ def get_generation_hours_data(user, date_from=None, date_to=None, providers=None
             if not wtg_col or not hrs_col:
                 continue
 
-            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs)
+            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs, customers)
 
             select_parts = [
                 f"`{wtg_col}`",
@@ -768,7 +818,7 @@ def get_generation_hours_data(user, date_from=None, date_to=None, providers=None
     }
 
 
-def get_avg_generation_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_avg_generation_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute data for wind_avg_genration.html.
     """
@@ -789,7 +839,7 @@ def get_avg_generation_data(user, date_from=None, date_to=None, providers=None, 
             if not wtg_col or not gen_col:
                 continue
 
-            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs)
+            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs, customers)
 
             select_parts = [
                 f"`{wtg_col}`",
@@ -918,7 +968,7 @@ def get_avg_generation_data(user, date_from=None, date_to=None, providers=None, 
     }
 
 
-def get_machine_availability_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_machine_availability_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute data for wind_Avg_Machine_Availability.html.
     """
@@ -938,7 +988,7 @@ def get_machine_availability_data(user, date_from=None, date_to=None, providers=
             if not wtg_col or not ma_col:
                 continue
 
-            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs)
+            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs, customers)
 
             select_parts = [
                 f"`{wtg_col}`",
@@ -1056,7 +1106,7 @@ def get_machine_availability_data(user, date_from=None, date_to=None, providers=
     }
 
 
-def get_grid_availability_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_grid_availability_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute data for wind_Grid_Availability.html.
     """
@@ -1071,25 +1121,51 @@ def get_grid_availability_data(user, date_from=None, date_to=None, providers=Non
             wtg_col = cols["wtg"]
             iga_col = cols["iga"]
             ega_col = cols["ega"]
+            comb_ga_col = cols.get("comb_ga")
+            gf_col = cols.get("gf")
+            opr_col = cols.get("opr_hrs")
             date_col = cols["date"]
             site_col = cols["site"]
 
-            if not wtg_col or (not iga_col and not ega_col):
+            has_ga = iga_col or ega_col or comb_ga_col or (gf_col and opr_col)
+            if not wtg_col or not has_ga:
                 continue
 
-            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs)
+            where_clause, params = build_where_clause(cols, date_from, date_to, providers, sites, states, wtgs, customers)
 
-            select_parts = [f"`{wtg_col}`"]
             if iga_col:
-                select_parts.extend([f"AVG(CAST(`{iga_col}` AS DECIMAL(8,2)))", f"COUNT(`{iga_col}`)"])
+                iga_expr = f"AVG(CAST(`{iga_col}` AS DECIMAL(8,2)))"
+                iga_cnt_expr = f"COUNT(`{iga_col}`)"
+            elif gf_col and opr_col:
+                iga_expr = "100.0"
+                iga_cnt_expr = f"COUNT(`{wtg_col}`)"
+            elif comb_ga_col:
+                iga_expr = f"AVG(CAST(`{comb_ga_col}` AS DECIMAL(8,2)))"
+                iga_cnt_expr = f"COUNT(`{comb_ga_col}`)"
             else:
-                select_parts.extend(["NULL", "0"])
+                iga_expr = "NULL"
+                iga_cnt_expr = "0"
 
             if ega_col:
-                select_parts.extend([f"AVG(CAST(`{ega_col}` AS DECIMAL(8,2)))", f"COUNT(`{ega_col}`)"])
+                ega_expr = f"AVG(CAST(`{ega_col}` AS DECIMAL(8,2)))"
+                ega_cnt_expr = f"COUNT(`{ega_col}`)"
+            elif gf_col and opr_col:
+                ega_expr = f"AVG(GREATEST(0, (CAST(`{opr_col}` AS DECIMAL(10,2)) - CAST(`{gf_col}` AS DECIMAL(10,2))) / NULLIF(CAST(`{opr_col}` AS DECIMAL(10,2)), 0) * 100))"
+                ega_cnt_expr = f"COUNT(`{wtg_col}`)"
+            elif comb_ga_col:
+                ega_expr = f"AVG(CAST(`{comb_ga_col}` AS DECIMAL(8,2)))"
+                ega_cnt_expr = f"COUNT(`{comb_ga_col}`)"
             else:
-                select_parts.extend(["NULL", "0"])
+                ega_expr = "NULL"
+                ega_cnt_expr = "0"
 
+            select_parts = [
+                f"`{wtg_col}`",
+                iga_expr,
+                iga_cnt_expr,
+                ega_expr,
+                ega_cnt_expr,
+            ]
             if site_col:
                 select_parts.append(f"MAX(`{site_col}`)")
             else:
@@ -1123,11 +1199,13 @@ def get_grid_availability_data(user, date_from=None, date_to=None, providers=Non
 
             # Monthly trend
             if date_col:
-                select_m = [f"LEFT(`{date_col}`, 7) AS ym"]
-                if iga_col: select_m.extend([f"AVG(CAST(`{iga_col}` AS DECIMAL(8,2)))", f"COUNT(`{iga_col}`)"])
-                else: select_m.extend(["NULL", "0"])
-                if ega_col: select_m.extend([f"AVG(CAST(`{ega_col}` AS DECIMAL(8,2)))", f"COUNT(`{ega_col}`)"])
-                else: select_m.extend(["NULL", "0"])
+                select_m = [
+                    f"LEFT(`{date_col}`, 7) AS ym",
+                    f"{iga_expr} AS iavg",
+                    f"{iga_cnt_expr} AS icnt",
+                    f"{ega_expr} AS eavg",
+                    f"{ega_cnt_expr} AS ecnt",
+                ]
 
                 query_m = f"""
                     SELECT {', '.join(select_m)}
@@ -1222,12 +1300,12 @@ def get_grid_availability_data(user, date_from=None, date_to=None, providers=Non
     }
 
 
-def get_grid_and_machine_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_grid_and_machine_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute combined data for wind_Grid_Availability_and_Machine.html.
     """
-    ma_res = get_machine_availability_data(user, date_from, date_to, providers, sites, states, wtgs)
-    ga_res = get_grid_availability_data(user, date_from, date_to, providers, sites, states, wtgs)
+    ma_res = get_machine_availability_data(user, date_from, date_to, providers, sites, states, wtgs, customers)
+    ga_res = get_grid_availability_data(user, date_from, date_to, providers, sites, states, wtgs, customers)
 
     ma_map = {item["wtg"]: item["ma"] for item in json.loads(ma_res["all_wtgs_json"])}
     ga_items = json.loads(ga_res["all_wtgs_json"])
@@ -1275,12 +1353,12 @@ def get_grid_and_machine_data(user, date_from=None, date_to=None, providers=None
     }
 
 
-def get_wtg_plf_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_wtg_plf_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute data for wind_wtg_plf.html.
     """
-    dash_data = get_wind_dashboard_data(user, date_from, date_to, providers, sites, states, wtgs)
-    ga_res = get_grid_availability_data(user, date_from, date_to, providers, sites, states, wtgs)
+    dash_data = get_wind_dashboard_data(user, date_from, date_to, providers, sites, states, wtgs, customers)
+    ga_res = get_grid_availability_data(user, date_from, date_to, providers, sites, states, wtgs, customers)
 
     all_wtgs = json.loads(dash_data["all_wtgs_json"])
     ga_map = {item["wtg"]: item for item in json.loads(ga_res["all_wtgs_json"])}
@@ -1341,7 +1419,7 @@ def get_wtg_plf_data(user, date_from=None, date_to=None, providers=None, sites=N
     }
 
 
-def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute data for wind_breakdown_hours.html and dashboard_breakdown.html.
     """
@@ -1363,17 +1441,40 @@ def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None,
     with connection.cursor() as cursor:
         for t in target_tables:
             cols = inspect_bd_table_cols(t)
+            cols_gen = inspect_gen_table_cols(t)
             oem_name = infer_oem_from_table(t)
-            wtg_c = cols["wtg"]
+            wtg_c = cols["wtg"] or cols_gen.get("wtg")
             dur_c = cols["dur"]
-            date_c = cols["date"]
+            date_c = cols["date"] or cols_gen.get("date")
             cause_c = cols["cause"]
-            site_c = cols.get("site")
-            state_c = cols.get("state")
-            provider_c = cols.get("provider")
+            site_c = cols.get("site") or cols_gen.get("site")
+            state_c = cols.get("state") or cols_gen.get("state")
+            provider_c = cols.get("provider") or cols_gen.get("provider")
+            cust_c = cols.get("customer") or cols_gen.get("customer")
+            up_c = cols.get("uploaded_by") or cols_gen.get("uploaded_by")
+            opr_c = cols_gen.get("opr_hrs")
+            gen_c = cols_gen.get("gen_hrs")
 
-            if not wtg_c or not dur_c:
+            if not wtg_c:
                 continue
+            if not dur_c and not (opr_c and gen_c):
+                continue
+
+            if dur_c:
+                dur_expr = f"CAST(`{dur_c}` AS DECIMAL(15,2))"
+                where_parts = [f"`{dur_c}` IS NOT NULL AND `{dur_c}` != '' AND CAST(`{dur_c}` AS DECIMAL(15,2)) > 0"]
+            else:
+                dur_expr = f"GREATEST(0, CAST(`{opr_c}` AS DECIMAL(10,2)) - CAST(`{gen_c}` AS DECIMAL(10,2)))"
+                where_parts = [f"{dur_expr} > 0"]
+
+            if cause_c:
+                cause_expr = f"COALESCE(NULLIF(TRIM(`{cause_c}`), ''), 'General Breakdown')"
+            else:
+                gf_part = f"CAST(COALESCE(`{cols_gen['gf']}`, '0') AS DECIMAL(10,2))" if cols_gen.get("gf") else "0"
+                fm_part = f"CAST(COALESCE(`{cols_gen['fm']}`, '0') AS DECIMAL(10,2))" if cols_gen.get("fm") else "0"
+                s_part = f"CAST(COALESCE(`{cols_gen['s']}`, '0') AS DECIMAL(10,2))" if cols_gen.get("s") else "0"
+                u_part = f"CAST(COALESCE(`{cols_gen['u']}`, '0') AS DECIMAL(10,2))" if cols_gen.get("u") else "0"
+                cause_expr = f"CASE WHEN {gf_part} > 0 THEN 'Grid Fault' WHEN {fm_part} > 0 THEN 'Force Majeure' WHEN {s_part} > 0 THEN 'Shutdown' WHEN {u_part} > 0 THEN 'Unscheduled' ELSE 'Operational Loss' END"
 
             # Provider filter
             exp_p = []
@@ -1389,7 +1490,6 @@ def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None,
                     if canonicalize_provider_name(oem_name) not in norm_provs:
                         continue
 
-            where_parts = [f"`{dur_c}` IS NOT NULL AND `{dur_c}` != ''"]
             p_b = []
             if date_c and date_from and date_to:
                 where_parts.append(f"`{date_c}` BETWEEN %s AND %s")
@@ -1421,14 +1521,26 @@ def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None,
                 where_parts.append(f"`{provider_c}` IN ({placeholders})")
                 p_b.extend(exp_p)
 
+            if customers and cust_c:
+                placeholders = ",".join(["%s"] * len(customers))
+                where_parts.append(f"`{cust_c}` IN ({placeholders})")
+                p_b.extend(customers)
+            elif customers and not cust_c and up_c:
+                exp_c = []
+                for c in customers:
+                    exp_c.extend([c, c.lower(), c.upper(), c.title()])
+                placeholders = ",".join(["%s"] * len(exp_c))
+                where_parts.append(f"`{up_c}` IN ({placeholders})")
+                p_b.extend(exp_c)
+
             where_str = "WHERE " + " AND ".join(where_parts)
 
             # Query WTG downtime
             query_w = f"""
                 SELECT `{wtg_c}`,
-                       SUM(CAST(`{dur_c}` AS DECIMAL(15,2))),
+                       SUM({dur_expr}),
                        COUNT(*),
-                       MAX(CAST(`{dur_c}` AS DECIMAL(15,2)))
+                       MAX({dur_expr})
                 FROM `{t}`
                 {where_str}
                 GROUP BY `{wtg_c}`
@@ -1452,7 +1564,7 @@ def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None,
             if date_c:
                 query_m = f"""
                     SELECT LEFT(`{date_c}`, 7) AS ym,
-                           SUM(CAST(`{dur_c}` AS DECIMAL(15,2)))
+                           SUM({dur_expr})
                     FROM `{t}`
                     {where_str}
                     GROUP BY ym
@@ -1464,20 +1576,18 @@ def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None,
                         monthly_bd[str(ym)[:7]] += float(m_dur or 0.0)
 
             # Query top causes
-            if cause_c:
-                query_c = f"""
-                    SELECT `{cause_c}`, SUM(CAST(`{dur_c}` AS DECIMAL(15,2)))
-                    FROM `{t}`
-                    {where_str}
-                    AND `{cause_c}` IS NOT NULL AND `{cause_c}` != ''
-                    GROUP BY `{cause_c}`
-                    ORDER BY 2 DESC
-                    LIMIT 20
-                """
-                cursor.execute(query_c, p_b)
-                for c_name, c_dur in cursor.fetchall():
-                    if c_name and str(c_name).strip() and str(c_name).strip().lower() != 'none':
-                        causes_agg[str(c_name).strip()[:40]] += float(c_dur or 0.0)
+            query_c = f"""
+                SELECT {cause_expr} AS c_name, SUM({dur_expr})
+                FROM `{t}`
+                {where_str}
+                GROUP BY c_name
+                ORDER BY 2 DESC
+                LIMIT 20
+            """
+            cursor.execute(query_c, p_b)
+            for c_name, c_dur in cursor.fetchall():
+                if c_name and str(c_name).strip() and str(c_name).strip().lower() != 'none':
+                    causes_agg[str(c_name).strip()[:40]] += float(c_dur or 0.0)
 
     all_wtgs = []
     total_hrs = 0.0
@@ -1563,7 +1673,7 @@ def get_breakdown_hours_data(user, date_from=None, date_to=None, providers=None,
     }
 
 
-def get_drill_down_data(user, selected_wtg=None, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None):
+def get_drill_down_data(user, selected_wtg=None, date_from=None, date_to=None, providers=None, sites=None, states=None, wtgs=None, customers=None):
     """
     Compute turbine-specific drill-down metrics for wind_drill_down.html.
     """
@@ -1628,6 +1738,20 @@ def get_drill_down_data(user, selected_wtg=None, date_from=None, date_to=None, p
                 w_conds.append(f"`{d_col}` <= %s")
                 w_params.append(str(date_to))
 
+            cust_c = cols.get("customer")
+            up_c = cols.get("uploaded_by")
+            if customers and cust_c:
+                placeholders = ",".join(["%s"] * len(customers))
+                w_conds.append(f"`{cust_c}` IN ({placeholders})")
+                w_params.extend(customers)
+            elif customers and not cust_c and up_c:
+                exp_c = []
+                for c in customers:
+                    exp_c.extend([c, c.lower(), c.upper(), c.title()])
+                placeholders = ",".join(["%s"] * len(exp_c))
+                w_conds.append(f"`{up_c}` IN ({placeholders})")
+                w_params.extend(exp_c)
+
             w_where = "WHERE " + " AND ".join(w_conds)
 
             select_parts = []
@@ -1640,6 +1764,10 @@ def get_drill_down_data(user, selected_wtg=None, date_from=None, date_to=None, p
             if hrs_col: select_parts.append(f"SUM(CAST(`{hrs_col}` AS DECIMAL(15,2)))")
             else: select_parts.append("0")
             if iga_col: select_parts.extend([f"AVG(CAST(`{iga_col}` AS DECIMAL(8,2)))", f"COUNT(`{iga_col}`)"])
+            elif cols.get("gf") and cols.get("opr_hrs"):
+                gf_c = cols["gf"]
+                opr_c = cols["opr_hrs"]
+                select_parts.extend([f"AVG(GREATEST(0, (CAST(`{opr_c}` AS DECIMAL(10,2)) - CAST(`{gf_c}` AS DECIMAL(10,2))) / NULLIF(CAST(`{opr_c}` AS DECIMAL(10,2)), 0) * 100))", f"COUNT(*)"])
             else: select_parts.extend(["NULL", "0"])
 
             query = f"SELECT {', '.join(select_parts)} FROM `{t}` {w_where}"
@@ -1763,25 +1891,29 @@ def get_drill_down_data(user, selected_wtg=None, date_from=None, date_to=None, p
     }
 
 
-def get_breakdown_analysis_data(user, btype="repetitive", severity_filter=None, wtg_filter=None, date_from=None, date_to=None):
+def get_breakdown_analysis_data(user, btype="repetitive", severity_filter=None, wtg_filter=None, date_from=None, date_to=None, customers=None):
     """
     Compute fast, real breakdown analysis metrics and alerts for breakdown_analysis.html.
     """
-    _, bd_tables = get_user_wind_tables(user)
+    gen_tables, bd_tables = get_user_wind_tables(user)
+    target_tables = list(bd_tables) if bd_tables else list(gen_tables)
 
     chart_data = defaultdict(int)
     alerts = []
     wtg_options = set()
 
     with connection.cursor() as cursor:
-        for t in bd_tables:
+        for t in target_tables:
             cols = inspect_bd_table_cols(t)
+            cols_gen = inspect_gen_table_cols(t)
             oem_name = infer_oem_from_table(t)
-            wtg_c = cols["wtg"]
+            wtg_c = cols["wtg"] or cols_gen.get("wtg")
             d_col = cols["dur"]
-            dt_col = cols["date"]
+            dt_col = cols["date"] or cols_gen.get("date")
             c_col = cols["cause"]
             act_col = cols["action"]
+            cust_c = cols.get("customer") or cols_gen.get("customer")
+            up_c = cols.get("uploaded_by") or cols_gen.get("uploaded_by")
 
             if not wtg_c:
                 continue
@@ -1809,6 +1941,18 @@ def get_breakdown_analysis_data(user, btype="repetitive", severity_filter=None, 
 
             if btype == "extended" and d_col:
                 where_parts.append(f"CAST(`{d_col}` AS DECIMAL(10,2)) >= 10")
+
+            if customers and cust_c:
+                placeholders = ",".join(["%s"] * len(customers))
+                where_parts.append(f"`{cust_c}` IN ({placeholders})")
+                p_b.extend(customers)
+            elif customers and not cust_c and up_c:
+                exp_c = []
+                for c in customers:
+                    exp_c.extend([c, c.lower(), c.upper(), c.title()])
+                placeholders = ",".join(["%s"] * len(exp_c))
+                where_parts.append(f"`{up_c}` IN ({placeholders})")
+                p_b.extend(exp_c)
 
             w_str = "WHERE " + " AND ".join(where_parts)
 
@@ -2030,7 +2174,20 @@ def get_installation_summary_data(user):
     table_name = next((t for t in possible_tables if t in db_tables), None)
 
     if table_name:
-        customer = user.username if user and user.is_authenticated else "Malpani Group"
+        customer = ""
+        gen_tables, _ = get_user_wind_tables(user)
+        for gt in gen_tables:
+            cols = inspect_gen_table_cols(gt)
+            c_col = cols.get("customer")
+            if c_col:
+                with connection.cursor() as cur:
+                    cur.execute(f"SELECT DISTINCT `{c_col}` FROM `{gt}` WHERE `{c_col}` IS NOT NULL AND `{c_col}` != '' LIMIT 1")
+                    row = cur.fetchone()
+                    if row and row[0]:
+                        customer = str(row[0]).strip()
+                        break
+        if not customer:
+            customer = user.username if user and user.is_authenticated else ""
         data = {
             "power_sale_labels": [],
             "power_sale_counts": [],

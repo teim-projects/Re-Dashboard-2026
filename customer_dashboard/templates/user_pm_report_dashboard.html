@@ -307,7 +307,19 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     labels: ["Completed", "Pending"],
     series: [{{ completed }}, {{ pending }}],
-    colors: ["#34d399", "#fbbf24"],
+    colors: ["#34d399", "#818cf8"],
+    fill: {
+      type: "gradient",
+      gradient: {
+        shade: "light",
+        type: "vertical",
+        shadeIntensity: 0.25,
+        inverseColors: false,
+        opacityFrom: 0.95,
+        opacityTo: 0.75,
+        stops: [0, 100]
+      }
+    },
     legend: {
       position: "bottom",
       fontSize: "13px",
@@ -360,7 +372,19 @@ document.addEventListener("DOMContentLoaded", () => {
       { name: "Completed", data: {{ wtg_completed|safe }} },
       { name: "Pending", data: {{ wtg_pending|safe }} },
     ],
-    colors: ["#34d399", "#fbbf24"],
+    colors: ["#34d399", "#818cf8"],
+    fill: {
+      type: "gradient",
+      gradient: {
+        shade: "light",
+        type: "vertical",
+        shadeIntensity: 0.25,
+        inverseColors: false,
+        opacityFrom: 0.95,
+        opacityTo: 0.75,
+        stops: [0, 100]
+      }
+    },
     xaxis: {
       categories: {{ wtg_labels|safe }},
       title: { text: "WTG Units", style: { fontWeight: 600 } },

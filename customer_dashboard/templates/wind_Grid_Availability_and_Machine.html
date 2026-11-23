@@ -658,7 +658,7 @@
           },
           animations: { enabled: true, easing: "easeinout", speed: 600 }
         },
-        colors: ["#818cf8", "#34d399", "#fbbf24", "#c084fc"],
+        colors: ["#818cf8", "#38bdf8", "#34d399", "#c084fc"],
         plotOptions: {
           bar: {
             columnWidth: subset.length <= 10 ? "52%" : "68%",
@@ -856,7 +856,20 @@
             dataLabels: { position: "top" }
           }
         },
-        colors: ["#818cf8", "#34d399", "#fbbf24", "#c084fc"],
+        colors: ["#818cf8", "#38bdf8", "#34d399", "#c084fc"],
+        fill: {
+          type: "gradient",
+          gradient: {
+            shade: "light",
+            type: "horizontal",
+            shadeIntensity: 0.25,
+            gradientToColors: ["#34d399", "#818cf8", "#6ee7b7", "#e879f9"],
+            inverseColors: false,
+            opacityFrom: 0.95,
+            opacityTo: 0.85,
+            stops: [0, 100]
+          }
+        },
         dataLabels: {
           enabled: true,
           formatter: (val) => val > 0 ? val.toFixed(1) + "%" : "",

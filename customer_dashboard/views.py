@@ -11,6 +11,7 @@ def wind_dashboard(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -333,71 +334,21 @@ def _pick(col_map, *candidates):
 
 @login_required
 def wind_generation_kwh(request):
-    if request.GET.get("clear_filters"):
-        request.session.pop("wind_filters", None)
-
-    saved = request.session.get("wind_filters", {})
-
-    def get_or_saved_list(key):
-        vals = request.GET.getlist(key)
-        return vals if vals else saved.get(key, [])
-
-    date_from = request.GET.get("date_from") or saved.get("date_from")
-    date_to   = request.GET.get("date_to")   or saved.get("date_to")
-
-    from customer_dashboard.data_service import (
-        get_user_wind_tables,
-        get_filter_options,
-        get_generation_kwh_data,
-        canonicalize_provider_name,
-    )
-
-    raw_providers = get_or_saved_list("provider")
-    providers = sorted(list(set([canonicalize_provider_name(p) for p in raw_providers if p])))
-    uploaded_by = get_or_saved_list("uploaded_by")
-    customers = get_or_saved_list("customer")
-    states    = get_or_saved_list("state")
-    sites     = get_or_saved_list("site")
-    wtgs      = get_or_saved_list("wtg")
-
-    request.session["wind_filters"] = {
-        "date_from": date_from,
-        "date_to": date_to,
-        "provider": providers,
-        "uploaded_by": uploaded_by,
-        "customer": customers,
-        "state": states,
-        "site": sites,
-        "wtg": wtgs,
-    }
-    request.session.modified = True
-    gen_tables, bd_tables = get_user_wind_tables(request.user)
-    filter_opts = get_filter_options(gen_tables, bd_tables)
-
+    from customer_dashboard.data_service import get_generation_kwh_data, get_filter_context
+    f_ctx = get_filter_context(request.user, request)
     data = get_generation_kwh_data(
         request.user,
-        date_from=date_from,
-        date_to=date_to,
-        providers=providers,
-        sites=sites,
-        states=states,
-        wtgs=wtgs,
+        date_from=f_ctx["date_from"],
+        date_to=f_ctx["date_to"],
+        providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
+        sites=f_ctx["selected_sites"],
+        states=f_ctx["selected_states"],
+        wtgs=f_ctx["selected_wtgs"],
     )
-
     context = {
         **data,
-        "providers": filter_opts["providers"],
-        "customers": filter_opts["customers"],
-        "states": filter_opts["states"],
-        "sites": filter_opts["sites"],
-        "wtgs": filter_opts["wtgs"],
-        "selected_providers": providers,
-        "selected_customers": customers,
-        "selected_states": states,
-        "selected_sites": sites,
-        "selected_wtgs": wtgs,
-        "date_from": date_from or "",
-        "date_to": date_to or "",
+        **f_ctx,
         "no_data": data["wtg_count"] == 0,
         "no_data_msg": "No wind generation data found for the selected filters." if data["wtg_count"] == 0 else "",
     }
@@ -517,6 +468,7 @@ def wind_generation_hours(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -562,6 +514,7 @@ def wind_avg_genration(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -651,6 +604,7 @@ def wind_Grid_Availability_and_Machine(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -758,6 +712,7 @@ def wind_drill_down(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -814,6 +769,7 @@ def wind_Avg_Machine_Availability(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -1438,6 +1394,7 @@ def wind_wtg_plf(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -1542,6 +1499,7 @@ def wind_Grid_Availability(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -1625,6 +1583,7 @@ def wind_breakdown_hours(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -1904,6 +1863,7 @@ def dashboard_breakdown(request):
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
         providers=f_ctx["selected_providers"],
+        customers=f_ctx["selected_customers"],
         sites=f_ctx["selected_sites"],
         states=f_ctx["selected_states"],
         wtgs=f_ctx["selected_wtgs"],
@@ -2779,6 +2739,7 @@ def _breakdown_analysis(request, recurrence_only=False):
         wtg_filter=wtg,
         date_from=f_ctx["date_from"],
         date_to=f_ctx["date_to"],
+        customers=f_ctx["selected_customers"],
     )
     return render(request, "breakdown_analysis.html", {**data, **f_ctx})
 

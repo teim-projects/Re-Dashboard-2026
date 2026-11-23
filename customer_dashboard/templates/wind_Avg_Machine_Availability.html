@@ -469,6 +469,7 @@
   let chartSourceData = [...fullWtgData];
   let chartPageSize = 10;
   let chartCurrentPage = 1;
+  let isBottomMode = false;
 
   function updateInsightRibbon() {
     if (!fullWtgData.length) return;
@@ -672,6 +673,18 @@
           }
         },
         colors: barColors,
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shade: 'light',
+            type: 'vertical',
+            shadeIntensity: 0.25,
+            inverseColors: false,
+            opacityFrom: 0.95,
+            opacityTo: 0.75,
+            stops: [0, 100]
+          }
+        },
         dataLabels: {
           enabled: true,
           formatter: (val) => Number(val).toFixed(1) + "%",
@@ -796,11 +809,24 @@
             barHeight: "64%",
             borderRadius: 8,
             borderRadiusApplication: 'end',
-            distributed: true,
+            distributed: false,
             dataLabels: { position: "top" }
           }
         },
-        colors: barColors,
+        colors: [isBottomMode ? '#fda4af' : '#818cf8'],
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shade: 'light',
+            type: 'horizontal',
+            shadeIntensity: 0.25,
+            gradientToColors: [isBottomMode ? '#fcd34d' : '#34d399'],
+            inverseColors: false,
+            opacityFrom: 0.95,
+            opacityTo: 0.85,
+            stops: [0, 100]
+          }
+        },
         dataLabels: {
           enabled: true,
           formatter: (val) => Number(val).toFixed(1) + "%",
@@ -941,6 +967,7 @@
       $("#rankingSwitcher button").removeClass("active");
       $(this).addClass("active");
       const view = $(this).data("view");
+      isBottomMode = (view === "bottom10");
       if (view === "top10") {
         chartSourceData = [...fullWtgData];
         chartPageSize = 10;

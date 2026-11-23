@@ -380,14 +380,24 @@
           horizontal: true,
           barHeight: "68%",
           borderRadius: 6,
-          distributed: true,
+          distributed: false,
           dataLabels: { position: "top" }
         }
       },
-      colors: subset.map(d => {
-        const h = Number(d.total_hrs !== undefined ? d.total_hrs : (d.hours !== undefined ? d.hours : 0));
-        return h > 1500 ? "#fda4af" : (h > 500 ? "#fcd34d" : "#34d399");
-      }),
+      colors: [isBottomMode ? '#fda4af' : '#818cf8'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'horizontal',
+          shadeIntensity: 0.25,
+          gradientToColors: [isBottomMode ? '#fcd34d' : '#34d399'],
+          inverseColors: false,
+          opacityFrom: 0.95,
+          opacityTo: 0.85,
+          stops: [0, 100]
+        }
+      },
       dataLabels: {
         enabled: true,
         formatter: (val) => val > 0 ? Number(val).toLocaleString() + " hrs" : "",
@@ -495,6 +505,7 @@
   let chartSourceData = [...fullWtgData];
   let chartPageSize = 10;
   let chartCurrentPage = 1;
+  let isBottomMode = false;
 
   function getChartTotalPages() {
     if (chartPageSize === "all") return 1;
@@ -561,14 +572,24 @@
           horizontal: true,
           barHeight: "68%",
           borderRadius: 6,
-          distributed: true,
+          distributed: false,
           dataLabels: { position: "top" }
         }
       },
-      colors: subset.map(d => {
-        const h = Number(d.total_hrs !== undefined ? d.total_hrs : (d.hours !== undefined ? d.hours : 0));
-        return h > 1500 ? "#fda4af" : (h > 500 ? "#fcd34d" : "#34d399");
-      }),
+      colors: [isBottomMode ? '#fda4af' : '#818cf8'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'horizontal',
+          shadeIntensity: 0.25,
+          gradientToColors: [isBottomMode ? '#fcd34d' : '#34d399'],
+          inverseColors: false,
+          opacityFrom: 0.95,
+          opacityTo: 0.85,
+          stops: [0, 100]
+        }
+      },
       dataLabels: {
         enabled: true,
         formatter: (val) => val > 0 ? Number(val).toLocaleString() + " hrs" : "",
@@ -625,6 +646,7 @@
       $("#rankingSwitcher button").removeClass("active");
       $(this).addClass("active");
       const view = $(this).data("view");
+      isBottomMode = (view === "bottom10");
       if (view === "top10") {
         chartSourceData = [...fullWtgData];
         chartPageSize = 10;

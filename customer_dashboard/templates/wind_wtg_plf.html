@@ -438,7 +438,19 @@ document.addEventListener("DOMContentLoaded", function () {
       plotOptions: {
         bar: { borderRadius: 8, columnWidth: '40%', distributed: true }
       },
-      colors: ['#34d399', '#fbbf24'],
+      colors: ['#34d399', '#818cf8'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'vertical',
+          shadeIntensity: 0.25,
+          inverseColors: false,
+          opacityFrom: 0.95,
+          opacityTo: 0.75,
+          stops: [0, 100]
+        }
+      },
       dataLabels: {
         enabled: true,
         formatter: function(val) { return val.toFixed(2) + '%'; },

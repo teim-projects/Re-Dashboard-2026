@@ -549,7 +549,7 @@ document.addEventListener("DOMContentLoaded", function () {
           shade: 'light',
           type: 'horizontal',
           shadeIntensity: 0.25,
-          gradientToColors: [isBottomMode ? '#fcd34d' : '#a78bfa'],
+          gradientToColors: [isBottomMode ? '#fcd34d' : '#34d399'],
           stops: [0, 100]
         }
       },
@@ -692,6 +692,18 @@ document.addEventListener("DOMContentLoaded", function () {
         bar: { borderRadius: 8, columnWidth: '45%', distributed: true }
       },
       colors: ['#818cf8', '#38bdf8', '#34d399', '#fbbf24', '#f472b6'],
+      fill: {
+        type: 'gradient',
+        gradient: {
+          shade: 'light',
+          type: 'vertical',
+          shadeIntensity: 0.25,
+          inverseColors: false,
+          opacityFrom: 0.95,
+          opacityTo: 0.75,
+          stops: [0, 100]
+        }
+      },
       dataLabels: {
         enabled: true,
         formatter: function(val) {
